@@ -1,6 +1,7 @@
 .country-input-form {
   margin: 2rem 0;
   display: flex;
+  justify-content: center;
 }
 
 .autocomplete {

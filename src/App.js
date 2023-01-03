@@ -23,6 +23,7 @@ function App() {
   const [song, setSong] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [correct, setCorrect] = useState(false);
 
   const [guesses, setGuesses] = useState([]);
 
@@ -77,7 +78,7 @@ function App() {
   }, [song]);
 
   useEffect(() => {
-    if (guesses.length > 4) {
+    if (guesses.length > 4 && !correct) {
       setFinished(true);
       setErrorMessage(`Answer was: ${song.country}`);
     }
@@ -91,7 +92,8 @@ function App() {
     const songChoice = albumChoice.tracks[songIndexChoice];
     const songObj = {
       country: albumChoice.country,
-      link: songChoice
+      link: songChoice,
+      album: albumChoice.album_name
     }
     setSong(songObj);
 
@@ -138,6 +140,7 @@ function App() {
           setGuesses([...guesses, {country: countryAnswer, correct: true}])
   
           setFinished(true);
+          setCorrect(true);
         } else {
           const correctCountry = countriesJSON.find(country => country.name === song.country);
 
@@ -191,7 +194,8 @@ function App() {
       {submitted ? <Guesses guesses={guesses} showGeoHints={showGeoHints} /> : null}
       {finished ? <button className="next-song-button" onClick={onNextSongClicked}>Next Song</button> : null}
       <div className="iframe-wrapper">
-        <div id="embed-iframe" style={{top: finished ? '0' : '-1000px', opacity: finished ? 1 : 0}} dangerouslySetInnerHTML={{__html: embedHtml}}>
+        {finished ? <span><strong>Album: </strong>{song.album}</span> : null}
+        <div id="embed-iframe" style={{top: finished ? '3rem' : '-100rem', opacity: finished ? 1 : 0}} dangerouslySetInnerHTML={{__html: embedHtml}}>
         </div>
       </div>
     </div>

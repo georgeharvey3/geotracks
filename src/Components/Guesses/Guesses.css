@@ -1,0 +1,26 @@
+.guesses {
+  width: 80%;
+  list-style: none;
+  margin: 1rem auto;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding-left: 0;
+}
+
+.guesses__guess {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.guesses__guess-result {
+  display: flex;
+  gap: .5rem
+}
+
+.guesses__guess-direction,
+.guesses__guess-icon {
+  height: 1rem;
+  width: 1rem;
+}

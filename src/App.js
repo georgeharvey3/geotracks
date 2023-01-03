@@ -167,6 +167,7 @@ function App() {
   const onNextSongClicked = () => {
     setSubmitted(false);
     setFinished(false);
+    setCorrect(false);
     setGuesses([]);
     setErrorMessage("");
     setQuestionIndex(questionIndex + 1);

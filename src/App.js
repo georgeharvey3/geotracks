@@ -44,14 +44,13 @@ function App() {
 
   window.addEventListener('message', (e) => {
     if (e.origin === 'https://open.spotify.com') {
+      
       if (e.data?.type === 'ready') {
         setSongReady(true);
-      }
-
-      if (!songPlaying) {
-        if (e.data?.payload?.isPaused === false) {
+      } else if (e.data?.type === 'playback_update') {
+        if (e.data?.payload?.isPaused === false && e.data?.payload?.position !== e.data?.payload?.duration) {
           setSongPlaying(true);
-        } else if (e.data?.payload?.isPaused === true) {
+        } else {
           setSongPlaying(false);
         }
       }

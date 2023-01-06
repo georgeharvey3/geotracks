@@ -27,6 +27,8 @@ input[type=submit] {
   color: #fff;
   cursor: pointer;
   border-radius: 0 .75rem .75rem 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 input[type=submit]:hover {

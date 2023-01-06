@@ -65,6 +65,7 @@ function App() {
       
       if (e.data?.type === 'ready') {
         setSongReady(true);
+        setSongFinished(false);
       } else if (e.data?.type === 'playback_update') {
         if (e.data?.payload?.isPaused === false) {
           if (e.data?.payload?.position !== e.data?.payload?.duration) {
@@ -82,7 +83,9 @@ function App() {
 
   useEffect(() => {
     if (questionIndex > 0 && songReady) {
-      toggleSong();
+      if (window.innerWidth >= 1024) {
+        toggleSong();
+      }
     }
   }, [songReady, questionIndex])
 
@@ -190,6 +193,7 @@ function App() {
     setSubmitted(false);
     setFinished(false);
     setCorrect(false);
+    setSongFinished(false);
     setGuesses([]);
     setErrorMessage("");
     setQuestionIndex(questionIndex + 1);
@@ -219,7 +223,7 @@ function App() {
       {finished ? <button className="next-song-button" onClick={onNextSongClicked}>Next Song</button> : null}
       <div className="iframe-wrapper">
         {finished ? <span><strong>Album: </strong>{song.album}</span> : null}
-        <div id="embed-iframe" style={{top: finished ? '3rem' : '-100rem', opacity: finished ? 1 : 0}} dangerouslySetInnerHTML={{__html: embedHtml}}>
+        <div id="embed-iframe" style={{top: finished ? '4rem' : '-100rem', opacity: finished ? 1 : 0}} dangerouslySetInnerHTML={{__html: embedHtml}}>
         </div>
       </div>
     </div>

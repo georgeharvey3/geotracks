@@ -188,6 +188,7 @@ function App() {
       <button className="pause-play-button" disabled={!songReady} onClick={onPlayClicked}>
         {songReady ? songPlaying ?  <img src={Play} alt="Play" /> : <img src={Pause} alt="Pause" /> : <Spinner />}
         </button>
+      <span className="prompt">Which country does this song originate from?</span>
       <CountryInput onFormSubmit={onFormSubmit} disabled={finished} countries={countriesJSON}/>
       <Slider checked={showGeoHints} onCheck={onCheck}/>
       {errorMessage ? <p>{errorMessage}</p> : null}

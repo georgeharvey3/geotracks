@@ -37,8 +37,23 @@ function App() {
   const [questionIndex, setQuestionIndex] = useState(0);
 
   document.addEventListener('keypress', (e) => {
-    if (e.key === " ") {
-      toggleSong();
+    const inputSelector = '#myInput';
+    
+    if (!e.target.matches(inputSelector)) {
+      if (e.key === " ") {
+        toggleSong();
+      }
+
+      if (e.key === 'Enter') {
+        if (finished) {
+          onNextSongClicked();
+        } else {
+          const input = document.querySelector(inputSelector);
+          if (input) {
+            input.focus();
+          }
+        }
+      }
     }
   });
 

@@ -8,6 +8,7 @@ import Spinner from './Components/Spinner/Spinner';
 
 import Pause from "../src/assets/pause.png";
 import Play from "../src/assets/play.png";
+import Replay from "../src/assets/replay.png";
 
 import albumsJSON from "./albums.json";
 import countriesJSON from "./countries.json";
@@ -24,6 +25,8 @@ function App() {
   const [submitted, setSubmitted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [correct, setCorrect] = useState(false);
+
+  const [songFinished, setSongFinished] = useState(false);
 
   const [guesses, setGuesses] = useState([]);
 
@@ -63,8 +66,13 @@ function App() {
       if (e.data?.type === 'ready') {
         setSongReady(true);
       } else if (e.data?.type === 'playback_update') {
-        if (e.data?.payload?.isPaused === false && e.data?.payload?.position !== e.data?.payload?.duration) {
-          setSongPlaying(true);
+        if (e.data?.payload?.isPaused === false) {
+          if (e.data?.payload?.position !== e.data?.payload?.duration) {
+            setSongPlaying(true);
+            setSongFinished(false);
+          } else {
+            setSongFinished(true);
+          }
         } else {
           setSongPlaying(false);
         }
@@ -201,7 +209,7 @@ function App() {
     <div className="App">
       <h1>GeoTracks</h1>
       <button className="pause-play-button" disabled={!songReady} onClick={onPlayClicked}>
-        {songReady ? songPlaying ?  <img src={Play} alt="Play" /> : <img src={Pause} alt="Pause" /> : <Spinner />}
+        {songReady ? songFinished ? <img src={Replay} alt="Replay" /> : songPlaying ?  <img src={Play} alt="Play" /> : <img src={Pause} alt="Pause" /> : <Spinner />}
         </button>
       <span className="prompt">Which country does this song originate from?</span>
       <CountryInput onFormSubmit={onFormSubmit} disabled={finished} countries={countriesJSON}/>

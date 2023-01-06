@@ -2,6 +2,11 @@
   box-sizing: border-box;
 }
 
+body {
+  background-color: #282828;
+  color: white;
+}
+
 .App {
   width: 100%;
   max-width: 450px;
@@ -40,6 +45,15 @@
 .pause-play-button:active:not(:disabled) {
   transform: translateY(5px);
   box-shadow: none;
+}
+
+.pause-play-button img {
+  opacity: .8;
+}
+
+
+.pause-play-button img[alt="Replay"] {
+  height: 70%;
 }
 
 .next-song-button {

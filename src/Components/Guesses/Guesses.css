@@ -24,3 +24,8 @@
   height: 1rem;
   width: 1rem;
 }
+
+.guesses__guess-direction {
+  background-color: white;
+  border-radius: 50%;
+}

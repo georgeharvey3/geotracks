@@ -8,6 +8,7 @@
   /*the container must be positioned relative:*/
   position: relative;
   display: inline-block;
+  color: black;
 }
 input {
   border: 1px solid transparent;
@@ -19,13 +20,13 @@ input {
 input[type=text] {
   background-color: #f1f1f1;
   width: 100%;
-  border-radius: .2rem;
+  border-radius: .75rem 0 0 .75rem;
 }
 input[type=submit] {
   background-color: DodgerBlue;
   color: #fff;
   cursor: pointer;
-  border-radius: .2rem;
+  border-radius: 0 .75rem .75rem 0;
 }
 
 input[type=submit]:hover {

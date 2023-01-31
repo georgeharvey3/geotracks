@@ -38,49 +38,6 @@ function App() {
 
     const [questionIndex, setQuestionIndex] = useState(0);
 
-    document.addEventListener("keypress", (e) => {
-        const inputSelector = "#myInput";
-
-        if (!e.target.matches(inputSelector)) {
-            if (e.key === " ") {
-                toggleSong();
-            }
-
-            if (e.key === "Enter") {
-                if (finished) {
-                    onNextSongClicked();
-                } else {
-                    const input = document.querySelector(inputSelector);
-                    if (input) {
-                        input.focus();
-                    }
-                }
-            }
-        }
-    });
-
-    window.addEventListener("message", (e) => {
-        if (e.origin === "https://open.spotify.com") {
-            if (e.data?.type === "ready") {
-                setSongReady(true);
-                setSongFinished(false);
-            } else if (e.data?.type === "playback_update") {
-                if (e.data?.payload?.isPaused === false) {
-                    if (
-                        e.data?.payload?.position !== e.data?.payload?.duration
-                    ) {
-                        setSongPlaying(true);
-                        setSongFinished(false);
-                    } else {
-                        setSongFinished(true);
-                    }
-                } else {
-                    setSongPlaying(false);
-                }
-            }
-        }
-    });
-
     useEffect(() => {
         if (questionIndex > 0 && songReady) {
             if (window.innerWidth >= 1024) {
@@ -90,6 +47,57 @@ function App() {
     }, [songReady, questionIndex]);
 
     useEffect(() => {
+      const inputSelector = "#myInput";
+      const input = document.querySelector(inputSelector);
+
+        document.addEventListener("keypress", (e) => {
+            if (!e.target.matches(inputSelector)) {
+                if (e.key === " ") {
+                    toggleSong();
+                    return;
+                }
+
+                if (e.key === "Enter") {
+                    onNextSongClicked();
+                    return;
+                }
+
+                if (input) {
+                    input.focus();
+                }
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+              input.blur();
+              return;
+          }
+        })
+
+
+        window.addEventListener("message", (e) => {
+            if (e.origin === "https://open.spotify.com") {
+                if (e.data?.type === "ready") {
+                    setSongReady(true);
+                    setSongFinished(false);
+                } else if (e.data?.type === "playback_update") {
+                    if (e.data?.payload?.isPaused === false) {
+                        if (
+                            e.data?.payload?.position !==
+                            e.data?.payload?.duration
+                        ) {
+                            setSongPlaying(true);
+                            setSongFinished(false);
+                        } else {
+                            setSongFinished(true);
+                        }
+                    } else {
+                        setSongPlaying(false);
+                    }
+                }
+            }
+        });
         selectSong();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -222,6 +230,11 @@ function App() {
     };
 
     const onNextSongClicked = () => {
+      console.log(finished);
+        if (!finished) {
+            return;
+        }
+
         setSubmitted(false);
         setFinished(false);
         setCorrect(false);

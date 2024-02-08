@@ -75,8 +75,12 @@ function App() {
       }
     });
 
+    window.onSpotifyIframeApiReady = (IFrameAPI) => {
+      setSongReady(true);
+      setSongFinished(false);
+    }
+    
     window.addEventListener("message", (e) => {
-      console.log(e);
       if (e.origin === "https://open.spotify.com") {
         if (e.data?.type === "ready") {
           setSongReady(true);
@@ -219,7 +223,6 @@ function App() {
   };
 
   const onNextSongClicked = () => {
-    console.log(finished);
     if (!finished) {
       return;
     }

@@ -38,6 +38,8 @@ function App() {
 
   const [questionIndex, setQuestionIndex] = useState(0);
 
+  const [logs, setLogs] = useState([]);
+
   useEffect(() => {
     if (questionIndex > 0 && songReady) {
       if (window.innerWidth >= 1024) {
@@ -75,13 +77,9 @@ function App() {
       }
     });
 
-    window.onSpotifyIframeApiReady = (IFrameAPI) => {
-      setSongReady(true);
-      setSongFinished(false);
-    }
-    
     window.addEventListener("message", (e) => {
       if (e.origin === "https://open.spotify.com") {
+        log(e.data);
         if (e.data?.type === "ready") {
           setSongReady(true);
           setSongFinished(false);
@@ -137,6 +135,10 @@ function App() {
 
     setAlbums(newAlbums);
   };
+
+  const log = (message) => {
+    setLogs([...logs, JSON.stringify(message)]);
+  }; 
 
   const fetchEmbed = () => {
     fetch(`https://open.spotify.com/oembed?url=${song.link}`)
@@ -300,6 +302,9 @@ function App() {
           dangerouslySetInnerHTML={{ __html: embedHtml }}
         ></div>
       </div>
+      {logs.map((message, index) => (
+        <p key={index}>{message}</p>
+      ))}
     </div>
   );
 }

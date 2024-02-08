@@ -79,7 +79,7 @@ function App() {
 
     window.addEventListener("message", (e) => {
       if (e.origin === "https://open.spotify.com") {
-        log(e.data);
+        console.log(e);
         if (e.data?.type === "ready") {
           // setSongReady(true);
           // setSongFinished(false);
@@ -138,18 +138,21 @@ function App() {
 
   const log = (message) => {
     setLogs([...logs, JSON.stringify(message)]);
-  }; 
+  };
 
   const fetchEmbed = () => {
+    log("fetching embed");
     fetch(`https://open.spotify.com/oembed?url=${song.link}`)
       .then((res) => res.json())
       .then((data) => {
+        log("embed received");
         if (data.html) {
           setEmbedHtml(data.html);
           setSongReady(true);
-          setSongFinished(true);
+          setSongFinished(false);
         }
-      });
+      })
+      .catch((err) => log("Error:", err));
   };
 
   const onPlayClicked = (e) => {
@@ -298,8 +301,8 @@ function App() {
         <div
           id="embed-iframe"
           style={{
-            top: finished ? "4rem" : "-100rem",
-            opacity: finished ? 1 : 0,
+            top: finished ? "4rem" : "4rem",
+            opacity: finished ? 1 : 1,
           }}
           dangerouslySetInnerHTML={{ __html: embedHtml }}
         ></div>

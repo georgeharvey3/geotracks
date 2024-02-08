@@ -81,8 +81,8 @@ function App() {
       if (e.origin === "https://open.spotify.com") {
         log(e.data);
         if (e.data?.type === "ready") {
-          setSongReady(true);
-          setSongFinished(false);
+          // setSongReady(true);
+          // setSongFinished(false);
         } else if (e.data?.type === "playback_update") {
           if (e.data?.payload?.isPaused === false) {
             if (e.data?.payload?.position !== e.data?.payload?.duration) {
@@ -146,6 +146,8 @@ function App() {
       .then((data) => {
         if (data.html) {
           setEmbedHtml(data.html);
+          setSongReady(true);
+          setSongFinished(true);
         }
       });
   };

@@ -299,7 +299,7 @@ function App() {
           id="embed-iframe"
           style={{
             // top: finished ? "4rem" : "-100rem",
-            // opacity: finished ? 1 : 0,
+            opacity: finished ? 1 : 0,
           }}
           dangerouslySetInnerHTML={{ __html: embedHtml }}
         ></div>

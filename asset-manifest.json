@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/geotracks/static/css/main.92bcf869.css",
-    "main.js": "/geotracks/static/js/main.2b7ef852.js",
+    "main.js": "/geotracks/static/js/main.e5912600.js",
     "static/js/787.9f80c812.chunk.js": "/geotracks/static/js/787.9f80c812.chunk.js",
     "static/media/replay.png": "/geotracks/static/media/replay.34587baa2b5fc99a73a9.png",
     "static/media/SW.png": "/geotracks/static/media/SW.12496009346886e1c03f.png",
@@ -14,11 +14,11 @@
     "static/media/E.png": "/geotracks/static/media/E.e3b18e16213df4377f39.png",
     "index.html": "/geotracks/index.html",
     "main.92bcf869.css.map": "/geotracks/static/css/main.92bcf869.css.map",
-    "main.2b7ef852.js.map": "/geotracks/static/js/main.2b7ef852.js.map",
+    "main.e5912600.js.map": "/geotracks/static/js/main.e5912600.js.map",
     "787.9f80c812.chunk.js.map": "/geotracks/static/js/787.9f80c812.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.92bcf869.css",
-    "static/js/main.2b7ef852.js"
+    "static/js/main.e5912600.js"
   ]
 }

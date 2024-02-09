@@ -78,8 +78,8 @@ function App() {
     });
 
     window.addEventListener("message", (e) => {
-      log(e.data);
       if (e.origin === "https://open.spotify.com") {
+        log(e.data);
         if (e.data?.type === "ready") {
           // setSongReady(true);
           // setSongFinished(false);

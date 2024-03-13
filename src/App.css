@@ -77,10 +77,7 @@ body {
 }
 
 #embed-iframe {
-  position: absolute;
-  left: 0;
-  right: 0;
-  transition: top ease-out 1s;
+  margin-top: 2rem;
 }
 
 .prompt {

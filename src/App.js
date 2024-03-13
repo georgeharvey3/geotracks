@@ -79,13 +79,17 @@ function App() {
 
     window.addEventListener("message", (e) => {
       if (e.origin === "https://open.spotify.com") {
-        log(e.data);
+        // console.log(e.data);
+        // log(e.data);
         if (e.data?.type === "ready") {
           setSongReady(true);
           setSongFinished(false);
         } else if (e.data?.type === "playback_update") {
           if (e.data?.payload?.isPaused === false) {
-            if (e.data?.payload?.position !== e.data?.payload?.duration) {
+            if (
+              e.data?.payload?.position === 0 ||
+              e.data?.payload?.position !== e.data?.payload?.duration
+            ) {
               setSongPlaying(true);
               setSongFinished(false);
             } else {
@@ -146,8 +150,6 @@ function App() {
       .then((data) => {
         if (data.html) {
           setEmbedHtml(data.html);
-          // setSongReady(true);
-          // setSongFinished(false);
         }
       })
       .catch((err) => console.error(err));
@@ -251,6 +253,18 @@ function App() {
     selectSong();
   };
 
+  let buttonContent = <Spinner />;
+
+  if (songReady) {
+    if (songFinished) {
+      buttonContent = <img src={Replay} alt="Replay" />;
+    } else if (songPlaying) {
+      buttonContent = <img src={Pause} alt="Pause" />;
+    } else {
+      buttonContent = <img src={Play} alt="Play" />;
+    }
+  }
+
   return (
     <div className="App">
       <h1>GeoTracks</h1>
@@ -259,17 +273,7 @@ function App() {
         disabled={!songReady}
         onClick={onPlayClicked}
       >
-        {songReady ? (
-          songFinished && window.innerWidth > 1024 ? (
-            <img src={Replay} alt="Replay" />
-          ) : songPlaying ? (
-            <img src={Play} alt="Play" />
-          ) : (
-            <img src={Pause} alt="Pause" />
-          )
-        ) : (
-          <Spinner />
-        )}
+        {buttonContent}
       </button>
       <span className="prompt">
         Which country does this song originate from?
@@ -299,7 +303,6 @@ function App() {
         <div
           id="embed-iframe"
           style={{
-            // top: finished ? "4rem" : "-100rem",
             opacity: finished ? 1 : 0,
           }}
           dangerouslySetInnerHTML={{ __html: embedHtml }}

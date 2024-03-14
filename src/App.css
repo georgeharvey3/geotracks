@@ -95,7 +95,7 @@ h1 {
   top: 2.5rem;
   left: 1rem;
   cursor: pointer;
-  border-radius: .25rem;
+  border-radius: 0.25rem;
   border: none;
 }
 
@@ -110,10 +110,7 @@ h1 {
 }
 
 #embed-iframe {
-  position: absolute;
-  left: 0;
-  right: 0;
-  transition: top ease-out 1s;
+  margin-top: 2rem;
 }
 
 .prompt {
@@ -122,7 +119,7 @@ h1 {
 }
 
 .name-input {
-  border-radius: .75rem 0 0 .75rem;
+  border-radius: 0.75rem 0 0 0.75rem;
 }
 
 table {
@@ -135,5 +132,5 @@ table {
 td,
 th {
   border: thin solid white;
-  padding: .5rem 0;
+  padding: 0.5rem 0;
 }

@@ -11,10 +11,10 @@ import Pause from "../../assets/pause.png";
 const game = (props) => {
   return (
     <>
-      {props.isCompetion ? (
+      {props.isCompetition ? (
         <CurrentScore
           score={props.score}
-          turnsRemaining={props.CountryInputturnsRemaining}
+          turnsRemaining={props.turnsRemaining}
         />
       ) : null}
       <button
@@ -41,14 +41,17 @@ const game = (props) => {
         onFormSubmit={props.onFormSubmit}
         disabled={props.finished}
       />
+      {props.isCompetition ? (
+        <p>Enabling GeoHints will score half points</p>
+      ) : null}
       <Slider checked={props.showGeoHints} onCheck={props.onCheck} />
       {props.errorMessage ? <p>{props.errorMessage}</p> : null}
       {props.submitted ? (
         <Guesses guesses={props.guesses} showGeoHints={props.showGeoHints} />
       ) : null}
       {props.finished ? (
-        <button className="next-song-button" onClick={props.onNextSongClicked}>
-          Next Song
+        <button className="button" onClick={props.onNextSongClicked}>
+          {props.turnsRemaining === 0 ? "Continue" : "Next Song"}
         </button>
       ) : null}
       <div className="iframe-wrapper">

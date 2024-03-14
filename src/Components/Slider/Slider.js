@@ -4,7 +4,7 @@ const Slider = (props) => {
 
   return (
     <label className="slider-label">
-      Geo Hints
+      GeoHints
       <input className="slider" type="checkbox" onChange={props.onCheck} checked={props.checked}/>
     </label>
   );

@@ -13,8 +13,13 @@ body {
   padding: 1rem;
   margin: 0 auto;
   text-align: center;
+  position: relative;
 
-  font-family: 'Inconsolata', monospace;;
+  font-family: "Inconsolata", monospace;
+}
+
+h1 {
+  margin: 1.5rem 0;
 }
 
 .pause-play-button {
@@ -48,27 +53,55 @@ body {
 }
 
 .pause-play-button img {
-  opacity: .8;
+  opacity: 0.8;
 }
-
 
 .pause-play-button img[alt="Replay"] {
   height: 70%;
 }
 
-.next-song-button {
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: center;
+  max-width: 10rem;
+  margin: 0 auto;
+}
+
+.button {
   border: none;
   background-color: DodgerBlue;
-  padding: .5rem 1rem;
-  border-radius: .2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.2rem;
   color: white;
-  font-family: 'Inconsolata', monospace;
+  font-family: "Inconsolata", monospace;
   font-size: 1rem;
 }
 
-.next-song-button:hover {
+.button:hover {
   cursor: pointer;
-  opacity: .8;
+  opacity: 0.8;
+}
+
+.menu-button {
+  height: 2rem;
+  width: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.2rem;
+  position: absolute;
+  top: 2.5rem;
+  left: 1rem;
+  cursor: pointer;
+  border-radius: .25rem;
+  border: none;
+}
+
+.menu-button img {
+  height: auto;
+  width: 100%;
 }
 
 .iframe-wrapper {
@@ -86,4 +119,21 @@ body {
 .prompt {
   margin: 1.5rem 0;
   display: block;
+}
+
+.name-input {
+  border-radius: .75rem 0 0 .75rem;
+}
+
+table {
+  width: 100%;
+  border: thin solid white;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+td,
+th {
+  border: thin solid white;
+  padding: .5rem 0;
 }

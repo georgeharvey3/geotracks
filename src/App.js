@@ -6,6 +6,7 @@ import Base from "./Layouts/Base/Base";
 import Game from "./Components/Game/Game";
 import Menu from "./Components/Menu/Menu";
 import FinalScore from "./Components/FinalScore/FinalScore";
+import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 
 import albumsJSON from "./albums.json";
 import countriesJSON from "./countries.json";
@@ -26,7 +27,7 @@ const SCORE_VALUES = {
   5: 20,
 };
 
-const NUM_COMPETITION_TURNS = 1;
+const NUM_COMPETITION_TURNS = 10;
 
 function App() {
   const [embedHtml, setEmbedHtml] = useState("");
@@ -46,15 +47,30 @@ function App() {
 
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [showGeoHints, setShowGeoHints] = useState(true);
+  const [showGeoHints, setShowGeoHints] = useState(false);
+  const [geoHintsEnabled, setGeoHintsEnabled] = useState(false);
 
   const [questionIndex, setQuestionIndex] = useState(0);
 
   const [gameMode, setGameMode] = useState("");
 
+  const [showScoreboard, setShowScoreboard] = useState(false);
+
   // COMPETITION
   const [turnIndex, setTurnIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [scores, setScores] = useState([]);
+  const [nameInputValue, setNameInputValue] = useState("");
+  const [showFinalScore, setShowFinalScore] = useState(false);
+
+  useEffect(() => {
+    fetchScores().then((scores) => setScores(scores));
+  }, []);
+
+  useEffect(() => {
+    if (turnIndex === NUM_COMPETITION_TURNS) {
+    }
+  }, [turnIndex]);
 
   useEffect(() => {
     if (questionIndex > 0 && songReady) {
@@ -151,6 +167,25 @@ function App() {
     setAlbums(newAlbums);
   };
 
+  const fetchScores = async () => {
+    const res = await fetch(
+      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json"
+    );
+    const json = await res.json();
+
+    const scoresArray = Object.entries(json).map((entry) => ({
+      name: entry[0],
+      score: entry[1],
+    }));
+    const scoresArraySorted = scoresArray.sort(
+      (score1, score2) => score2.score - score1.score
+    );
+
+    console.log({ scoresArraySorted });
+
+    return scoresArraySorted;
+  };
+
   const fetchEmbed = () => {
     fetch(`https://open.spotify.com/oembed?url=${song.link}`)
       .then((res) => res.json())
@@ -192,8 +227,11 @@ function App() {
 
           setFinished(true);
           setCorrect(true);
-          setTurnIndex(turnIndex + 1);
-          setScore(score + SCORE_VALUES[guesses.length + 1]);
+          setScore(
+            score +
+              SCORE_VALUES[guesses.length + 1] *
+                Math.abs(Number(geoHintsEnabled) - 2)
+          );
         } else {
           const correctCountry = countriesJSON.find(
             (country) => country.name === song.country
@@ -232,13 +270,13 @@ function App() {
   const onCheck = (e) => {
     if (e.target.checked) {
       setShowGeoHints(true);
+      setGeoHintsEnabled(true);
     } else {
       setShowGeoHints(false);
     }
   };
 
   const onNextSongClicked = () => {
-    console.log(finished);
     if (!finished) {
       return;
     }
@@ -251,6 +289,16 @@ function App() {
     setErrorMessage("");
     setQuestionIndex(questionIndex + 1);
 
+    if (gameMode === GAME_MODES.competition) {
+      setGeoHintsEnabled(false);
+      setShowGeoHints(false);
+      setTurnIndex(turnIndex + 1);
+
+      if (turnIndex === NUM_COMPETITION_TURNS) {
+        setShowFinalScore(true);
+      }
+    }
+
     if (songPlaying) {
       const iframe = document.querySelector("#embed-iframe iframe");
 
@@ -262,18 +310,64 @@ function App() {
     selectSong();
   };
 
+  const onNameInputChange = (event) => {
+    if (event.target.value.length <= 10) {
+      setNameInputValue(event.target.value);
+    }
+  };
+
+  const onScoreFormSubmit = async (event) => {
+    event.preventDefault();
+
+    const scoresRes = await fetch(
+      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json"
+    );
+    const scoresJson = await scoresRes.json();
+
+    await fetch(
+      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json",
+      {
+        method: "PUT",
+        body: JSON.stringify({ ...scoresJson, [nameInputValue]: score }),
+      }
+    );
+
+    window.location.reload();
+  };
+
+  const onMenuClicked = () => {
+    setGameMode("");
+    setShowScoreboard("");
+  }
+
   let content;
 
   if (gameMode === "") {
-    content = <Menu gameModes={GAME_MODES} setGameMode={setGameMode} />;
-  } else if (
-    gameMode === GAME_MODES.competition &&
-    turnIndex === NUM_COMPETITION_TURNS
-  ) {
-    content = <FinalScore score={score} />;
+    if (showScoreboard) {
+      content = <Scoreboard scores={scores.slice(0, 10)} />;
+    } else {
+      content = (
+        <Menu
+          gameModes={GAME_MODES}
+          setGameMode={setGameMode}
+          setShowScoreboard={setShowScoreboard}
+        />
+      );
+    }
+  } else if (showFinalScore) {
+    content = (
+      <FinalScore
+        score={score}
+        setGameMode={setGameMode}
+        nameInputValue={nameInputValue}
+        onNameInputChange={onNameInputChange}
+        onScoreFormSubmit={onScoreFormSubmit}
+      />
+    );
   } else {
     content = (
       <Game
+        setGameMode={setGameMode}
         songReady={songReady}
         songFinished={songFinished}
         onPlayClicked={onPlayClicked}
@@ -295,9 +389,7 @@ function App() {
     );
   }
 
-  console.log(content);
-
-  return <Base>{content}</Base>;
+  return <Base showMenuButton={gameMode !== "" || showScoreboard} onMenuClicked={onMenuClicked}>{content}</Base>;
 }
 
 export default App;

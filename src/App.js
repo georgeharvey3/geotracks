@@ -1,20 +1,33 @@
 import "./App.css";
 import { useEffect, useState } from "react";
 
-import CountryInput from "./Components/CountryInput/CountryInput";
-import Guesses from "./Components/Guesses/Guesses";
-import Slider from "./Components/Slider/Slider";
-import Spinner from "./Components/Spinner/Spinner";
+import Base from "./Layouts/Base/Base";
 
-import Pause from "../src/assets/pause.png";
-import Play from "../src/assets/play.png";
-import Replay from "../src/assets/replay.png";
+import Game from "./Components/Game/Game";
+import Menu from "./Components/Menu/Menu";
+import FinalScore from "./Components/FinalScore/FinalScore";
+import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 
 import albumsJSON from "./albums.json";
 import countriesJSON from "./countries.json";
 
 import getDistance from "./helpers/getDistance";
 import getBearing from "./helpers/getBearing";
+
+const GAME_MODES = {
+  infinite: "infinite",
+  competition: "competition",
+};
+
+const SCORE_VALUES = {
+  1: 150,
+  2: 80,
+  3: 60,
+  4: 40,
+  5: 20,
+};
+
+const NUM_COMPETITION_TURNS = 10;
 
 function App() {
   const [embedHtml, setEmbedHtml] = useState("");
@@ -34,11 +47,30 @@ function App() {
 
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [showGeoHints, setShowGeoHints] = useState(true);
+  const [showGeoHints, setShowGeoHints] = useState(false);
+  const [geoHintsEnabled, setGeoHintsEnabled] = useState(false);
 
   const [questionIndex, setQuestionIndex] = useState(0);
 
-  const [logs, setLogs] = useState([]);
+  const [gameMode, setGameMode] = useState("");
+
+  const [showScoreboard, setShowScoreboard] = useState(false);
+
+  // COMPETITION
+  const [turnIndex, setTurnIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [scores, setScores] = useState([]);
+  const [nameInputValue, setNameInputValue] = useState("");
+  const [showFinalScore, setShowFinalScore] = useState(false);
+
+  useEffect(() => {
+    fetchScores().then((scores) => setScores(scores));
+  }, []);
+
+  useEffect(() => {
+    if (turnIndex === NUM_COMPETITION_TURNS) {
+    }
+  }, [turnIndex]);
 
   useEffect(() => {
     if (questionIndex > 0 && songReady) {
@@ -79,17 +111,12 @@ function App() {
 
     window.addEventListener("message", (e) => {
       if (e.origin === "https://open.spotify.com") {
-        // console.log(e.data);
-        // log(e.data);
         if (e.data?.type === "ready") {
           setSongReady(true);
           setSongFinished(false);
         } else if (e.data?.type === "playback_update") {
           if (e.data?.payload?.isPaused === false) {
-            if (
-              e.data?.payload?.position === 0 ||
-              e.data?.payload?.position !== e.data?.payload?.duration
-            ) {
+            if (e.data?.payload?.position !== e.data?.payload?.duration) {
               setSongPlaying(true);
               setSongFinished(false);
             } else {
@@ -140,8 +167,23 @@ function App() {
     setAlbums(newAlbums);
   };
 
-  const log = (message) => {
-    setLogs([...logs, JSON.stringify(message)]);
+  const fetchScores = async () => {
+    const res = await fetch(
+      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json"
+    );
+    const json = await res.json();
+
+    const scoresArray = Object.entries(json).map((entry) => ({
+      name: entry[0],
+      score: entry[1],
+    }));
+    const scoresArraySorted = scoresArray.sort(
+      (score1, score2) => score2.score - score1.score
+    );
+
+    console.log({ scoresArraySorted });
+
+    return scoresArraySorted;
   };
 
   const fetchEmbed = () => {
@@ -151,8 +193,7 @@ function App() {
         if (data.html) {
           setEmbedHtml(data.html);
         }
-      })
-      .catch((err) => console.error(err));
+      });
   };
 
   const onPlayClicked = (e) => {
@@ -186,6 +227,11 @@ function App() {
 
           setFinished(true);
           setCorrect(true);
+          setScore(
+            score +
+              SCORE_VALUES[guesses.length + 1] *
+                Math.abs(Number(geoHintsEnabled) - 2)
+          );
         } else {
           const correctCountry = countriesJSON.find(
             (country) => country.name === song.country
@@ -224,6 +270,7 @@ function App() {
   const onCheck = (e) => {
     if (e.target.checked) {
       setShowGeoHints(true);
+      setGeoHintsEnabled(true);
     } else {
       setShowGeoHints(false);
     }
@@ -242,6 +289,16 @@ function App() {
     setErrorMessage("");
     setQuestionIndex(questionIndex + 1);
 
+    if (gameMode === GAME_MODES.competition) {
+      setGeoHintsEnabled(false);
+      setShowGeoHints(false);
+      setTurnIndex(turnIndex + 1);
+
+      if (turnIndex === NUM_COMPETITION_TURNS) {
+        setShowFinalScore(true);
+      }
+    }
+
     if (songPlaying) {
       const iframe = document.querySelector("#embed-iframe iframe");
 
@@ -253,66 +310,86 @@ function App() {
     selectSong();
   };
 
-  let buttonContent = <Spinner />;
-
-  if (songReady) {
-    if (songFinished) {
-      buttonContent = <img src={Replay} alt="Replay" />;
-    } else if (songPlaying) {
-      buttonContent = <img src={Pause} alt="Pause" />;
-    } else {
-      buttonContent = <img src={Play} alt="Play" />;
+  const onNameInputChange = (event) => {
+    if (event.target.value.length <= 10) {
+      setNameInputValue(event.target.value);
     }
+  };
+
+  const onScoreFormSubmit = async (event) => {
+    event.preventDefault();
+
+    const scoresRes = await fetch(
+      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json"
+    );
+    const scoresJson = await scoresRes.json();
+
+    await fetch(
+      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json",
+      {
+        method: "PUT",
+        body: JSON.stringify({ ...scoresJson, [nameInputValue]: score }),
+      }
+    );
+
+    window.location.reload();
+  };
+
+  const onMenuClicked = () => {
+    setGameMode("");
+    setShowScoreboard("");
   }
 
-  return (
-    <div className="App">
-      <h1>GeoTracks</h1>
-      <button
-        className="pause-play-button"
-        disabled={!songReady}
-        onClick={onPlayClicked}
-      >
-        {buttonContent}
-      </button>
-      <span className="prompt">
-        Which country does this song originate from?
-      </span>
-      <CountryInput
-        onFormSubmit={onFormSubmit}
-        disabled={finished}
-        countries={countriesJSON}
+  let content;
+
+  if (gameMode === "") {
+    if (showScoreboard) {
+      content = <Scoreboard scores={scores.slice(0, 10)} />;
+    } else {
+      content = (
+        <Menu
+          gameModes={GAME_MODES}
+          setGameMode={setGameMode}
+          setShowScoreboard={setShowScoreboard}
+        />
+      );
+    }
+  } else if (showFinalScore) {
+    content = (
+      <FinalScore
+        score={score}
+        setGameMode={setGameMode}
+        nameInputValue={nameInputValue}
+        onNameInputChange={onNameInputChange}
+        onScoreFormSubmit={onScoreFormSubmit}
       />
-      <Slider checked={showGeoHints} onCheck={onCheck} />
-      {errorMessage ? <p>{errorMessage}</p> : null}
-      {submitted ? (
-        <Guesses guesses={guesses} showGeoHints={showGeoHints} />
-      ) : null}
-      {finished ? (
-        <button className="next-song-button" onClick={onNextSongClicked}>
-          Next Song
-        </button>
-      ) : null}
-      <div className="iframe-wrapper">
-        {finished ? (
-          <span>
-            <strong>Album: </strong>
-            {song.album}
-          </span>
-        ) : null}
-        <div
-          id="embed-iframe"
-          style={{
-            opacity: finished ? 1 : 0,
-          }}
-          dangerouslySetInnerHTML={{ __html: embedHtml }}
-        ></div>
-      </div>
-      {logs.map((message, index) => (
-        <p key={index}>{message}</p>
-      ))}
-    </div>
-  );
+    );
+  } else {
+    content = (
+      <Game
+        setGameMode={setGameMode}
+        songReady={songReady}
+        songFinished={songFinished}
+        onPlayClicked={onPlayClicked}
+        songPlaying={songPlaying}
+        onFormSubmit={onFormSubmit}
+        finished={finished}
+        showGeoHints={showGeoHints}
+        onCheck={onCheck}
+        errorMessage={errorMessage}
+        submitted={submitted}
+        guesses={guesses}
+        onNextSongClicked={onNextSongClicked}
+        song={song}
+        embedHtml={embedHtml}
+        isCompetition={gameMode === GAME_MODES.competition}
+        turnsRemaining={NUM_COMPETITION_TURNS - turnIndex}
+        score={score}
+      />
+    );
+  }
+
+  return <Base showMenuButton={gameMode !== "" || showScoreboard} onMenuClicked={onMenuClicked}>{content}</Base>;
 }
 
 export default App;

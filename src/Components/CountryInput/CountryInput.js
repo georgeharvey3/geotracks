@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import countriesJSON from "../../countries.json";
 import "./CountryInput.css";
 
 const CountryInput = (props) => {
@@ -28,7 +29,7 @@ const CountryInput = (props) => {
             for (i = 0; i < arr.length; i++) {
                 /*check if the item starts with the same letters as the text field value:*/
                 if (
-                    arr[i].substr(0, val.length).toUpperCase() ==
+                    arr[i].substr(0, val.length).toUpperCase() ===
                     val.toUpperCase()
                 ) {
                     /*create a DIV element for each matching element:*/
@@ -56,20 +57,20 @@ const CountryInput = (props) => {
         inp.addEventListener("keydown", function (e) {
             var x = document.getElementById(this.id + "autocomplete-list");
             if (x) x = x.getElementsByTagName("div");
-            if (e.keyCode == 40) {
+            if (e.keyCode === 40) {
                 /*If the arrow DOWN key is pressed,
           increase the currentFocus variable:*/
                 currentFocus++;
                 /*and and make the current item more visible:*/
                 addActive(x);
-            } else if (e.keyCode == 38) {
+            } else if (e.keyCode === 38) {
                 //up
                 /*If the arrow UP key is pressed,
           decrease the currentFocus variable:*/
                 currentFocus--;
                 /*and and make the current item more visible:*/
                 addActive(x);
-            } else if (e.keyCode == 13) {
+            } else if (e.keyCode === 13) {
                 const active = document.querySelector('.autocomplete-active');
 
                 if (active) {
@@ -105,7 +106,7 @@ const CountryInput = (props) => {
       except the one passed as an argument:*/
             var x = document.getElementsByClassName("autocomplete-items");
             for (var i = 0; i < x.length; i++) {
-                if (elmnt != x[i] && elmnt != inp) {
+                if (elmnt !== x[i] && elmnt !== inp) {
                     x[i].parentNode.removeChild(x[i]);
                 }
             }
@@ -117,7 +118,7 @@ const CountryInput = (props) => {
     }
 
     /*An array containing all the country names in the world:*/
-    var countries = props.countries.map(country => country.name);
+    var countries = countriesJSON.map(country => country.name);
 
     useEffect(() => {
         /*initiate the autocomplete function on the "myInput" element, and pass along the countries array as possible autocomplete values:*/

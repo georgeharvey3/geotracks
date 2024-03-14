@@ -295,7 +295,7 @@ function App() {
       setShowGeoHints(false);
       setTurnIndex(turnIndex + 1);
 
-      if (turnIndex === NUM_COMPETITION_TURNS) {
+      if (turnIndex === NUM_COMPETITION_TURNS - 1) {
         setShowFinalScore(true);
       }
     }

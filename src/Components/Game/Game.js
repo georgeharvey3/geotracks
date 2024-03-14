@@ -9,6 +9,18 @@ import Play from "../../assets/play.png";
 import Pause from "../../assets/pause.png";
 
 const game = (props) => {
+  let buttonContent = <Spinner />;
+
+  if (props.songReady) {
+    if (props.songFinished) {
+      buttonContent = <img src={Replay} alt="Replay" />;
+    } else if (props.songPlaying) {
+      buttonContent = <img src={Pause} alt="Pause" />;
+    } else {
+      buttonContent = <img src={Play} alt="Play" />;
+    }
+  }
+
   return (
     <>
       {props.isCompetition ? (
@@ -22,17 +34,7 @@ const game = (props) => {
         disabled={!props.songReady}
         onClick={props.onPlayClicked}
       >
-        {props.songReady ? (
-          props.songFinished && window.innerWidth > 1024 ? (
-            <img src={Replay} alt="Replay" />
-          ) : props.songPlaying ? (
-            <img src={Play} alt="Play" />
-          ) : (
-            <img src={Pause} alt="Pause" />
-          )
-        ) : (
-          <Spinner />
-        )}
+        {buttonContent}
       </button>
       <span className="prompt">
         Which country does this song originate from?
@@ -64,7 +66,7 @@ const game = (props) => {
         <div
           id="embed-iframe"
           style={{
-            top: props.finished ? "4rem" : "-100rem",
+            transition: 'none',
             opacity: props.finished ? 1 : 0,
           }}
           dangerouslySetInnerHTML={{ __html: props.embedHtml }}

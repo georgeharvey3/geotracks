@@ -116,7 +116,10 @@ function App() {
           setSongFinished(false);
         } else if (e.data?.type === "playback_update") {
           if (e.data?.payload?.isPaused === false) {
-            if (e.data?.payload?.position !== e.data?.payload?.duration) {
+            if (
+              e.data?.payload?.position === 0 ||
+              e.data?.payload?.position !== e.data?.payload?.duration
+            ) {
               setSongPlaying(true);
               setSongFinished(false);
             } else {
@@ -180,8 +183,6 @@ function App() {
     const scoresArraySorted = scoresArray.sort(
       (score1, score2) => score2.score - score1.score
     );
-
-    console.log({ scoresArraySorted });
 
     return scoresArraySorted;
   };
@@ -338,7 +339,7 @@ function App() {
   const onMenuClicked = () => {
     setGameMode("");
     setShowScoreboard("");
-  }
+  };
 
   let content;
 
@@ -389,7 +390,14 @@ function App() {
     );
   }
 
-  return <Base showMenuButton={gameMode !== "" || showScoreboard} onMenuClicked={onMenuClicked}>{content}</Base>;
+  return (
+    <Base
+      showMenuButton={gameMode !== "" || showScoreboard}
+      onMenuClicked={onMenuClicked}
+    >
+      {content}
+    </Base>
+  );
 }
 
 export default App;

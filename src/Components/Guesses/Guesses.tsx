@@ -1,5 +1,7 @@
 import "./Guesses.css";
 
+import { Guess, Direction } from "../../types";
+
 import Correct from "../../assets/check.png";
 import Incorrect from "../../assets/cross.png";
 
@@ -12,7 +14,7 @@ import SW from "../../assets/arrows/SW.png";
 import W from "../../assets/arrows/W.png";
 import NW from "../../assets/arrows/NW.png";
 
-const directionMap = {
+const directionMap: Record<Direction, string> = {
     N,
     NE,
     E,
@@ -23,7 +25,12 @@ const directionMap = {
     NW,
 };
 
-const guesses = (props) => {
+interface GuessesProps {
+  guesses: Guess[];
+  showGeoHints: boolean;
+}
+
+const Guesses = (props: GuessesProps) => {
     return (
         <ul className="guesses">
             {props.guesses.map((guess, index) => (
@@ -41,11 +48,11 @@ const guesses = (props) => {
                                 {props.showGeoHints ? (
                                     <>
                                         <span className="guesses__guess-distance">
-                                            {guess.distance.toFixed()}km
+                                            {guess.distance!.toFixed()}km
                                         </span>
                                         <img
                                             className="guesses__guess-direction"
-                                            src={directionMap[guess.direction]}
+                                            src={directionMap[guess.direction as Direction]}
                                             alt={guess.direction}
                                         />
                                     </>
@@ -64,4 +71,4 @@ const guesses = (props) => {
     );
 };
 
-export default guesses;
+export default Guesses;

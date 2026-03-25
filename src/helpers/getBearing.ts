@@ -1,15 +1,17 @@
+import { Direction } from "../types";
+
 // Converts from degrees to radians.
-function toRadians(degrees) {
+function toRadians(degrees: number): number {
   return degrees * Math.PI / 180;
-};
- 
+}
+
 // Converts from radians to degrees.
-function toDegrees(radians) {
+function toDegrees(radians: number): number {
   return radians * 180 / Math.PI;
 }
 
 
-function direction(startLat, startLng, destLat, destLng){
+function direction(startLat: number, startLng: number, destLat: number, destLng: number): Direction {
   startLat = toRadians(startLat);
   startLng = toRadians(startLng);
   destLat = toRadians(destLat);
@@ -22,29 +24,29 @@ function direction(startLat, startLng, destLat, destLng){
   brng = toDegrees(brng);
   brng = (brng + 360) % 360;
 
-  let direction;
-  
+  let dir: Direction;
+
   if (brng > 337.5) {
-    direction = 'N';
+    dir = 'N';
   } else if (brng > 292.5) {
-    direction = 'NW';
+    dir = 'NW';
   } else if (brng > 247.5) {
-    direction = 'W';
+    dir = 'W';
   } else if (brng > 202.5) {
-    direction = 'SW';
+    dir = 'SW';
   } else if (brng > 157.5) {
-    direction = 'S';
+    dir = 'S';
   } else if (brng > 112.5) {
-    direction = 'SE';
+    dir = 'SE';
   } else if (brng > 67.5) {
-    direction = 'E';
+    dir = 'E';
   } else if (brng > 22.5) {
-    direction = 'NE';
+    dir = 'NE';
   } else {
-    direction = 'N';
+    dir = 'N';
   }
 
-  return direction
+  return dir;
 }
 
 

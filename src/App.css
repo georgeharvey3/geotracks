@@ -107,6 +107,7 @@ h1 {
 .iframe-wrapper {
   position: relative;
   margin-top: 2rem;
+  overflow: hidden;
 }
 
 #embed-iframe {

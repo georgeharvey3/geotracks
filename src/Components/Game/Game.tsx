@@ -1,14 +1,39 @@
+import React from "react";
 import Spinner from "../Spinner/Spinner";
 import CountryInput from "../CountryInput/CountryInput";
 import Slider from "../Slider/Slider";
 import Guesses from "../Guesses/Guesses";
 import CurrentScore from "../CurrentScore/CurrentScore";
 
+import { Guess, Song } from "../../types";
+
 import Replay from "../../assets/replay.png";
 import Play from "../../assets/play.png";
 import Pause from "../../assets/pause.png";
 
-const game = (props) => {
+interface GameProps {
+  setGameMode: (mode: string) => void;
+  songReady: boolean;
+  songFinished: boolean;
+  onPlayClicked: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  songPlaying: boolean;
+  onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  finished: boolean;
+  showGeoHints: boolean;
+  onCheck: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  errorMessage: string;
+  submitted: boolean;
+  guesses: Guess[];
+  onNextSongClicked: () => void;
+  song: Song;
+  embedRef: React.RefObject<HTMLDivElement | null>;
+  isCompetition: boolean;
+  turnsRemaining: number;
+  score: number;
+  countryInputRef: React.RefObject<HTMLInputElement | null>;
+}
+
+const Game = (props: GameProps) => {
   let buttonContent = <Spinner />;
 
   if (props.songReady) {
@@ -40,6 +65,7 @@ const game = (props) => {
         Which country does this song originate from?
       </span>
       <CountryInput
+        ref={props.countryInputRef}
         onFormSubmit={props.onFormSubmit}
         disabled={props.finished}
       />
@@ -56,24 +82,23 @@ const game = (props) => {
           {props.turnsRemaining === 0 ? "Continue" : "Next Song"}
         </button>
       ) : null}
-      <div className="iframe-wrapper">
-        {props.finished ? (
-          <span>
-            <strong>Album: </strong>
-            {props.song.album}
-          </span>
-        ) : null}
+      {props.finished ? (
+        <span>
+          <strong>Album: </strong>
+          {props.song.album}
+        </span>
+      ) : null}
+      <div
+        className="iframe-wrapper"
+        style={props.finished ? undefined : { height: 0, overflow: 'hidden' }}
+      >
         <div
           id="embed-iframe"
-          style={{
-            transition: 'none',
-            opacity: props.finished ? 1 : 0,
-          }}
-          dangerouslySetInnerHTML={{ __html: props.embedHtml }}
+          ref={props.embedRef}
         ></div>
       </div>
     </>
   );
 };
 
-export default game;
+export default Game;

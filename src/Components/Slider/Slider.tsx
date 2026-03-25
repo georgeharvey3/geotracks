@@ -1,6 +1,12 @@
+import React from 'react';
 import './Slider.css';
 
-const Slider = (props) => {
+interface SliderProps {
+  checked: boolean;
+  onCheck: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+const Slider = (props: SliderProps) => {
 
   return (
     <label className="slider-label">

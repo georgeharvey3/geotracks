@@ -1,6 +1,13 @@
+import React from "react";
 import HomeIcon from "../../assets/home-icon.png";
 
-const base = (props) => (
+interface BaseProps {
+  showMenuButton: boolean;
+  onMenuClicked: () => void;
+  children: React.ReactNode;
+}
+
+const Base = (props: BaseProps) => (
   <div className="App">
     <h1>GeoTracks</h1>
     {props.showMenuButton ? (
@@ -12,4 +19,4 @@ const base = (props) => (
   </div>
 );
 
-export default base;
+export default Base;

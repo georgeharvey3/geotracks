@@ -1,4 +1,10 @@
-const scoreboard = (props) => {
+import { ScoreEntry } from '../../types';
+
+interface ScoreboardProps {
+  scores: ScoreEntry[];
+}
+
+const Scoreboard = (props: ScoreboardProps) => {
   return (
     <div>
       <h2>Top Scores</h2>
@@ -22,4 +28,4 @@ const scoreboard = (props) => {
   );
 };
 
-export default scoreboard;
+export default Scoreboard;

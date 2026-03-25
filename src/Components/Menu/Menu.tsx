@@ -1,4 +1,12 @@
-const menu = (props) => (
+import { GameModes } from '../../types';
+
+interface MenuProps {
+  gameModes: GameModes;
+  setGameMode: (mode: string) => void;
+  setShowScoreboard: (show: boolean) => void;
+}
+
+const Menu = (props: MenuProps) => (
   <>
     <div className="buttons">
       <button className="button" onClick={() => props.setGameMode(props.gameModes.competition)}>
@@ -14,4 +22,4 @@ const menu = (props) => (
   </>
 );
 
-export default menu;
+export default Menu;

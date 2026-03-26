@@ -1,5 +1,5 @@
-import React from 'react';
-import './Slider.css';
+import React from "react";
+import { Box, FormControlLabel, Switch } from "@mui/material";
 
 interface SliderProps {
   checked: boolean;
@@ -7,13 +7,21 @@ interface SliderProps {
 }
 
 const Slider = (props: SliderProps) => {
-
   return (
-    <label className="slider-label">
-      GeoHints
-      <input className="slider" type="checkbox" onChange={props.onCheck} checked={props.checked}/>
-    </label>
+    <Box sx={{ display: "flex", justifyContent: "center" }}>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={props.checked}
+            onChange={props.onCheck}
+            color="primary"
+          />
+        }
+        label="GeoHints"
+        sx={{ color: "text.secondary" }}
+      />
+    </Box>
   );
-}
+};
 
 export default Slider;

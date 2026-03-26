@@ -1,4 +1,8 @@
-import { GameModes } from '../../types';
+import { Box, Button, Stack } from "@mui/material";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
+import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import { GameModes } from "../../types";
 
 interface MenuProps {
   gameModes: GameModes;
@@ -7,19 +11,34 @@ interface MenuProps {
 }
 
 const Menu = (props: MenuProps) => (
-  <>
-    <div className="buttons">
-      <button className="button" onClick={() => props.setGameMode(props.gameModes.competition)}>
+  <Box sx={{ mt: 4 }}>
+    <Stack spacing={2} sx={{ maxWidth: 280, mx: "auto" }}>
+      <Button
+        variant="contained"
+        size="large"
+        startIcon={<EmojiEventsIcon />}
+        onClick={() => props.setGameMode(props.gameModes.competition)}
+      >
         Competition Mode
-      </button>
-      <button className="button" onClick={() => props.setGameMode(props.gameModes.infinite)}>
+      </Button>
+      <Button
+        variant="contained"
+        size="large"
+        startIcon={<AllInclusiveIcon />}
+        onClick={() => props.setGameMode(props.gameModes.infinite)}
+      >
         Infinite Mode
-      </button>
-      <button className="button" onClick={() => props.setShowScoreboard(true)}>
+      </Button>
+      <Button
+        variant="outlined"
+        size="large"
+        startIcon={<LeaderboardIcon />}
+        onClick={() => props.setShowScoreboard(true)}
+      >
         Scoreboard
-      </button>
-    </div>
-  </>
+      </Button>
+    </Stack>
+  </Box>
 );
 
 export default Menu;

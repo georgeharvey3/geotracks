@@ -1,4 +1,5 @@
 import "./App.css";
+import "./index.css";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
 import Base from "./Layouts/Base/Base";

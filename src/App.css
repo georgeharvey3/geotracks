@@ -2,136 +2,13 @@
   box-sizing: border-box;
 }
 
-body {
-  background-color: #282828;
-  color: white;
-}
-
-.App {
-  width: 100%;
-  max-width: 450px;
-  padding: 1rem;
-  margin: 0 auto;
-  text-align: center;
-  position: relative;
-
-  font-family: "Inconsolata", monospace;
-}
-
-h1 {
-  margin: 1.5rem 0;
-}
-
-.pause-play-button {
-  border-radius: 1rem;
-  height: 5rem;
-  width: 5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  border: none;
-  box-shadow: 0 5px 0px -1px darkgray;
-  background-color: rgb(241, 241, 241);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pause-play-button:hover {
-  cursor: pointer;
-  background-color: rgb(226, 226, 226);
-}
-
-.pause-play-button:disabled {
-  cursor: not-allowed;
-}
-
-.pause-play-button:active:not(:disabled) {
-  transform: translateY(5px);
-  box-shadow: none;
-}
-
-.pause-play-button img {
-  opacity: 0.8;
-}
-
-.pause-play-button img[alt="Replay"] {
-  height: 70%;
-}
-
-.buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  justify-content: center;
-  max-width: 10rem;
-  margin: 0 auto;
-}
-
-.button {
-  border: none;
-  background-color: DodgerBlue;
-  padding: 0.5rem 1rem;
-  border-radius: 0.2rem;
-  color: white;
-  font-family: "Inconsolata", monospace;
-  font-size: 1rem;
-}
-
-.button:hover {
-  cursor: pointer;
-  opacity: 0.8;
-}
-
-.menu-button {
-  height: 2rem;
-  width: 2rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0.2rem;
-  position: absolute;
-  top: 2.5rem;
-  left: 1rem;
-  cursor: pointer;
-  border-radius: 0.25rem;
-  border: none;
-}
-
-.menu-button img {
-  height: auto;
-  width: 100%;
-}
-
 .iframe-wrapper {
   position: relative;
-  margin-top: 2rem;
+  margin-top: 1.5rem;
   overflow: hidden;
+  border-radius: 12px;
 }
 
 #embed-iframe {
-  margin-top: 2rem;
-}
-
-.prompt {
-  margin: 1.5rem 0;
-  display: block;
-}
-
-.name-input {
-  border-radius: 0.75rem 0 0 0.75rem;
-}
-
-table {
-  width: 100%;
-  border: thin solid white;
-  table-layout: fixed;
-  border-collapse: collapse;
-}
-
-td,
-th {
-  border: thin solid white;
-  padding: 0.5rem 0;
+  margin-top: 0;
 }

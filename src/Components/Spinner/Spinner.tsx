@@ -1,9 +1,7 @@
-import './Spinner.css';
+import { CircularProgress } from "@mui/material";
 
 const Spinner = () => {
-  return (
-    <div className="lds-ring"><div></div><div></div><div></div><div></div></div>
-  );
-}
+  return <CircularProgress size={32} />;
+};
 
 export default Spinner;

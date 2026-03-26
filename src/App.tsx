@@ -235,6 +235,7 @@ function App() {
   const attemptLoad = useCallback((songLink: string) => {
     console.log('[attemptLoad] loading song:', songLink, 'retry:', retryCountRef.current, 'controller exists:', !!controllerRef.current);
     setSongReady(false);
+    setSongPlaying(false);
     setSongLoadFailed(false);
     if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
 
@@ -448,6 +449,8 @@ function App() {
     setFinished(false);
     setCorrect(false);
     setSongFinished(false);
+    setSongReady(false);
+    setSongPlaying(false);
     setGuesses([]);
     setErrorMessage("");
     setQuestionIndex(prev => prev + 1);

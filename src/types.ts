@@ -15,6 +15,9 @@ export interface Song {
   country: string;
   link: string;
   album: string;
+  trackTitle?: string;
+  artistName?: string;
+  thumbnailUrl?: string;
 }
 
 export interface Guess {

@@ -6,6 +6,8 @@ import { Guess, Song } from '../../types';
 const createDefaultProps = (overrides: Partial<React.ComponentProps<typeof Game>> = {}) => ({
   setGameMode: jest.fn(),
   songReady: true,
+  songLoadFailed: false,
+  onRetryLoad: jest.fn(),
   songFinished: false,
   onPlayClicked: jest.fn(),
   songPlaying: false,

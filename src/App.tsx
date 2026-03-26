@@ -14,6 +14,7 @@ import countriesJSON from "./countries.json";
 
 import getDistance from "./helpers/getDistance";
 import getBearing from "./helpers/getBearing";
+import getDailySongs from "./helpers/getDailySongs";
 
 import { Album, Song, Guess, ScoreEntry } from "./types";
 
@@ -33,6 +34,8 @@ const SCORE_VALUES: Record<number, number> = {
 const NUM_COMPETITION_TURNS = 10;
 
 function App() {
+  const [dailySongs] = useState<Song[]>(() => getDailySongs(albumsJSON));
+  const dailySongIndexRef = useRef(0);
   const [albums, setAlbums] = useState<Album[]>(albumsJSON);
   const [song, setSong] = useState<Song>({} as Song);
   const [submitted, setSubmitted] = useState(false);
@@ -45,6 +48,7 @@ function App() {
 
   const [songPlaying, setSongPlaying] = useState(false);
   const [songReady, setSongReady] = useState(false);
+  const [songLoadFailed, setSongLoadFailed] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -69,6 +73,10 @@ function App() {
   const controllerRef = useRef<SpotifyEmbedController | null>(null);
   const iframeApiRef = useRef<SpotifyIFrameAPI | null>(null);
   const pendingSongRef = useRef<string | null>(null);
+  const songLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
+  const MAX_AUTO_RETRIES = 3;
+  const LOAD_TIMEOUT_MS = 10000;
 
   // Refs to hold latest callback values so global event listeners avoid stale closures
   const onNextSongClickedRef = useRef<() => void>(() => {});
@@ -137,25 +145,55 @@ function App() {
     return url;
   };
 
+  const destroyController = useCallback(() => {
+    if (controllerRef.current) {
+      controllerRef.current.destroy();
+      controllerRef.current = null;
+    }
+    if (embedRef.current) {
+      embedRef.current.innerHTML = '';
+    }
+  }, []);
+
   // Initialize the Spotify IFrame API controller once the API is ready and the DOM element exists
   const initController = useCallback((IFrameAPI: SpotifyIFrameAPI) => {
     iframeApiRef.current = IFrameAPI;
-    if (controllerRef.current || !embedRef.current) return;
+    console.log('[initController] controllerRef exists:', !!controllerRef.current, 'embedRef exists:', !!embedRef.current);
+    if (controllerRef.current || !embedRef.current) {
+      console.log('[initController] bailing out early');
+      return;
+    }
+    if (!pendingSongRef.current) {
+      console.log('[initController] no pending song, bailing out');
+      return;
+    }
 
-    const initialUri = pendingSongRef.current
-      ? toSpotifyUri(pendingSongRef.current)
-      : 'spotify:track:placeholder';
+    const initialUri = toSpotifyUri(pendingSongRef.current);
+    console.log('[initController] creating controller with URI:', initialUri);
     pendingSongRef.current = null;
 
     IFrameAPI.createController(embedRef.current, { uri: initialUri, width: '100%', height: 152 }, (controller) => {
+      console.log('[initController] controller callback fired');
       controllerRef.current = controller;
       controller.addListener('ready', () => {
+        console.log('[initController] ready event fired');
+        if (songLoadTimerRef.current) {
+          clearTimeout(songLoadTimerRef.current);
+          songLoadTimerRef.current = null;
+        }
+        retryCountRef.current = 0;
+        setSongLoadFailed(false);
         setSongReady(true);
         setSongFinished(false);
       });
       controller.addListener('playback_update', (e) => {
         const { isPaused, position, duration } = e.data;
-        const isFinished = duration > 0 && position >= duration;
+        const CLIP_DURATION_MS = 30000;
+        const isClipFinished = duration > 0 && position >= CLIP_DURATION_MS;
+        const isFinished = duration > 0 && (position >= duration || isClipFinished);
+        if (isClipFinished && !isPaused) {
+          controller.togglePlay();
+        }
         setSongPlaying(!isPaused && !isFinished);
         if (isFinished) {
           setSongFinished(true);
@@ -179,18 +217,59 @@ function App() {
     };
   }, [initController]);
 
+  // Listen for Spotify embed messages as a fallback ready detection
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://open.spotify.com') return;
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        console.log('[postMessage] from Spotify:', data.type || data);
+      } catch {
+        // ignore non-JSON messages
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const attemptLoad = useCallback((songLink: string) => {
+    console.log('[attemptLoad] loading song:', songLink, 'retry:', retryCountRef.current, 'controller exists:', !!controllerRef.current);
+    setSongReady(false);
+    setSongLoadFailed(false);
+    if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
+
+    songLoadTimerRef.current = setTimeout(() => {
+      if (retryCountRef.current < MAX_AUTO_RETRIES) {
+        retryCountRef.current += 1;
+        console.log('[attemptLoad] auto-retrying, attempt:', retryCountRef.current);
+        destroyController();
+        attemptLoad(songLink);
+      } else {
+        console.warn('[attemptLoad] all retries exhausted, marking load as failed');
+        setSongLoadFailed(true);
+      }
+    }, LOAD_TIMEOUT_MS);
+
+    if (controllerRef.current) {
+      controllerRef.current.loadUri(toSpotifyUri(songLink));
+    } else {
+      pendingSongRef.current = songLink;
+      if (iframeApiRef.current) {
+        initController(iframeApiRef.current);
+      }
+    }
+  }, [destroyController, initController]);
+
   // Load new track URI when song changes
   useEffect(() => {
     if (song && song.link) {
-      setSongReady(false);
-      if (controllerRef.current) {
-        controllerRef.current.loadUri(toSpotifyUri(song.link));
-      } else {
-        // Controller not ready yet — queue the song for when it initializes
-        pendingSongRef.current = song.link;
-      }
+      retryCountRef.current = 0;
+      attemptLoad(song.link);
     }
-  }, [song]);
+    return () => {
+      if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
+    };
+  }, [song, attemptLoad]);
 
   useEffect(() => {
     if (guesses.length > 4 && !correct) {
@@ -201,22 +280,68 @@ function App() {
   }, [guesses]);
 
   const selectSong = () => {
-    const albumIndexChoice = Math.floor(Math.random() * albums.length);
-    const albumChoice = albums[albumIndexChoice];
-    const songIndexChoice = Math.floor(
-      Math.random() * albumChoice.tracks.length
-    );
-    const songChoice = albumChoice.tracks[songIndexChoice];
-    const songObj: Song = {
-      country: albumChoice.country,
-      link: songChoice,
-      album: albumChoice.album_name,
-    };
+    let songObj: Song;
+    let albumIndexToRemove = -1;
+
+    if (dailySongIndexRef.current < dailySongs.length) {
+      songObj = dailySongs[dailySongIndexRef.current];
+      dailySongIndexRef.current += 1;
+      albumIndexToRemove = albums.findIndex(
+        (a) => a.album_name === songObj.album
+      );
+    } else {
+      albumIndexToRemove = Math.floor(Math.random() * albums.length);
+      const albumChoice = albums[albumIndexToRemove];
+      const songIndexChoice = Math.floor(
+        Math.random() * albumChoice.tracks.length
+      );
+      songObj = {
+        country: albumChoice.country,
+        link: albumChoice.tracks[songIndexChoice],
+        album: albumChoice.album_name,
+      };
+    }
+
     setSong(songObj);
 
-    const newAlbums = albums.filter((_, index) => index !== albumIndexChoice);
+    // Fetch track metadata from Spotify oEmbed API
+    const songLink = songObj.link;
+    const fetchOembed = (url: string, attempt = 0, maxRetries = 3, delay = 1000) => {
+      const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`;
+      console.log(`[fetchOembed] attempt: ${attempt}, url: ${url}`);
+      fetch(oembedUrl)
+        .then((res) => {
+          console.log(`[fetchOembed] response status: ${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          console.log(`[fetchOembed] success, title: ${data.title}`);
+          setSong((prev) => {
+            if (prev.link !== songLink) return prev;
+            return {
+              ...prev,
+              trackTitle: data.title,
+              artistName: data.author_name,
+              thumbnailUrl: data.thumbnail_url,
+            };
+          });
+        })
+        .catch((err) => {
+          console.error(`[fetchOembed] failed, attempt: ${attempt}, error:`, err.message || err);
+          if (attempt < maxRetries) {
+            console.log(`[fetchOembed] scheduling retry ${attempt + 1} in ${delay}ms`);
+            setTimeout(() => fetchOembed(url, attempt + 1, maxRetries, delay), delay);
+          } else {
+            console.warn(`[fetchOembed] all retries exhausted`);
+          }
+        });
+    };
+    fetchOembed(songObj.link);
 
-    setAlbums(newAlbums);
+    if (albumIndexToRemove >= 0) {
+      const newAlbums = albums.filter((_, index) => index !== albumIndexToRemove);
+      setAlbums(newAlbums);
+    }
   };
 
   const fetchScores = async (): Promise<ScoreEntry[]> => {
@@ -234,6 +359,14 @@ function App() {
     );
 
     return scoresArraySorted;
+  };
+
+  const onRetryLoad = () => {
+    console.log('[onRetryLoad] song:', song?.link);
+    if (!song || !song.link) return;
+    destroyController();
+    retryCountRef.current = 0;
+    attemptLoad(song.link);
   };
 
   const onPlayClicked = () => {
@@ -401,6 +534,8 @@ function App() {
       <Game
         setGameMode={setGameMode}
         songReady={songReady}
+        songLoadFailed={songLoadFailed}
+        onRetryLoad={onRetryLoad}
         songFinished={songFinished}
         onPlayClicked={onPlayClicked}
         songPlaying={songPlaying}

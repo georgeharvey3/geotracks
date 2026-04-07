@@ -13,6 +13,7 @@ interface SpotifyPlaybackEvent {
 
 interface SpotifyEmbedController {
   togglePlay(): void;
+  seek(position: number): void;
   loadUri(uri: string): void;
   addListener(event: 'ready', callback: () => void): void;
   addListener(event: 'playback_started', callback: () => void): void;

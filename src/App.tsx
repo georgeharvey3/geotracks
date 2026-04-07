@@ -75,11 +75,13 @@ function App() {
   const pendingSongRef = useRef<string | null>(null);
   const songLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
+  const replayPendingRef = useRef(false);
   const MAX_AUTO_RETRIES = 3;
   const LOAD_TIMEOUT_MS = 10000;
 
   // Refs to hold latest callback values so global event listeners avoid stale closures
   const onNextSongClickedRef = useRef<() => void>(() => {});
+  const onPlayClickedRef = useRef<() => void>(() => {});
 
   const toggleSong = useCallback(() => {
     controllerRef.current?.togglePlay();
@@ -107,7 +109,7 @@ function App() {
       const isInputFocused = document.activeElement === countryInputRef.current;
       if (!isInputFocused) {
         if (e.key === " ") {
-          toggleSong();
+          onPlayClickedRef.current();
           return;
         }
 
@@ -185,6 +187,10 @@ function App() {
         setSongLoadFailed(false);
         setSongReady(true);
         setSongFinished(false);
+        if (replayPendingRef.current) {
+          replayPendingRef.current = false;
+          controller.togglePlay();
+        }
       });
       controller.addListener('playback_update', (e) => {
         const { isPaused, position, duration } = e.data;
@@ -370,9 +376,19 @@ function App() {
     attemptLoad(song.link);
   };
 
-  const onPlayClicked = () => {
+  const onPlayClicked = useCallback(() => {
+    if (songFinished && controllerRef.current && song?.link) {
+      replayPendingRef.current = true;
+      controllerRef.current.loadUri(toSpotifyUri(song.link));
+      setSongFinished(false);
+      return;
+    }
     toggleSong();
-  };
+  }, [songFinished, song, toggleSong]);
+
+  useEffect(() => {
+    onPlayClickedRef.current = onPlayClicked;
+  }, [onPlayClicked]);
 
   const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

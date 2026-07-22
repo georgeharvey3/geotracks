@@ -520,8 +520,30 @@ function App() {
   };
 
   const onMenuClicked = () => {
+    destroyController();
+    if (songLoadTimerRef.current) {
+      clearTimeout(songLoadTimerRef.current);
+      songLoadTimerRef.current = null;
+    }
+    setSong({} as Song);
+    setSongReady(false);
+    setSongPlaying(false);
+    setSongFinished(false);
+    setSongLoadFailed(false);
+    setSubmitted(false);
+    setFinished(false);
+    setCorrect(false);
+    setGuesses([]);
+    setErrorMessage("");
+    setGeoHintsEnabled(false);
+    setShowGeoHints(false);
+    setQuestionIndex(0);
+    setTurnIndex(0);
+    setScore(0);
+    setShowFinalScore(false);
     setGameMode("");
     setShowScoreboard(false);
+    selectSong();
   };
 
   let content;

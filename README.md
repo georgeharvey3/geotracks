@@ -1,70 +1,77 @@
-# Getting Started with Create React App
+# GeoTracks
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+GeoTracks is a music geography guessing game. Players listen to a short Spotify clip and guess the country the track comes from. Wrong guesses can reveal how far away — and in which direction — the correct country lies.
 
-## Available Scripts
+🎮 **Play it:** https://georgeharvey3.github.io/geotracks
 
-In the project directory, you can run:
+## Game Modes
 
-### `npm start`
+- **Competition** — 10 turns with scoring and a global Firebase-backed leaderboard. Submit your name at the end to save your score.
+- **Infinite** — Unlimited rounds for casual play, no scoring.
+- **Scoreboard** — View the top 10 competition scores.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Each day everyone starts with the same seeded set of songs (deterministic per calendar date), so scores are comparable. Once the daily set is exhausted, songs are chosen at random.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## How Scoring Works
 
-### `npm test`
+Points are awarded by how few guesses you needed:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| Guess attempt | 1st | 2nd | 3rd | 4th | 5th |
+| ------------- | --- | --- | --- | --- | --- |
+| Points        | 150 | 80  | 60  | 40  | 20  |
 
-### `npm run build`
+You get up to 5 guesses per round. Enabling **geo hints** for a round halves the points earned that round.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Geo Hints
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+When enabled, each incorrect guess shows the distance (km) and compass direction (N/NE/E/SE/S/SW/W/NW) from your guess toward the correct country. Distances use the Haversine formula (`src/helpers/getDistance.ts`) and bearings use a standard great-circle bearing calculation (`src/helpers/getBearing.ts`), both driven by coordinates in `src/countries.json`.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Keyboard Shortcuts
 
-### `npm run eject`
+- **Space** — Toggle playback
+- **Enter** — Next song (once the round is finished)
+- **Typing** — Auto-focuses the country input
+- **Escape** — Blurs the country input
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Tech Stack
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- **React 18** + **TypeScript**, bootstrapped with Create React App
+- **MUI (Material UI)** for components and theming
+- **Firebase Realtime Database** for the competition leaderboard
+- **Spotify IFrame API** for playback, **Spotify oEmbed API** for track metadata
+- **Jest** + **React Testing Library** for unit tests, **Cypress** for end-to-end tests
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Architecture
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+All game state lives in `src/App.tsx` via React hooks — there is no state management library. Components under `src/Components/` are presentational and receive everything through props.
 
-## Learn More
+### Spotify Integration
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Playback uses the Spotify IFrame API: a controller is created against a hidden embed element and driven programmatically (`togglePlay`, `loadUri`). Clips play for 30 seconds before auto-pausing. Track title, artist, and thumbnail are fetched separately from the Spotify oEmbed API. Loading has automatic retries and a manual retry fallback if a track fails to load.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Firebase
 
-### Code Splitting
+Scores are stored in Firebase Realtime Database at:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```
+https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json
+```
 
-### Analyzing the Bundle Size
+### Key Files
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- `src/App.tsx` — All game state and logic
+- `src/albums.json` — Song pool: `{ country, album_name, tracks: [spotify_urls] }`
+- `src/countries.json` — Country list with coordinates for autocomplete and distance/bearing math
+- `src/types.ts` — Shared TypeScript types
+- `src/theme.ts` — MUI theme
+- `src/helpers/getDailySongs.ts` — Seeded daily song selection (Mulberry32 PRNG)
+- `src/Components/CountryInput/` — Custom autocomplete input (arrow-key navigation, no external library)
 
-### Making a Progressive Web App
+## Development
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `npm start` — Run the dev server at [localhost:3000](http://localhost:3000)
+- `npm test` — Run unit tests in interactive watch mode
+- `npm run build` — Production build to `build/`
+- `npm run cy:open` — Open the Cypress test runner
+- `npm run cy:run` — Run Cypress tests headlessly
+- `npm run deploy` — Build and deploy to GitHub Pages via gh-pages

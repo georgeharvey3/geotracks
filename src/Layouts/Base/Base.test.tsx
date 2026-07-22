@@ -4,7 +4,7 @@ import Base from './Base';
 describe('Base', () => {
   it('renders the GeoTracks title', () => {
     render(
-      <Base showMenuButton={false} onMenuClicked={jest.fn()}>
+      <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Child</div>
       </Base>
     );
@@ -13,7 +13,7 @@ describe('Base', () => {
 
   it('renders children', () => {
     render(
-      <Base showMenuButton={false} onMenuClicked={jest.fn()}>
+      <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Test Child Content</div>
       </Base>
     );
@@ -22,7 +22,7 @@ describe('Base', () => {
 
   it('shows the home button when showMenuButton is true', () => {
     render(
-      <Base showMenuButton={true} onMenuClicked={jest.fn()}>
+      <Base showMenuButton={true} onMenuClicked={vi.fn()}>
         <div>Child</div>
       </Base>
     );
@@ -31,7 +31,7 @@ describe('Base', () => {
 
   it('hides the home button when showMenuButton is false', () => {
     render(
-      <Base showMenuButton={false} onMenuClicked={jest.fn()}>
+      <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Child</div>
       </Base>
     );
@@ -39,7 +39,7 @@ describe('Base', () => {
   });
 
   it('calls onMenuClicked when the home button is clicked', () => {
-    const onMenuClicked = jest.fn();
+    const onMenuClicked = vi.fn();
     render(
       <Base showMenuButton={true} onMenuClicked={onMenuClicked}>
         <div>Child</div>

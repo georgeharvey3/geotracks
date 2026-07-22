@@ -5,10 +5,10 @@ import FinalScore from './FinalScore';
 describe('FinalScore', () => {
   const defaultProps = {
     score: 750,
-    setGameMode: jest.fn(),
+    setGameMode: vi.fn(),
     nameInputValue: '',
-    onNameInputChange: jest.fn(),
-    onScoreFormSubmit: jest.fn(),
+    onNameInputChange: vi.fn(),
+    onScoreFormSubmit: vi.fn(),
   };
 
   it('displays the score', () => {
@@ -32,7 +32,7 @@ describe('FinalScore', () => {
   });
 
   it('calls onNameInputChange when typing', async () => {
-    const onNameInputChange = jest.fn();
+    const onNameInputChange = vi.fn();
     render(<FinalScore {...defaultProps} onNameInputChange={onNameInputChange} />);
     await userEvent.type(screen.getByPlaceholderText('Name...'), 'A');
     expect(onNameInputChange).toHaveBeenCalled();

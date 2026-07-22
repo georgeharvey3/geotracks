@@ -35,11 +35,11 @@ When enabled, each incorrect guess shows the distance (km) and compass direction
 
 ## Tech Stack
 
-- **React 18** + **TypeScript**, bootstrapped with Create React App
+- **React 18** + **TypeScript**, built with **Vite**
 - **MUI (Material UI)** for components and theming
 - **Firebase Realtime Database** for the competition leaderboard
 - **Spotify IFrame API** for playback, **Spotify oEmbed API** for track metadata
-- **Jest** + **React Testing Library** for unit tests, **Cypress** for end-to-end tests
+- **Vitest** + **React Testing Library** for unit tests, **Cypress** for end-to-end tests
 
 ## Architecture
 
@@ -51,11 +51,7 @@ Playback uses the Spotify IFrame API: a controller is created against a hidden e
 
 ### Firebase
 
-Scores are stored in Firebase Realtime Database at:
-
-```
-https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json
-```
+Scores are stored in Firebase Realtime Database at `${VITE_FIREBASE_DB_URL}/scores.json`. The database base URL is configured via the `VITE_FIREBASE_DB_URL` env var (see `.env.example`) and surfaced through `src/config.ts`.
 
 ### Key Files
 
@@ -69,9 +65,10 @@ https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.js
 
 ## Development
 
-- `npm start` — Run the dev server at [localhost:3000](http://localhost:3000)
-- `npm test` — Run unit tests in interactive watch mode
-- `npm run build` — Production build to `build/`
+- `npm start` — Run the Vite dev server at [localhost:5173/geotracks/](http://localhost:5173/geotracks/)
+- `npm test` — Run the unit-test suite once under Vitest (`npm run test:watch` for watch mode)
+- `npm run build` — Type-check and produce a production build in `dist/`
+- `npm run preview` — Serve the production build locally
 - `npm run cy:open` — Open the Cypress test runner
 - `npm run cy:run` — Run Cypress tests headlessly
-- `npm run deploy` — Build and deploy to GitHub Pages via gh-pages
+- `npm run deploy` — Build and deploy `dist/` to GitHub Pages via gh-pages

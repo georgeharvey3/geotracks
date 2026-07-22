@@ -39,11 +39,11 @@ interface GameProps {
   guesses: Guess[];
   onNextSongClicked: () => void;
   song: Song;
-  embedRef: React.RefObject<HTMLDivElement | null>;
+  embedRef: React.RefObject<HTMLDivElement>;
   isCompetition: boolean;
   turnsRemaining: number;
   score: number;
-  countryInputRef: React.RefObject<HTMLInputElement | null>;
+  countryInputRef: React.RefObject<HTMLInputElement>;
 }
 
 const AlbumArt = ({ src, alt }: { src?: string; alt: string }) => {

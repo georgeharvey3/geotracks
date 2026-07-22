@@ -17,6 +17,7 @@ import getBearing from "./helpers/getBearing";
 import getDailySongs from "./helpers/getDailySongs";
 
 import { Album, Song, Guess, ScoreEntry } from "./types";
+import { SCORES_URL } from "./config";
 
 const GAME_MODES = {
   infinite: "infinite",
@@ -352,9 +353,7 @@ function App() {
   };
 
   const fetchScores = async (): Promise<ScoreEntry[]> => {
-    const res = await fetch(
-      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json"
-    );
+    const res = await fetch(SCORES_URL);
     const json = await res.json();
 
     const scoresArray: ScoreEntry[] = Object.entries(json).map((entry) => ({
@@ -503,18 +502,13 @@ function App() {
   const onScoreFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const scoresRes = await fetch(
-      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json"
-    );
+    const scoresRes = await fetch(SCORES_URL);
     const scoresJson = await scoresRes.json();
 
-    await fetch(
-      "https://geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json",
-      {
-        method: "PUT",
-        body: JSON.stringify({ ...scoresJson, [nameInputValue]: score }),
-      }
-    );
+    await fetch(SCORES_URL, {
+      method: "PUT",
+      body: JSON.stringify({ ...scoresJson, [nameInputValue]: score }),
+    });
 
     window.location.reload();
   };

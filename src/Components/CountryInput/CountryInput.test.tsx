@@ -4,12 +4,12 @@ import CountryInput from './CountryInput';
 
 describe('CountryInput', () => {
   const defaultProps = {
-    onFormSubmit: jest.fn((e) => e.preventDefault()),
+    onFormSubmit: vi.fn((e) => e.preventDefault()),
     disabled: false,
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders the input field with placeholder', () => {
@@ -90,7 +90,7 @@ describe('CountryInput', () => {
   });
 
   it('clears input after form submission', async () => {
-    const onFormSubmit = jest.fn((e) => e.preventDefault());
+    const onFormSubmit = vi.fn((e) => e.preventDefault());
     render(<CountryInput {...defaultProps} onFormSubmit={onFormSubmit} />);
     const input = screen.getByPlaceholderText('Country');
     await userEvent.type(input, 'France');

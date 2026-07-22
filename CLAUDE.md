@@ -4,17 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Development Commands
 
-- `npm start` — Run dev server (localhost:3000)
-- `npm test` — Run unit tests in interactive watch mode (Jest via react-scripts)
-- `npm run build` — Production build to `build/`
-- `npm run deploy` — Build and deploy to GitHub Pages via gh-pages
+- `npm start` (alias `npm run dev`) — Run the Vite dev server (localhost:5173, served under the `/geotracks/` base)
+- `npm test` — Run the unit-test suite once under Vitest; `npm run test:watch` for interactive watch mode
+- `npm run build` — Type-check (`tsc`) then produce a production bundle in `dist/`
+- `npm run preview` — Serve the production `dist/` build locally
+- `npm run deploy` — Build and deploy `dist/` to GitHub Pages via gh-pages
 - `npm run cy:open` / `npm run cy:run` — Cypress e2e runner (open / headless)
 
-> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo — notably a **CRA → Vite** migration, **Jest → Vitest**, retiring Cypress for RTL/Vitest integration tests, locking down the Firebase leaderboard, a full `App.tsx` refactor, and GitHub Actions CI/CD. Until those land, the commands and architecture below describe the **current** (Create React App) state.
+### Configuration / env
+
+Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set `VITE_FIREBASE_DB_URL` (the Firebase RTDB base URL backing the leaderboard). Values are surfaced through `src/config.ts`.
+
+> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests, locking down the Firebase leaderboard, a full `App.tsx` refactor, and GitHub Actions CI/CD.
 
 ## Architecture
 
-GeoTracks is a **React 18 + TypeScript** music geography guessing game (Create React App, MUI for components/theming). Players listen to Spotify clips and guess the country of origin. Two game modes: **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard).
+GeoTracks is a **React 18 + TypeScript** music geography guessing game (built with Vite, MUI for components/theming). Players listen to Spotify clips and guess the country of origin. Two game modes: **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard).
 
 ### State Management
 

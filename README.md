@@ -20,7 +20,7 @@ Points are awarded by how few guesses you needed:
 | ------------- | --- | --- | --- | --- | --- |
 | Points        | 150 | 80  | 60  | 40  | 20  |
 
-You get up to 5 guesses per round. Enabling **geo hints** for a round halves the points earned that round.
+You get up to 5 guesses per round. Enabling **geo hints** for a round halves the points earned that round. A perfect competition run (10 first-guess correct answers, no hints) scores the maximum of **1500**.
 
 ## Geo Hints
 

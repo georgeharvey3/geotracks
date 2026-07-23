@@ -4,6 +4,7 @@ import {
   GameState,
   GAME_MODES,
   NUM_COMPETITION_TURNS,
+  MAX_COMPETITION_SCORE,
 } from "./gameReducer";
 import { Song } from "../types";
 
@@ -30,15 +31,14 @@ function stateWith(overrides: Partial<GameState> = {}): GameState {
 
 describe("gameReducer", () => {
   describe("SUBMIT_GUESS scoring", () => {
-    // The current formula doubles points when geo-hints are OFF
-    // (|Number(false) - 2| = 2). This behaviour is intentionally pinned here;
-    // reconciling it with the documented 150-base is a separate ticket.
+    // Without geo-hints, the score is the base SCORE_VALUES for the attempt
+    // (150/80/60/40/20). A perfect competition run is therefore 10 * 150 = 1500.
     it.each([
-      [0, 300],
-      [1, 160],
-      [2, 120],
-      [3, 80],
-      [4, 40],
+      [0, 150],
+      [1, 80],
+      [2, 60],
+      [3, 40],
+      [4, 20],
     ])(
       "awards %i-prior-guesses -> %i points without geo-hints",
       (priorGuesses, expected) => {
@@ -56,12 +56,28 @@ describe("gameReducer", () => {
       }
     );
 
-    it("halves points when geo-hints are enabled (first guess -> 150)", () => {
+    it("halves points when geo-hints are enabled (first guess -> 75)", () => {
       const next = gameReducer(stateWith({ geoHintsEnabled: true }), {
         type: "SUBMIT_GUESS",
         countryAnswer: "France",
       });
-      expect(next.score).toBe(150);
+      expect(next.score).toBe(75);
+    });
+
+    it("reaches the canonical 1500 max on a perfect competition run", () => {
+      // 10 turns, each a first-guess correct with no geo-hints = 10 * 150.
+      let state = stateWith({ turnIndex: 0 });
+      for (let turn = 0; turn < NUM_COMPETITION_TURNS; turn += 1) {
+        // NEXT_SONG picks a real song from the pool, so re-pin France each turn.
+        state = { ...state, song: FRANCE_SONG };
+        state = gameReducer(state, {
+          type: "SUBMIT_GUESS",
+          countryAnswer: "France",
+        });
+        state = gameReducer(state, { type: "NEXT_SONG" });
+      }
+      expect(state.score).toBe(MAX_COMPETITION_SCORE);
+      expect(state.score).toBe(1500);
     });
 
     it("is case-insensitive on the correct answer", () => {

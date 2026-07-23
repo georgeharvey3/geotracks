@@ -34,6 +34,7 @@ Playback uses the **Spotify IFrame API**: a controller is created against a hidd
 - Scores are stored in Firebase Realtime Database via a raw `fetch` to `geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json` (no SDK/auth yet — hardening is tracked in issue #4)
 - Score values by guess attempt: 1st=150, 2nd=80, 3rd=60, 4th=40, 5th=20
 - Enabling geo hints halves the score for that round
+- Canonical competition score range is **0–1500** (`MAX_COMPETITION_SCORE` in `src/state/gameReducer.ts` = `SCORE_VALUES[1] * NUM_COMPETITION_TURNS`, i.e. 10 first-guess correct answers with no hints). This is the bound the leaderboard `.validate` rule enforces (issue #7).
 - Each calendar day starts with the same seeded song set (`src/helpers/getDailySongs.ts`, Mulberry32 PRNG) so scores are comparable; once exhausted, songs are random. Albums are removed from the pool after selection to prevent repeats within a session.
 
 ### Geo Hints System

@@ -21,6 +21,11 @@ export const SCORE_VALUES: Record<number, number> = {
 
 export const NUM_COMPETITION_TURNS = 10;
 
+// Canonical maximum competition score: a perfect run is a first-guess correct
+// answer with no geo-hints on every turn (SCORE_VALUES[1] * NUM_COMPETITION_TURNS).
+// This is the upper bound the leaderboard `.validate` rule enforces (issue #7).
+export const MAX_COMPETITION_SCORE = SCORE_VALUES[1] * NUM_COMPETITION_TURNS;
+
 export type Screen = "menu" | "scoreboard" | "playing" | "finalScore";
 
 export interface GameState {
@@ -143,12 +148,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
 
       if (countryAnswer.toLowerCase() === state.song.country.toLowerCase()) {
-        // Correct: score by the attempt number. Note the current formula
-        // doubles points when geo-hints are OFF (|0 - 2| = 2). This quirk is
-        // preserved deliberately; reconciliation is a separate ticket.
-        const scoreDelta =
-          SCORE_VALUES[state.guesses.length + 1] *
-          Math.abs(Number(state.geoHintsEnabled) - 2);
+        // Correct: award the base points for this attempt number, halved when
+        // geo-hints were enabled for the round (matches the documented design).
+        const basePoints = SCORE_VALUES[state.guesses.length + 1];
+        const scoreDelta = state.geoHintsEnabled ? basePoints / 2 : basePoints;
 
         return {
           ...state,

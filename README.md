@@ -51,7 +51,32 @@ Playback uses the Spotify IFrame API: a controller is created against a hidden e
 
 ### Firebase
 
-Scores are stored in Firebase Realtime Database at `${VITE_FIREBASE_DB_URL}/scores.json`. The database base URL is configured via the `VITE_FIREBASE_DB_URL` env var (see `.env.example`) and surfaced through `src/config.ts`.
+Scores live in Firebase Realtime Database, accessed through the **Firebase JS SDK** with **anonymous auth** — never raw REST fetches. All leaderboard I/O sits behind the `useLeaderboard` hook (`src/hooks/useLeaderboard.ts`); the SDK is initialised once in `src/firebase.ts` from the public web config in `src/config.ts` (sourced from `VITE_FIREBASE_*` env vars — see `.env.example`).
+
+Scores are an **append-only** list: `scores/{pushId}: { name, score, createdAt }`. Writes use `push()`; reads are ordered and bounded server-side (`orderByChild("score").limitToLast(20)`). The Firebase web config values are public client identifiers by design — the leaderboard is protected by security rules, not by hiding them.
+
+#### Security rules
+
+`database.rules.json` (wired up by `firebase.json`) enforces:
+
+- **Public read**, with `.indexOn: ["score"]` so ordered reads are efficient.
+- **Append-only writes**: a record may only be created (`auth != null && !data.exists() && newData.exists()`) — existing records can't be overwritten or deleted.
+- **Strict validation**: exactly `{ name, score, createdAt }`, `name` a 1–10 char string, `score` an integer in `0…1500` (the maximum competition score), and `createdAt == now`.
+
+Deploy the rules with:
+
+```bash
+firebase deploy --only database
+```
+
+Before the strict rules go live, migrate any existing legacy `{name: score}` data into push records (backfilling `createdAt`) — run **while the database is still open**:
+
+```bash
+node scripts/migrate-scores.mjs          # dry run — prints the plan
+node scripts/migrate-scores.mjs --apply  # perform the migration
+```
+
+For the client to sign in, add **Anonymous** as a sign-in provider in the Firebase console (Authentication → Sign-in method), and add the app's origins under Authentication → Settings → Authorized domains: `georgeharvey3.github.io` and `localhost`.
 
 ### Key Files
 

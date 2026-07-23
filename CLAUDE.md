@@ -13,9 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Configuration / env
 
-Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set `VITE_FIREBASE_DB_URL` (the Firebase RTDB base URL backing the leaderboard). Values are surfaced through `src/config.ts`.
+Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set the `VITE_FIREBASE_*` values (RTDB base URL plus the Firebase web config for the SDK). Values are surfaced through `src/config.ts` and the SDK is initialised in `src/firebase.ts`. These are public client identifiers, not secrets.
 
-> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests, locking down the Firebase leaderboard, a full `App.tsx` refactor, and GitHub Actions CI/CD.
+> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests, a full `App.tsx` refactor, and GitHub Actions CI/CD. The Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules).
 
 ## Architecture
 
@@ -31,7 +31,7 @@ Playback uses the **Spotify IFrame API**: a controller is created against a hidd
 
 ### Scoring & Firebase
 
-- Scores are stored in Firebase Realtime Database via a raw `fetch` to `geotracks-d9b5c-default-rtdb.europe-west1.firebasedatabase.app/scores.json` (no SDK/auth yet — hardening is tracked in issue #4)
+- Scores are stored in Firebase Realtime Database via the **Firebase JS SDK** with **anonymous auth**, all behind the `useLeaderboard` hook (`src/hooks/useLeaderboard.ts`); the SDK is initialised in `src/firebase.ts`. Records are append-only (`scores/{pushId}: { name, score, createdAt }`, written with `push()`); reads are bounded (`orderByChild("score").limitToLast(20)`). Access is locked down by committed security rules (`database.rules.json` + `firebase.json`): public read, per-record create-only write (`auth != null && !data.exists()`), and strict `.validate` (name 1–10 chars, integer score 0–1500, `createdAt == now`, no extra fields). Deploy with `firebase deploy --only database`; migrate legacy `{name:score}` data first via `node scripts/migrate-scores.mjs --apply`.
 - Score values by guess attempt: 1st=150, 2nd=80, 3rd=60, 4th=40, 5th=20
 - Enabling geo hints halves the score for that round
 - Canonical competition score range is **0–1500** (`MAX_COMPETITION_SCORE` in `src/state/gameReducer.ts` = `SCORE_VALUES[1] * NUM_COMPETITION_TURNS`, i.e. 10 first-guess correct answers with no hints). This is the bound the leaderboard `.validate` rule enforces (issue #7).

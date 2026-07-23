@@ -57,7 +57,7 @@ const Scoreboard = (props: ScoreboardProps) => {
           <TableBody>
             {props.scores.map((score, index) => (
               <TableRow
-                key={score.name}
+                key={score.id ?? score.name}
                 sx={{
                   "&:last-child td, &:last-child th": { border: 0 },
                 }}

@@ -43,4 +43,18 @@ describe("Scoreboard", () => {
     // Table headers should still render
     expect(screen.getByText("Name")).toBeInTheDocument();
   });
+
+  it("renders distinct rows for identical names keyed by push ID", () => {
+    render(
+      <Scoreboard
+        scores={[
+          { id: "-a", name: "Sam", score: 900 },
+          { id: "-b", name: "Sam", score: 700 },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText("Sam")).toHaveLength(2);
+    expect(screen.getByText("900")).toBeInTheDocument();
+    expect(screen.getByText("700")).toBeInTheDocument();
+  });
 });

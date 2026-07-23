@@ -19,6 +19,11 @@
 .env.test.local
 .env.production.local
 
+# firebase cli
+.firebase/
+firebase-debug.log*
+database-debug.log*
+
 # misc
 .DS_Store
 

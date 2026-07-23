@@ -8,14 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm test` — Run the unit-test suite once under Vitest; `npm run test:watch` for interactive watch mode
 - `npm run build` — Type-check (`tsc`) then produce a production bundle in `dist/`
 - `npm run preview` — Serve the production `dist/` build locally
-- `npm run deploy` — Build and deploy `dist/` to GitHub Pages via gh-pages
+- `npm run lint` — ESLint over the repo; `npm run format` / `npm run format:check` for Prettier
 - `npm run cy:open` / `npm run cy:run` — Cypress e2e runner (open / headless)
+
+### CI/CD & deployment
+
+Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) — there is no local `deploy` script. Every push and PR runs a `quality` job (lint + `tsc --noEmit` + `vitest run` + `vite build`) on the Node version pinned in `.nvmrc`. On push to `main`, a `deploy` job (gated `needs: quality`) publishes `dist/` to GitHub Pages via `actions/configure-pages` → `actions/upload-pages-artifact` → `actions/deploy-pages`. The repo's Pages **Source** must be set to **"GitHub Actions"** (Settings → Pages), and `main` is branch-protected to require a PR and a passing `quality` check.
 
 ### Configuration / env
 
 Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set the `VITE_FIREBASE_*` values (RTDB base URL plus the Firebase web config for the SDK). Values are surfaced through `src/config.ts` and the SDK is initialised in `src/firebase.ts`. These are public client identifiers, not secrets.
 
-> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests, a full `App.tsx` refactor, and GitHub Actions CI/CD. The Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules).
+> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests and a full `App.tsx` refactor. The Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules), and GitHub Actions CI/CD with PR-gated branch protection and automated Pages deploy has landed (issue #19).
 
 ## Architecture
 

@@ -9,13 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — Type-check (`tsc`) then produce a production bundle in `dist/`
 - `npm run preview` — Serve the production `dist/` build locally
 - `npm run deploy` — Build and deploy `dist/` to GitHub Pages via gh-pages
-- `npm run cy:open` / `npm run cy:run` — Cypress e2e runner (open / headless)
+- `npm run test:coverage` — Run the suite with a V8 coverage report (`coverage/`); reported only, no enforced gate
 
 ### Configuration / env
 
 Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set the `VITE_FIREBASE_*` values (RTDB base URL plus the Firebase web config for the SDK). Values are surfaced through `src/config.ts` and the SDK is initialised in `src/firebase.ts`. These are public client identifiers, not secrets.
 
-> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests, a full `App.tsx` refactor, and GitHub Actions CI/CD. The Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules).
+> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); the Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules); and Cypress has been retired in favour of RTL/Vitest integration tests (issue #18). Still pending are a full `App.tsx` refactor and GitHub Actions CI/CD.
 
 ## Architecture
 

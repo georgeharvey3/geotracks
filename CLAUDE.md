@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` — Type-check (`tsc`) then produce a production bundle in `dist/`
 - `npm run preview` — Serve the production `dist/` build locally
 - `npm run lint` — ESLint over the repo; `npm run format` / `npm run format:check` for Prettier
-- `npm run cy:open` / `npm run cy:run` — Cypress e2e runner (open / headless)
+- `npm run test:coverage` — Run the suite with a V8 coverage report (`coverage/`); reported only, no enforced gate
 
 ### CI/CD & deployment
 
@@ -19,7 +19,7 @@ Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) �
 
 Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set the `VITE_FIREBASE_*` values (RTDB base URL plus the Firebase web config for the SDK). Values are surfaced through `src/config.ts` and the SDK is initialised in `src/firebase.ts`. These are public client identifiers, not secrets.
 
-> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); still pending are retiring Cypress for RTL/Vitest integration tests and a full `App.tsx` refactor. The Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules), and GitHub Actions CI/CD with PR-gated branch protection and automated Pages deploy has landed (issue #19).
+> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); the Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules); GitHub Actions CI/CD with PR-gated branch protection and automated Pages deploy has landed (issue #19); and Cypress has been retired in favour of RTL/Vitest integration tests (issue #18). Still pending is a full `App.tsx` refactor.
 
 ## Architecture
 

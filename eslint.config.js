@@ -8,7 +8,7 @@ import prettier from "eslint-config-prettier";
 export default tseslint.config(
   // Paths ESLint should never look at.
   {
-    ignores: ["dist", "build", "coverage", "node_modules", "cypress"],
+    ignores: ["dist", "build", "coverage", "node_modules"],
   },
 
   // Base JS + typescript-eslint recommended (non-type-checked) rules.
@@ -55,6 +55,7 @@ export default tseslint.config(
     files: [
       "**/*.test.{ts,tsx}",
       "src/test-utils.tsx",
+      "src/test/**/*.{ts,tsx}",
       "src/setupTests.ts",
       "src/context/GameContext.tsx",
     ],

@@ -53,7 +53,7 @@ describe("gameReducer", () => {
         expect(next.score).toBe(expected);
         expect(next.correct).toBe(true);
         expect(next.finished).toBe(true);
-      }
+      },
     );
 
     it("halves points when geo-hints are enabled (first guess -> 75)", () => {
@@ -135,7 +135,9 @@ describe("gameReducer", () => {
     });
 
     it("SHOW_SCOREBOARD moves to the scoreboard screen", () => {
-      const next = gameReducer(createInitialState(), { type: "SHOW_SCOREBOARD" });
+      const next = gameReducer(createInitialState(), {
+        type: "SHOW_SCOREBOARD",
+      });
       expect(next.screen).toBe("scoreboard");
     });
 
@@ -208,9 +210,15 @@ describe("gameReducer", () => {
     });
 
     it("caps the name input at 10 characters", () => {
-      const ok = gameReducer(stateWith(), { type: "SET_NAME", value: "1234567890" });
+      const ok = gameReducer(stateWith(), {
+        type: "SET_NAME",
+        value: "1234567890",
+      });
       expect(ok.nameInputValue).toBe("1234567890");
-      const tooLong = gameReducer(ok, { type: "SET_NAME", value: "12345678901" });
+      const tooLong = gameReducer(ok, {
+        type: "SET_NAME",
+        value: "12345678901",
+      });
       expect(tooLong.nameInputValue).toBe("1234567890");
     });
   });

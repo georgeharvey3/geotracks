@@ -1,41 +1,65 @@
 {
-    "name": "geotracks",
-    "version": "0.1.0",
-    "homepage": "https://georgeharvey3.github.io/geotracks",
-    "private": true,
-    "type": "module",
-    "dependencies": {
-        "@emotion/react": "^11.14.0",
-        "@emotion/styled": "^11.14.1",
-        "@mui/icons-material": "^7.3.9",
-        "@mui/material": "^7.3.9",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0"
-    },
-    "scripts": {
-        "predeploy": "npm run build",
-        "deploy": "gh-pages -d dist",
-        "start": "vite",
-        "dev": "vite",
-        "build": "tsc && vite build",
-        "preview": "vite preview",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "cy:open": "cypress open",
-        "cy:run": "cypress run"
-    },
-    "devDependencies": {
-        "@testing-library/jest-dom": "^6.6.3",
-        "@testing-library/react": "^13.4.0",
-        "@testing-library/user-event": "^13.5.0",
-        "@types/react": "^18.3.12",
-        "@types/react-dom": "^18.3.1",
-        "@vitejs/plugin-react": "^5.0.4",
-        "cypress": "^15.13.0",
-        "gh-pages": "^4.0.0",
-        "jsdom": "^26.1.0",
-        "typescript": "^4.9.5",
-        "vite": "^7.1.9",
-        "vitest": "^3.2.4"
-    }
+  "name": "geotracks",
+  "version": "0.1.0",
+  "homepage": "https://georgeharvey3.github.io/geotracks",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
+    "start": "vite",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,json,css,md,html}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "cypress": "^15.13.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "gh-pages": "^4.0.0",
+    "globals": "^17.7.0",
+    "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
+    "lint-staged": "^17.1.1",
+    "prettier": "^3.9.6",
+    "typescript": "^4.9.5",
+    "typescript-eslint": "^8.65.0",
+    "vite": "^7.1.9",
+    "vitest": "^3.2.4"
+  }
 }

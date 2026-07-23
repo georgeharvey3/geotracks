@@ -57,13 +57,38 @@ const TrackReveal = ({ song }: { song: Song }) => (
   >
     <AlbumArt src={song.thumbnailUrl} alt={song.album} />
     <Box sx={{ minWidth: 0, overflow: "hidden" }}>
-      <Typography variant="body1" sx={{ fontWeight: "bold", textOverflow: "ellipsis", overflow: "hidden" }} noWrap>
+      <Typography
+        variant="body1"
+        sx={{
+          fontWeight: "bold",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+        }}
+        noWrap
+      >
         {song.trackTitle || "Unknown Track"}
       </Typography>
-      <Typography variant="body2" sx={{ color: "text.secondary", textOverflow: "ellipsis", overflow: "hidden" }} noWrap>
+      <Typography
+        variant="body2"
+        sx={{
+          color: "text.secondary",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+        }}
+        noWrap
+      >
         {song.artistName || "Unknown Artist"}
       </Typography>
-      <Typography variant="caption" sx={{ color: "text.secondary", textOverflow: "ellipsis", overflow: "hidden", display: "block" }} noWrap>
+      <Typography
+        variant="caption"
+        sx={{
+          color: "text.secondary",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          display: "block",
+        }}
+        noWrap
+      >
         {song.album}
       </Typography>
       <Box sx={{ mt: 0.5 }}>

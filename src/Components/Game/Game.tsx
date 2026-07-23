@@ -86,7 +86,15 @@ const Game = (props: GameProps) => {
       )}
 
       {props.finished && (
-        <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <Box
+          sx={{
+            mt: 2,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
           <Button
             variant="contained"
             startIcon={<SkipNextIcon />}
@@ -99,10 +107,7 @@ const Game = (props: GameProps) => {
         </Box>
       )}
 
-      <div
-        className="iframe-wrapper"
-        style={{ height: 0, overflow: "hidden" }}
-      >
+      <div className="iframe-wrapper" style={{ height: 0, overflow: "hidden" }}>
         <div id="embed-iframe" ref={props.embedRef}></div>
       </div>
     </Box>

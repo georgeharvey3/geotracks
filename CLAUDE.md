@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Contribution workflow
+
+When running `/implement` (or otherwise building a ticket in this repo), branch off and open PRs targeting `production-readiness`, **not** `main`. The production-readiness effort is integrated on that branch until it lands.
+
 ## Build & Development Commands
 
 - `npm start` — Run dev server (localhost:3000)

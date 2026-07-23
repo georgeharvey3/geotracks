@@ -30,7 +30,7 @@ const CLIP_DURATION_MS = 30000;
 // Convert a Spotify URL to a URI: .../track/XXX -> spotify:track:XXX
 function toSpotifyUri(url: string): string {
   const match = url.match(
-    /open\.spotify\.com\/(track|album|episode)\/([a-zA-Z0-9]+)/
+    /open\.spotify\.com\/(track|album|episode)\/([a-zA-Z0-9]+)/,
   );
   if (match) return `spotify:${match[1]}:${match[2]}`;
   return url;
@@ -111,7 +111,7 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
             setSongFinished(false);
           }
         });
-      }
+      },
     );
   }, []);
 
@@ -124,7 +124,7 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
         initController(iframeApiRef.current);
       }
     },
-    [initController]
+    [initController],
   );
 
   // Register the API-ready global once.
@@ -161,7 +161,7 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
         }
       }
     },
-    [destroyController, initController]
+    [destroyController, initController],
   );
 
   // Load the track (and fetch its oEmbed metadata) whenever the song changes.
@@ -177,7 +177,7 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
     let cancelled = false;
     const fetchOembed = (attempt = 0, maxRetries = 3, delay = 1000) => {
       const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(
-        songLink
+        songLink,
       )}`;
       fetch(oembedUrl)
         .then((res) => res.json())
@@ -192,11 +192,14 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
         .catch((err) => {
           if (cancelled) return;
           if (attempt < maxRetries) {
-            setTimeout(() => fetchOembed(attempt + 1, maxRetries, delay), delay);
+            setTimeout(
+              () => fetchOembed(attempt + 1, maxRetries, delay),
+              delay,
+            );
           } else {
             console.error(
               "[useSpotifyPlayer] oEmbed metadata failed:",
-              err?.message || err
+              err?.message || err,
             );
           }
         });

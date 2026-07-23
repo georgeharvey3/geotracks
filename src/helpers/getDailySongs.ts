@@ -16,7 +16,10 @@ function getDateSeed(): number {
   return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
 }
 
-export default function getDailySongs(albums: Album[], count: number = 10): Song[] {
+export default function getDailySongs(
+  albums: Album[],
+  count: number = 10,
+): Song[] {
   const rand = mulberry32(getDateSeed());
   const available = [...albums];
   const songs: Song[] = [];

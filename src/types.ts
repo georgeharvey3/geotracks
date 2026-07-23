@@ -32,7 +32,7 @@ export interface ScoreEntry {
   score: number;
 }
 
-export type Direction = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+export type Direction = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
 
 export interface GameModes {
   infinite: string;

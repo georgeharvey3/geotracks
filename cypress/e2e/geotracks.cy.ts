@@ -28,7 +28,7 @@ describe("GeoTracks E2E", () => {
 
       // Game view should appear
       cy.contains("Which country does this song originate from?").should(
-        "be.visible"
+        "be.visible",
       );
 
       // Country input should be present
@@ -52,7 +52,7 @@ describe("GeoTracks E2E", () => {
 
       // Wait for song to be ready
       cy.get('[data-testid="PlayArrowIcon"]', { timeout: 30000 }).should(
-        "be.visible"
+        "be.visible",
       );
 
       // Click play
@@ -60,7 +60,7 @@ describe("GeoTracks E2E", () => {
 
       // Should now show pause icon
       cy.get('[data-testid="PauseIcon"]', { timeout: 10000 }).should(
-        "be.visible"
+        "be.visible",
       );
 
       // Click pause
@@ -68,7 +68,7 @@ describe("GeoTracks E2E", () => {
 
       // Should return to play icon
       cy.get('[data-testid="PlayArrowIcon"]', { timeout: 10000 }).should(
-        "be.visible"
+        "be.visible",
       );
     });
 
@@ -76,7 +76,7 @@ describe("GeoTracks E2E", () => {
       cy.contains("button", "Infinite Mode").click();
 
       cy.contains("Which country does this song originate from?").should(
-        "be.visible"
+        "be.visible",
       );
 
       // Type a country and select from autocomplete
@@ -117,13 +117,7 @@ describe("GeoTracks E2E", () => {
       cy.contains("button", "Infinite Mode").click();
 
       // Use unlikely countries to ensure wrong guesses
-      const wrongGuesses = [
-        "Andorra",
-        "Tuvalu",
-        "Nauru",
-        "Palau",
-        "Monaco",
-      ];
+      const wrongGuesses = ["Andorra", "Tuvalu", "Nauru", "Palau", "Monaco"];
 
       wrongGuesses.forEach((country) => {
         // Check if the round is already finished (correct guess or exhausted)
@@ -152,13 +146,7 @@ describe("GeoTracks E2E", () => {
       cy.contains("button", "Infinite Mode").click();
 
       // Make 5 wrong guesses to finish the round
-      const wrongGuesses = [
-        "Andorra",
-        "Tuvalu",
-        "Nauru",
-        "Palau",
-        "Monaco",
-      ];
+      const wrongGuesses = ["Andorra", "Tuvalu", "Nauru", "Palau", "Monaco"];
 
       wrongGuesses.forEach((country) => {
         cy.get("body").then(($body) => {
@@ -179,7 +167,7 @@ describe("GeoTracks E2E", () => {
     it("returns to menu from a game via home button", () => {
       cy.contains("button", "Infinite Mode").click();
       cy.contains("Which country does this song originate from?").should(
-        "be.visible"
+        "be.visible",
       );
 
       cy.get('button[aria-label="menu"]').click();
@@ -192,7 +180,7 @@ describe("GeoTracks E2E", () => {
       cy.contains("button", "Competition Mode").click();
 
       cy.contains("Which country does this song originate from?").should(
-        "be.visible"
+        "be.visible",
       );
 
       // Competition mode shows turns remaining and score
@@ -201,7 +189,7 @@ describe("GeoTracks E2E", () => {
 
       // Should show the half-points warning
       cy.contains("Enabling GeoHints will score half points").should(
-        "be.visible"
+        "be.visible",
       );
     });
 
@@ -213,13 +201,7 @@ describe("GeoTracks E2E", () => {
       cy.contains("Score: 0").should("be.visible");
 
       // Exhaust guesses on first round
-      const wrongGuesses = [
-        "Andorra",
-        "Tuvalu",
-        "Nauru",
-        "Palau",
-        "Monaco",
-      ];
+      const wrongGuesses = ["Andorra", "Tuvalu", "Nauru", "Palau", "Monaco"];
 
       wrongGuesses.forEach((country) => {
         cy.get("body").then(($body) => {
@@ -299,7 +281,7 @@ describe("GeoTracks E2E", () => {
 
       // Wait for song ready
       cy.get('[data-testid="PlayArrowIcon"]', { timeout: 30000 }).should(
-        "be.visible"
+        "be.visible",
       );
 
       // Blur any focused element
@@ -310,7 +292,7 @@ describe("GeoTracks E2E", () => {
 
       // Should start playing
       cy.get('[data-testid="PauseIcon"]', { timeout: 10000 }).should(
-        "be.visible"
+        "be.visible",
       );
     });
 

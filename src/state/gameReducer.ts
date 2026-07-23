@@ -58,7 +58,7 @@ export type GameAction =
 function pickNextSong(
   albums: Album[],
   dailySongs: Song[],
-  dailySongIndex: number
+  dailySongIndex: number,
 ): { song: Song; albums: Album[]; dailySongIndex: number } {
   let song: Song;
   let nextDailyIndex = dailySongIndex;
@@ -71,7 +71,9 @@ function pickNextSong(
   } else {
     albumIndexToRemove = Math.floor(Math.random() * albums.length);
     const albumChoice = albums[albumIndexToRemove];
-    const songIndexChoice = Math.floor(Math.random() * albumChoice.tracks.length);
+    const songIndexChoice = Math.floor(
+      Math.random() * albumChoice.tracks.length,
+    );
     song = {
       country: albumChoice.country,
       link: albumChoice.tracks[songIndexChoice],
@@ -132,7 +134,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SUBMIT_GUESS": {
       const { countryAnswer } = action;
       const guessedCountry = countriesJSON.find(
-        (country) => country.name.toLowerCase() === countryAnswer.toLowerCase()
+        (country) => country.name.toLowerCase() === countryAnswer.toLowerCase(),
       );
 
       if (!guessedCountry) {
@@ -154,7 +156,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ...state,
           submitted: true,
           errorMessage: "",
-          guesses: [...state.guesses, { country: countryAnswer, correct: true }],
+          guesses: [
+            ...state.guesses,
+            { country: countryAnswer, correct: true },
+          ],
           finished: true,
           correct: true,
           score: state.score + scoreDelta,
@@ -163,20 +168,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Incorrect: record the guess with distance/direction to the answer.
       const correctCountry = countriesJSON.find(
-        (country) => country.name === state.song.country
+        (country) => country.name === state.song.country,
       )!;
 
       const distance = getDistance(
         parseFloat(guessedCountry.lat),
         parseFloat(guessedCountry.lon),
         parseFloat(correctCountry.lat),
-        parseFloat(correctCountry.lon)
+        parseFloat(correctCountry.lon),
       );
       const direction = getBearing(
         parseFloat(guessedCountry.lat),
         parseFloat(guessedCountry.lon),
         parseFloat(correctCountry.lat),
-        parseFloat(correctCountry.lon)
+        parseFloat(correctCountry.lon),
       );
 
       const guesses = [
@@ -211,7 +216,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const picked = pickNextSong(
         state.albums,
         state.dailySongs,
-        state.dailySongIndex
+        state.dailySongIndex,
       );
 
       const base: GameState = {
@@ -241,7 +246,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const picked = pickNextSong(
         state.albums,
         state.dailySongs,
-        state.dailySongIndex
+        state.dailySongIndex,
       );
 
       return {

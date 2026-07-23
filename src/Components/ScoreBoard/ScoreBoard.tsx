@@ -27,11 +27,23 @@ const getRankColor = (index: number) => {
 const Scoreboard = (props: ScoreboardProps) => {
   return (
     <Box sx={{ mt: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, mb: 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 1,
+          mb: 2,
+        }}
+      >
         <LeaderboardIcon sx={{ color: "primary.main" }} />
         <Typography variant="h2">Top Scores</Typography>
       </Box>
-      <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: 400, mx: "auto" }}>
+      <TableContainer
+        component={Paper}
+        variant="outlined"
+        sx={{ maxWidth: 400, mx: "auto" }}
+      >
         <Table size="small">
           <TableHead>
             <TableRow>

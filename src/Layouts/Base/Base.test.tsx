@@ -1,51 +1,51 @@
-import { render, screen } from '../../test-utils';
-import Base from './Base';
+import { render, screen } from "../../test-utils";
+import Base from "./Base";
 
-describe('Base', () => {
-  it('renders the GeoTracks title', () => {
+describe("Base", () => {
+  it("renders the GeoTracks title", () => {
     render(
       <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Child</div>
-      </Base>
+      </Base>,
     );
-    expect(screen.getByText('GeoTracks')).toBeInTheDocument();
+    expect(screen.getByText("GeoTracks")).toBeInTheDocument();
   });
 
-  it('renders children', () => {
+  it("renders children", () => {
     render(
       <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Test Child Content</div>
-      </Base>
+      </Base>,
     );
-    expect(screen.getByText('Test Child Content')).toBeInTheDocument();
+    expect(screen.getByText("Test Child Content")).toBeInTheDocument();
   });
 
-  it('shows the home button when showMenuButton is true', () => {
+  it("shows the home button when showMenuButton is true", () => {
     render(
       <Base showMenuButton={true} onMenuClicked={vi.fn()}>
         <div>Child</div>
-      </Base>
+      </Base>,
     );
-    expect(screen.getByTestId('HomeIcon')).toBeInTheDocument();
+    expect(screen.getByTestId("HomeIcon")).toBeInTheDocument();
   });
 
-  it('hides the home button when showMenuButton is false', () => {
+  it("hides the home button when showMenuButton is false", () => {
     render(
       <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Child</div>
-      </Base>
+      </Base>,
     );
-    expect(screen.queryByTestId('HomeIcon')).not.toBeInTheDocument();
+    expect(screen.queryByTestId("HomeIcon")).not.toBeInTheDocument();
   });
 
-  it('calls onMenuClicked when the home button is clicked', () => {
+  it("calls onMenuClicked when the home button is clicked", () => {
     const onMenuClicked = vi.fn();
     render(
       <Base showMenuButton={true} onMenuClicked={onMenuClicked}>
         <div>Child</div>
-      </Base>
+      </Base>,
     );
-    screen.getByTestId('HomeIcon').closest('button')!.click();
+    screen.getByTestId("HomeIcon").closest("button")!.click();
     expect(onMenuClicked).toHaveBeenCalledTimes(1);
   });
 });

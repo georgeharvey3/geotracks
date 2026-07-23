@@ -17,7 +17,7 @@ const GameContext = createContext<GameContextValue | null>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, undefined, () =>
-    createInitialState()
+    createInitialState(),
   );
   const leaderboard = useLeaderboardHook();
 
@@ -31,13 +31,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 function useGameContext(): GameContextValue {
   const ctx = useContext(GameContext);
   if (!ctx) {
-    throw new Error("useGame/useLeaderboard must be used within a GameProvider");
+    throw new Error(
+      "useGame/useLeaderboard must be used within a GameProvider",
+    );
   }
   return ctx;
 }
 
 // Game state + dispatch seam for presentational components.
-export function useGame(): { state: GameState; dispatch: React.Dispatch<GameAction> } {
+export function useGame(): {
+  state: GameState;
+  dispatch: React.Dispatch<GameAction>;
+} {
   const { state, dispatch } = useGameContext();
   return { state, dispatch };
 }

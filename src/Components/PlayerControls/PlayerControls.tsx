@@ -1,5 +1,11 @@
 import React from "react";
-import { Box, Button, IconButton, Typography, CircularProgress } from "@mui/material";
+import {
+  Box,
+  Button,
+  IconButton,
+  Typography,
+  CircularProgress,
+} from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import ReplayIcon from "@mui/icons-material/Replay";
@@ -30,7 +36,15 @@ const PlayerControls = (props: PlayerControlsProps) => {
 
   if (props.songLoadFailed) {
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", my: 3, gap: 1.5 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          my: 3,
+          gap: 1.5,
+        }}
+      >
         <ErrorOutlineIcon sx={{ fontSize: 48, color: "error.main" }} />
         <Typography variant="body1" sx={{ color: "text.secondary" }}>
           Song failed to load

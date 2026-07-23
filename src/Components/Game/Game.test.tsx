@@ -4,7 +4,6 @@ import Game from './Game';
 import { Guess, Song } from '../../types';
 
 const createDefaultProps = (overrides: Partial<React.ComponentProps<typeof Game>> = {}) => ({
-  setGameMode: vi.fn(),
   songReady: true,
   songLoadFailed: false,
   onRetryLoad: vi.fn(),

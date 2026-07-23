@@ -94,6 +94,10 @@ For the client to sign in, add **Anonymous** as a sign-in provider in the Fireba
 - `npm test` — Run the unit-test suite once under Vitest (`npm run test:watch` for watch mode)
 - `npm run build` — Type-check and produce a production build in `dist/`
 - `npm run preview` — Serve the production build locally
+- `npm run lint` — Lint the repo with ESLint (`npm run format` / `npm run format:check` for Prettier)
 - `npm run cy:open` — Open the Cypress test runner
 - `npm run cy:run` — Run Cypress tests headlessly
-- `npm run deploy` — Build and deploy `dist/` to GitHub Pages via gh-pages
+
+## Deployment
+
+Deployment is automated by GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — there is no local deploy step. Every push and pull request runs a `quality` job (lint, type-check, tests, build) on the Node version pinned in [`.nvmrc`](.nvmrc). Merges to `main` trigger a gated `deploy` job that publishes `dist/` to GitHub Pages. The repo's Pages **Source** is set to **"GitHub Actions"**.

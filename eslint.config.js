@@ -63,6 +63,17 @@ export default tseslint.config(
     },
   },
 
+  // Node scripts (e.g. the one-off leaderboard migration) run under Node, not
+  // the browser, so give them Node globals (process, console, fetch, …).
+  {
+    files: ["scripts/**/*.{js,mjs}"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+
   // Turn off formatting-related rules that Prettier owns. Must stay last.
   prettier,
 );

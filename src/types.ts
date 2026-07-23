@@ -28,8 +28,14 @@ export interface Guess {
 }
 
 export interface ScoreEntry {
+  // Firebase push ID of the record; used as the stable React key. Optional so
+  // presentational tests can supply plain `{ name, score }` fixtures.
+  id?: string;
   name: string;
   score: number;
+  // Server-set epoch millis when the score was submitted (backfilled for
+  // records migrated from the legacy name-keyed shape).
+  createdAt?: number;
 }
 
 export type Direction = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";

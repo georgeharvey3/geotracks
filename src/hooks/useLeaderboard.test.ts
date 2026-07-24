@@ -71,7 +71,7 @@ describe("useLeaderboard", () => {
       score: 1200,
       createdAt: 2,
     });
-    expect(result.current.scores[1].id).toBe("-a");
+    expect(result.current.scores[1]!.id).toBe("-a");
   });
 
   it("subscribes to public reads without requiring anonymous auth", () => {
@@ -100,7 +100,7 @@ describe("useLeaderboard", () => {
 
     expect(ensureAnonymousAuth).toHaveBeenCalled();
     expect(dbMocks.push).toHaveBeenCalledTimes(1);
-    const payload = dbMocks.push.mock.calls[0][1];
+    const payload = dbMocks.push.mock.calls[0]![1];
     expect(payload).toEqual({
       name: "Zoe",
       score: 300,

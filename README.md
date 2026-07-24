@@ -39,11 +39,11 @@ When enabled, each incorrect guess shows the distance (km) and compass direction
 - **MUI (Material UI)** for components and theming
 - **Firebase Realtime Database** for the competition leaderboard
 - **Spotify IFrame API** for playback, **Spotify oEmbed API** for track metadata
-- **Vitest** + **React Testing Library** for unit tests, **Cypress** for end-to-end tests
+- **Vitest** + **React Testing Library** for unit and integration tests
 
 ## Architecture
 
-All game state lives in `src/App.tsx` via React hooks — there is no state management library. Components under `src/Components/` are presentational and receive everything through props.
+Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `src/App.tsx` is a thin screen router, side effects are isolated in hooks under `src/hooks/` (`useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`), and components under `src/Components/` are presentational and receive everything through props. `GameScreen` is the container that wires the hooks to the reducer.
 
 ### Spotify Integration
 
@@ -80,7 +80,9 @@ For the client to sign in, add **Anonymous** as a sign-in provider in the Fireba
 
 ### Key Files
 
-- `src/App.tsx` — All game state and logic
+- `src/state/gameReducer.ts` — Pure game reducer and scoring constants
+- `src/context/GameContext.tsx` — `GameProvider` plus the `useGame()` / `useLeaderboard()` hooks
+- `src/hooks/` — Side-effect seams: Spotify player, keyboard shortcuts, leaderboard
 - `src/albums.json` — Song pool: `{ country, album_name, tracks: [spotify_urls] }`
 - `src/countries.json` — Country list with coordinates for autocomplete and distance/bearing math
 - `src/types.ts` — Shared TypeScript types
@@ -95,8 +97,9 @@ For the client to sign in, add **Anonymous** as a sign-in provider in the Fireba
 - `npm run build` — Type-check and produce a production build in `dist/`
 - `npm run preview` — Serve the production build locally
 - `npm run lint` — Lint the repo with ESLint (`npm run format` / `npm run format:check` for Prettier)
-- `npm run cy:open` — Open the Cypress test runner
-- `npm run cy:run` — Run Cypress tests headlessly
+- `npm run test:coverage` — Run the suite with a V8 coverage report
+
+Tests are Vitest + React Testing Library throughout: unit tests live next to their subjects, and `src/App.test.tsx` is an integration suite that mounts the real app with only the Spotify player and leaderboard seams faked (`src/test/`).
 
 ## Deployment
 

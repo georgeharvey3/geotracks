@@ -86,7 +86,10 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
         );
       } else if (e.key === "Enter" && activeIndex > -1) {
         e.preventDefault();
-        selectSuggestion(suggestions[activeIndex]);
+        const active = suggestions[activeIndex];
+        if (active !== undefined) {
+          selectSuggestion(active);
+        }
       } else if (e.key === "Escape") {
         setShowSuggestions(false);
       }

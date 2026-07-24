@@ -19,7 +19,7 @@ vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
 // The reducer seeds each round from getDailySongs(albums); compute the same
 // deterministic daily set here so tests know the correct answer per round.
 const dailySongs = getDailySongs(albumsJSON as Album[]);
-const answerAt = (round: number) => dailySongs[round].country;
+const answerAt = (round: number) => dailySongs[round]!.country;
 
 const allCountryNames = countriesJSON.map((c) => c.name);
 function wrongCountriesFor(answer: string, count: number): string[] {
@@ -187,7 +187,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      const wrong = wrongCountriesFor(answerAt(0), 1)[0];
+      const wrong = wrongCountriesFor(answerAt(0), 1)[0]!;
       await submitGuess(wrong);
 
       expect(screen.getByText(wrong)).toBeInTheDocument();
@@ -203,7 +203,7 @@ describe("App integration", () => {
 
       await userEvent.click(screen.getByLabelText("GeoHints"));
 
-      const wrong = wrongCountriesFor(answerAt(0), 1)[0];
+      const wrong = wrongCountriesFor(answerAt(0), 1)[0]!;
       await submitGuess(wrong);
 
       expect(screen.getByText(/\d+\s*km/)).toBeInTheDocument();

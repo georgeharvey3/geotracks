@@ -96,8 +96,8 @@ describe("gameReducer", () => {
       expect(next.correct).toBe(false);
       expect(next.finished).toBe(false);
       expect(next.guesses).toHaveLength(1);
-      expect(next.guesses[0].distance).toBeGreaterThan(0);
-      expect(next.guesses[0].direction).toBeTruthy();
+      expect(next.guesses[0]!.distance).toBeGreaterThan(0);
+      expect(next.guesses[0]!.direction).toBeTruthy();
     });
 
     it("rejects an unrecognised country without submitting", () => {

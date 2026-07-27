@@ -19,7 +19,7 @@ Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) �
 
 Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.example` → `.env` (gitignored) and set the `VITE_FIREBASE_*` values (RTDB base URL plus the Firebase web config for the SDK). Values are surfaced through `src/config.ts` and the SDK is initialised in `src/firebase.ts`. These are public client identifiers, not secrets.
 
-> **Production-readiness effort in flight:** a Wayfinder map ([GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4)) tracks pending decisions to harden this repo. The **CRA → Vite** and **Jest → Vitest** migrations have landed (issue #12); the Firebase leaderboard has been hardened (issue #17: SDK + anonymous auth + append-only rules); GitHub Actions CI/CD with PR-gated branch protection and automated Pages deploy has landed (issue #19); and Cypress has been retired in favour of RTL/Vitest integration tests (issue #18). Still pending is a full `App.tsx` refactor.
+> **Production-readiness backlog complete:** the hardening effort tracked in [GitHub issue #4](https://github.com/georgeharvey3/geotracks/issues/4) has landed in full — **CRA → Vite** and **Jest → Vitest** migrations (issue #12), Firebase leaderboard hardening (issue #17: SDK + anonymous auth + append-only rules), retirement of Cypress in favour of RTL/Vitest integration tests (issue #18), GitHub Actions CI/CD with PR-gated branch protection and automated Pages deploy (issue #19), the `App.tsx` refactor into reducer/context/hooks, and the docs/code-health cleanup (issue #20).
 
 ## Architecture
 
@@ -27,11 +27,17 @@ GeoTracks is a **React 18 + TypeScript** music geography guessing game (built wi
 
 ### State Management
 
-All game state lives in `src/App.tsx` (~600 lines) via useState/useEffect/useRef hooks — there is no state management library. Components under `src/Components/` are purely presentational and receive everything through props.
+Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `finalScore`). Side effects are isolated in hooks under `src/hooks/`:
+
+- `useSpotifyPlayer` — the entire imperative Spotify IFrame integration (controller lifecycle, oEmbed metadata, retries)
+- `useKeyboardShortcuts` — document-level key handlers for the game screen
+- `useLeaderboard` — all Firebase leaderboard reads/writes
+
+`src/Components/GameScreen/GameScreen.tsx` is the container that wires the player and keyboard hooks to the reducer; everything below it (under `src/Components/`) stays purely presentational and receives everything through props.
 
 ### Spotify Integration
 
-Playback uses the **Spotify IFrame API**: a controller is created against a hidden embed element (`IFrameAPI.createController`) and driven programmatically (`controller.togglePlay()`, `controller.loadUri()`). Clips auto-pause after ~30 seconds. Track title, artist, and thumbnail are fetched separately from the **Spotify oEmbed API** (`https://open.spotify.com/oembed?url=...`). The app listens for `message` events from `https://open.spotify.com` to track ready/playing/paused/finished states, and has automatic retries plus a manual retry fallback when a track fails to load.
+Playback uses the **Spotify IFrame API**, wrapped entirely by `src/hooks/useSpotifyPlayer.ts`: a controller is created against a hidden embed element (`IFrameAPI.createController`) and driven programmatically (`controller.togglePlay()`, `controller.loadUri()`). Clips auto-pause after ~30 seconds. Track title, artist, and thumbnail are fetched separately from the **Spotify oEmbed API** (`https://open.spotify.com/oembed?url=...`). Ready/playing/paused/finished states come from the controller's `ready` and `playback_update` listeners, and the hook has automatic retries plus a manual retry fallback when a track fails to load.
 
 ### Scoring & Firebase
 
@@ -45,14 +51,21 @@ Playback uses the **Spotify IFrame API**: a controller is created against a hidd
 
 When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E/SE/S/SW/W/NW) to the correct country. Uses the Haversine formula (`src/helpers/getDistance.ts`) and bearing calculation (`src/helpers/getBearing.ts`) with coordinates from `src/countries.json`.
 
-### Key Data Files
+### Key Files
 
+- `src/state/gameReducer.ts` — Pure game reducer, plus scoring/mode constants (`SCORE_VALUES`, `NUM_COMPETITION_TURNS`, `MAX_COMPETITION_SCORE`, `GAME_MODES`)
+- `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` context hooks
+- `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`
 - `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }`
 - `src/countries.json` — Array of `{ code, name, lat, lon }` used for autocomplete and distance/bearing calculations
 - `src/types.ts` — Shared TypeScript types
 - `src/theme.ts` — MUI theme
 
-### Keyboard Shortcuts (registered in `src/App.tsx`)
+### Testing
+
+Vitest + React Testing Library only — Cypress is retired. `src/App.test.tsx` holds the integration suite: it mounts the real `<App>` (real reducer, context, routing, keyboard shortcuts) and `vi.mock`s only the two side-effectful seams, using the controllable fakes in `src/test/` (`spotifyPlayerFake.ts`, `leaderboardFake.ts`). Unit tests sit next to their subjects (`*.test.ts(x)`). `src/test-utils.tsx` re-exports RTL with a theme-wrapped `render`. TypeScript is strict (including `noUncheckedIndexedAccess` and unused-code checks — see `tsconfig.json`).
+
+### Keyboard Shortcuts (`src/hooks/useKeyboardShortcuts.ts`, wired in `GameScreen`)
 
 - Space: toggle playback
 - Enter: next song (when round finished)

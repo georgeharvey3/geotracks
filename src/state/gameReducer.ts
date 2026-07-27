@@ -24,7 +24,7 @@ export const NUM_COMPETITION_TURNS = 10;
 // Canonical maximum competition score: a perfect run is a first-guess correct
 // answer with no geo-hints on every turn (SCORE_VALUES[1] * NUM_COMPETITION_TURNS).
 // This is the upper bound the leaderboard `.validate` rule enforces (issue #7).
-export const MAX_COMPETITION_SCORE = SCORE_VALUES[1] * NUM_COMPETITION_TURNS;
+export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 
 export type Screen = "menu" | "scoreboard" | "playing" | "finalScore";
 
@@ -69,19 +69,25 @@ function pickNextSong(
   let nextDailyIndex = dailySongIndex;
   let albumIndexToRemove = -1;
 
-  if (dailySongIndex < dailySongs.length) {
-    song = dailySongs[dailySongIndex];
+  const dailySong = dailySongs[dailySongIndex];
+  if (dailySong !== undefined) {
+    song = dailySong;
     nextDailyIndex = dailySongIndex + 1;
-    albumIndexToRemove = albums.findIndex((a) => a.album_name === song.album);
+    albumIndexToRemove = albums.findIndex(
+      (a) => a.album_name === dailySong.album,
+    );
   } else {
     albumIndexToRemove = Math.floor(Math.random() * albums.length);
-    const albumChoice = albums[albumIndexToRemove];
+    // Invariant: the album pool outlasts any session (it only shrinks by one
+    // per round), so a random in-range index always lands on an album with at
+    // least one track.
+    const albumChoice = albums[albumIndexToRemove]!;
     const songIndexChoice = Math.floor(
       Math.random() * albumChoice.tracks.length,
     );
     song = {
       country: albumChoice.country,
-      link: albumChoice.tracks[songIndexChoice],
+      link: albumChoice.tracks[songIndexChoice]!,
       album: albumChoice.album_name,
     };
   }
@@ -152,7 +158,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (countryAnswer.toLowerCase() === state.song.country.toLowerCase()) {
         // Correct: award the base points for this attempt number, halved when
         // geo-hints were enabled for the round (matches the documented design).
-        const basePoints = SCORE_VALUES[state.guesses.length + 1];
+        const basePoints = SCORE_VALUES[state.guesses.length + 1] ?? 0;
         const scoreDelta = state.geoHintsEnabled ? basePoints / 2 : basePoints;
 
         return {

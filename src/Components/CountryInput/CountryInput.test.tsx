@@ -71,7 +71,7 @@ describe("CountryInput", () => {
     });
     const list = screen.getByRole("list");
     const items = within(list).getAllByRole("button");
-    await userEvent.click(items[0]);
+    await userEvent.click(items[0]!);
     expect(input).toHaveValue("Germany");
   });
 

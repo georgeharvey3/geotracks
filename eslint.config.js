@@ -8,7 +8,9 @@ import prettier from "eslint-config-prettier";
 export default tseslint.config(
   // Paths ESLint should never look at.
   {
-    ignores: ["dist", "build", "coverage", "node_modules"],
+    // `.claude` holds agent worktrees: separate checkouts with their own lint
+    // history, not this checkout's sources.
+    ignores: ["dist", "build", "coverage", "node_modules", ".claude"],
   },
 
   // Base JS + typescript-eslint recommended (non-type-checked) rules.

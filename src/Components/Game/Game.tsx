@@ -1,12 +1,6 @@
 import React from "react";
-import { Box, Button, Typography } from "@mui/material";
-import SkipNextIcon from "@mui/icons-material/SkipNext";
-import CountryInput from "../CountryInput/CountryInput";
-import Slider from "../Slider/Slider";
-import Guesses from "../Guesses/Guesses";
-import CurrentScore from "../CurrentScore/CurrentScore";
-import PlayerControls from "../PlayerControls/PlayerControls";
-import TrackReveal from "../TrackReveal/TrackReveal";
+import { Box } from "@mui/material";
+import ControlPanel from "../ControlPanel/ControlPanel";
 import WorldMap from "../WorldMap/WorldMap";
 
 import { Guess, Song } from "../../types";
@@ -35,30 +29,32 @@ interface GameProps {
   countryInputRef: React.RefObject<HTMLInputElement>;
 }
 
+/**
+ * The game screen: the map is the surface and every control lives in a single
+ * panel. In landscape the map covers the viewport and the panel floats over a
+ * corner of it; in portrait they stack, the panel taking only the height its
+ * content needs and the map taking the rest. Nothing here scrolls — the page
+ * must not move under a pan gesture — so only the panel's own content can
+ * overflow.
+ */
 const Game = (props: GameProps) => {
   return (
-    <Box>
-      {props.isCompetition && (
-        <CurrentScore
-          score={props.score}
-          turnsRemaining={props.turnsRemaining}
-        />
-      )}
-
-      <PlayerControls
-        songReady={props.songReady}
-        songLoadFailed={props.songLoadFailed}
-        songFinished={props.songFinished}
-        songPlaying={props.songPlaying}
-        onRetryLoad={props.onRetryLoad}
-        onPlayClicked={props.onPlayClicked}
-      />
-
-      <Typography variant="body1" sx={{ my: 2, color: "text.secondary" }}>
-        Which country does this song originate from?
-      </Typography>
-
-      <Box sx={{ my: 2 }}>
+    <Box
+      sx={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
+        sx={{
+          // Portrait: whatever the content-sized tray leaves. Landscape: the
+          // whole viewport, with the tray floating over a corner of it.
+          flex: "1 1 auto",
+          minHeight: 0,
+        }}
+      >
         <WorldMap
           guesses={props.guesses}
           showGeoHints={props.showGeoHints}
@@ -68,63 +64,27 @@ const Game = (props: GameProps) => {
         />
       </Box>
 
-      <Typography
-        variant="caption"
-        sx={{ display: "block", mb: 1, color: "text.secondary" }}
-      >
-        Click a country, or type its name
-      </Typography>
-
-      <CountryInput
-        ref={props.countryInputRef}
+      <ControlPanel
+        songReady={props.songReady}
+        songLoadFailed={props.songLoadFailed}
+        onRetryLoad={props.onRetryLoad}
+        songFinished={props.songFinished}
+        onPlayClicked={props.onPlayClicked}
+        songPlaying={props.songPlaying}
         onFormSubmit={props.onFormSubmit}
-        disabled={props.finished}
+        finished={props.finished}
+        showGeoHints={props.showGeoHints}
+        onCheck={props.onCheck}
+        errorMessage={props.errorMessage}
+        submitted={props.submitted}
+        guesses={props.guesses}
+        onNextSongClicked={props.onNextSongClicked}
+        song={props.song}
+        isCompetition={props.isCompetition}
+        turnsRemaining={props.turnsRemaining}
+        score={props.score}
+        countryInputRef={props.countryInputRef}
       />
-
-      {props.isCompetition && (
-        <Typography
-          variant="body2"
-          sx={{ mt: 1, color: "warning.main", fontStyle: "italic" }}
-        >
-          Enabling GeoHints will score half points
-        </Typography>
-      )}
-
-      <Box sx={{ my: 2 }}>
-        <Slider checked={props.showGeoHints} onCheck={props.onCheck} />
-      </Box>
-
-      {props.errorMessage && (
-        <Typography color="error" sx={{ my: 1 }}>
-          {props.errorMessage}
-        </Typography>
-      )}
-
-      {props.submitted && (
-        <Guesses guesses={props.guesses} showGeoHints={props.showGeoHints} />
-      )}
-
-      {props.finished && (
-        <Box
-          sx={{
-            mt: 2,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 2,
-          }}
-        >
-          <Button
-            variant="contained"
-            startIcon={<SkipNextIcon />}
-            onClick={props.onNextSongClicked}
-          >
-            {props.turnsRemaining === 0 ? "Continue" : "Next Song"}
-          </Button>
-
-          <TrackReveal song={props.song} />
-        </Box>
-      )}
 
       <div className="iframe-wrapper" style={{ height: 0, overflow: "hidden" }}>
         <div id="embed-iframe" ref={props.embedRef}></div>

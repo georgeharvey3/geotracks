@@ -291,8 +291,16 @@ describe("App integration", () => {
       expect(mapTarget(typed)).toHaveAttribute("data-guess-state", "wrong");
 
       await guessOnMap(clicked);
-      // One shared board: both guesses are on the map and in the list.
+      // One shared board: both guesses are on the map, and the list — collapsed
+      // to its latest entry — reports the one the map committed.
       expect(mapTarget(clicked)).toHaveAttribute("data-guess-state", "wrong");
+      expect(mapTarget(typed)).toHaveAttribute("data-guess-state", "wrong");
+      expect(screen.getByTestId("CancelIcon")).toBeInTheDocument();
+
+      // The earlier typed guess is one tap away.
+      await userEvent.click(
+        screen.getByRole("button", { name: /1 earlier guess/i }),
+      );
       expect(screen.getAllByTestId("CancelIcon")).toHaveLength(2);
     });
 

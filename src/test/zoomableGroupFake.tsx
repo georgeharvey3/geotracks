@@ -1,4 +1,5 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
+import { act } from "@testing-library/react";
 
 /**
  * Stand-in for react-simple-maps' `<ZoomableGroup>`, which drives pan/zoom with
@@ -13,9 +14,32 @@ import { ReactNode } from "react";
  *     ...(await importOriginal<typeof import("react-simple-maps")>()),
  *     ZoomableGroup: (await import("./test/zoomableGroupFake")).default,
  *   }));
+ *
+ * The real wrapper reports the zoom level through `onMove`; the fake hands that
+ * callback to `zoomTo()` so a test can drive the zoom without d3.
  */
-const ZoomableGroupFake = ({ children }: { children?: ReactNode }) => (
-  <g data-testid="zoomable-group">{children}</g>
-);
+
+let reportMove: ((position: { zoom: number }) => void) | undefined;
+
+/** Report a zoom level to the map under test, as a real pan/zoom gesture would. */
+export const zoomTo = (zoom: number) => {
+  act(() => reportMove?.({ zoom }));
+};
+
+interface ZoomableGroupFakeProps {
+  children?: ReactNode;
+  onMove?: (position: { zoom: number }) => void;
+}
+
+const ZoomableGroupFake = ({ children, onMove }: ZoomableGroupFakeProps) => {
+  useEffect(() => {
+    reportMove = onMove;
+    return () => {
+      reportMove = undefined;
+    };
+  }, [onMove]);
+
+  return <g data-testid="zoomable-group">{children}</g>;
+};
 
 export default ZoomableGroupFake;

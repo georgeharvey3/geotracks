@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import WorldMap from "./WorldMap";
 import getProximityColor from "../../helpers/getProximityColor";
 import { setHoverCapability } from "../../test/hoverCapability";
+import { zoomTo } from "../../test/zoomableGroupFake";
 import { Guess } from "../../types";
 
 vi.mock("react-simple-maps", async (importOriginal) => ({
@@ -195,7 +196,7 @@ describe("WorldMap", () => {
 
       expect(stateOf("France")).toBe("wrong");
       expect(stateOf("Peru")).toBe("wrong");
-      // Same neutral fill however far apart the two guesses were.
+      // The same flat fill however far apart the two guesses were.
       expect(fillOf("France")).toBe(fillOf("Peru"));
     });
 
@@ -204,6 +205,38 @@ describe("WorldMap", () => {
 
       expect(screen.queryByText(/km/)).not.toBeInTheDocument();
       expect(screen.queryByTestId("map-hint-arrow-FR")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("zooming", () => {
+    // The scale wrapper each marker sits in: the map cancels the zoom out of it
+    // so the furniture keeps its on-screen size.
+    const scaleOf = (element: Element) =>
+      element.parentElement?.getAttribute("transform");
+
+    it("keeps hint arrows and point-markers the same size on screen", () => {
+      renderMap({ guesses: [wrong("France", 8000, "SW")], showGeoHints: true });
+
+      expect(scaleOf(screen.getByTestId("map-hint-arrow-FR"))).toBe("scale(1)");
+      expect(scaleOf(target("Monaco"))).toBe("scale(1)");
+
+      zoomTo(4);
+
+      expect(scaleOf(screen.getByTestId("map-hint-arrow-FR"))).toBe(
+        "scale(0.25)",
+      );
+      expect(scaleOf(target("Monaco"))).toBe("scale(0.25)");
+    });
+
+    it("keeps country outlines hairline-thin as the map zooms in", () => {
+      renderMap();
+      const widthAtRest = Number(target("France").getAttribute("stroke-width"));
+
+      zoomTo(4);
+
+      expect(Number(target("France").getAttribute("stroke-width"))).toBeCloseTo(
+        widthAtRest / 4,
+      );
     });
   });
 

@@ -57,7 +57,7 @@ function AppContent() {
   return (
     <Base
       showMenuButton={state.screen !== "menu"}
-      wide={state.screen === "playing"}
+      fullBleed={state.screen === "playing"}
       onMenuClicked={() => dispatch({ type: "RESET_TO_MENU" })}
     >
       {content}

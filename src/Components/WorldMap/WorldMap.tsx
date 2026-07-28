@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Box } from "@mui/material";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Box, useMediaQuery } from "@mui/material";
 import {
   ComposableMap,
   Geographies,
@@ -19,17 +19,39 @@ import {
   stragglerMarkers,
   topology,
 } from "../../map/geography";
+import { CHROME_CLEARANCE, LANDSCAPE_QUERY } from "../../layout";
 import { Guess } from "../../types";
 
+// Land sits well above the sea in lightness so the coastline reads at a glance,
+// and the hover highlight goes near-white — a colour nothing else on the map
+// uses — so the country under the pointer is unmistakable against its
+// neighbours. `wrong` is the hints-off marking: a flat desaturated red, well
+// clear of the saturated proximity-heat scale, carrying no distance at all.
 const FILLS = {
-  land: "#2f4257",
-  inertLand: "#26323f",
-  highlight: "#4a6a8f",
-  wrong: "#6b7280",
-  correct: "#66bb6a",
+  sea: "#0b1a30",
+  land: "#7d9cbb",
+  inertLand: "#4c5f75",
+  highlight: "#eaf4ff",
+  wrong: "#8b4a4a",
+  correct: "#4caf50",
   answer: "#ffa726",
-  border: "#1a1a2e",
+  border: "#0b1a30",
 } as const;
+
+// How far in the player may zoom. Generous, because the furniture is
+// counter-scaled: zooming is how you separate a crowded archipelago and reach
+// the country under a pile of hints.
+const MAX_ZOOM = 24;
+
+// Sizes of the map's furniture — country outlines, straggler dots, hint arrows
+// and labels — in screen units at zoom 1. Everything inside the zoomable group
+// is counter-scaled by 1/zoom so these stay put as the player zooms: otherwise
+// hints swell to cover whole regions and neighbouring straggler dots merge.
+const BORDER_WIDTH = 0.3;
+const STRAGGLER_RADIUS = 3.5;
+const STRAGGLER_STROKE = 0.75;
+const HINT_LABEL_SIZE = 10;
+const HINT_LABEL_OFFSET = 20;
 
 // SVG rotation is clockwise from up, which is exactly how compass bearings run,
 // so the octant the geo-hint reports doubles as the arrow's angle. The arrow
@@ -74,10 +96,22 @@ interface WorldMapProps {
 
 const WorldMap = (props: WorldMapProps) => {
   const hasHover = useHasHover();
+  const isLandscape = useMediaQuery(LANDSCAPE_QUERY);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [armedCode, setArmedCode] = useState<string | null>(null);
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Panning reports every tick too, so only a real zoom change re-renders. The
+  // callback is stable because react-simple-maps re-attaches d3-zoom whenever
+  // it changes identity.
+  const handleMove = useCallback(({ zoom: next }: { zoom: number }) => {
+    setZoom((current) => (current === next ? current : next));
+  }, []);
+
+  // Counter-scale for anything that should keep its size on screen.
+  const fixed = 1 / zoom;
 
   // The round is over: drop any preview so a country armed in this round can't
   // commit on its first tap in the next one.
@@ -115,8 +149,9 @@ const WorldMap = (props: WorldMapProps) => {
       case "correct":
         return FILLS.correct;
       case "wrong": {
-        // With hints off the fill must stay neutral: the map may never convey
-        // proximity the player opted out of.
+        // With hints off every wrong guess gets the same flat red, however near
+        // or far it was: the map says "wrong", but may never convey proximity
+        // the player opted out of.
         const distance = guessByCode.get(code)?.distance;
         return props.showGeoHints && distance !== undefined
           ? getProximityColor(distance)
@@ -167,8 +202,8 @@ const WorldMap = (props: WorldMapProps) => {
     ? countryNameByCode(previewedCode)
     : undefined;
 
-  // The hovered name follows the cursor; an armed (tapped) name sits above the
-  // map, clear of the finger.
+  // The hovered name follows the cursor; an armed (tapped) name sits at the top
+  // of the map, clear of the finger and of the layout's overlay chrome.
   const labelPosition =
     hoveredCode && pointer
       ? {
@@ -176,7 +211,11 @@ const WorldMap = (props: WorldMapProps) => {
           top: pointer.y - 12,
           transform: "translate(-50%, -100%)",
         }
-      : { left: "50%", top: 8, transform: "translateX(-50%)" };
+      : {
+          left: "50%",
+          top: CHROME_CLEARANCE + 8,
+          transform: "translateX(-50%)",
+        };
 
   const hintMarks: HintMark[] = props.showGeoHints
     ? [...guessByCode].flatMap(([code, guess]) => {
@@ -205,113 +244,132 @@ const WorldMap = (props: WorldMapProps) => {
       sx={{
         position: "relative",
         width: "100%",
-        mx: "auto",
-        borderRadius: 1,
+        height: "100%",
         overflow: "hidden",
-        bgcolor: "background.paper",
+        bgcolor: FILLS.sea,
         touchAction: "none",
       }}
     >
-      <ComposableMap
-        projection="geoEqualEarth"
-        projectionConfig={{ scale: 145 }}
-        width={800}
-        height={400}
-        style={{ width: "100%", height: "auto", display: "block" }}
+      {/* The inset lives on an inner box rather than as padding on the
+          container, so the container's box stays the frame the pointer
+          coordinates and the tooltip are both measured against. */}
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          top: isLandscape ? 0 : `${CHROME_CLEARANCE}px`,
+        }}
       >
-        <ZoomableGroup minZoom={1} maxZoom={8}>
-          <Geographies geography={topology}>
-            {({ geographies }: { geographies: MapGeography[] }) =>
-              geographies.map((geo) => {
-                // Undefined for shapes the app has no country for (disputed
-                // territories, and countries missing from countries.json): they
-                // are drawn as background land, but can't be committed.
-                const code =
-                  geo.id !== undefined && polygonCodes.has(geo.id)
-                    ? geo.id
-                    : undefined;
+        <ComposableMap
+          projection="geoEqualEarth"
+          projectionConfig={{ scale: 145 }}
+          width={800}
+          height={400}
+          // Landscape covers the viewport, cropping the empty polar bands;
+          // portrait fits the world into the band the layout reserves for it.
+          preserveAspectRatio={isLandscape ? "xMidYMid slice" : "xMidYMid meet"}
+          style={{ width: "100%", height: "100%", display: "block" }}
+        >
+          <ZoomableGroup minZoom={1} maxZoom={MAX_ZOOM} onMove={handleMove}>
+            <Geographies geography={topology}>
+              {({ geographies }: { geographies: MapGeography[] }) =>
+                geographies.map((geo) => {
+                  // Undefined for shapes the app has no country for (disputed
+                  // territories, and countries missing from countries.json): they
+                  // are drawn as background land, but can't be committed.
+                  const code =
+                    geo.id !== undefined && polygonCodes.has(geo.id)
+                      ? geo.id
+                      : undefined;
 
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
+                  return (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      tabIndex={-1}
+                      fill={fillFor(code, code !== undefined)}
+                      stroke={FILLS.border}
+                      strokeWidth={BORDER_WIDTH * fixed}
+                      // A straggler's point-marker is its labelled target; the
+                      // polygon underneath stays clickable for players who zoom in.
+                      aria-label={
+                        code !== undefined && !stragglerCodes.has(code)
+                          ? countryNameByCode(code)
+                          : undefined
+                      }
+                      data-guess-state={
+                        code !== undefined ? stateFor(code) : undefined
+                      }
+                      onClick={
+                        code !== undefined ? () => armOrCommit(code) : undefined
+                      }
+                      onMouseEnter={
+                        code !== undefined
+                          ? () => handleMouseEnter(code)
+                          : undefined
+                      }
+                      onMouseLeave={
+                        code !== undefined ? handleMouseLeave : undefined
+                      }
+                      style={code !== undefined ? interactionStyle : undefined}
+                    />
+                  );
+                })
+              }
+            </Geographies>
+
+            {stragglerMarkers.map((marker) => (
+              <Marker key={marker.code} coordinates={marker.coordinates}>
+                {/* Fixed on-screen size: zooming in separates crowded island
+                    dots instead of inflating them into each other. */}
+                <g transform={`scale(${fixed})`}>
+                  <circle
+                    r={STRAGGLER_RADIUS}
                     tabIndex={-1}
-                    fill={fillFor(code, code !== undefined)}
+                    fill={fillFor(marker.code, true)}
                     stroke={FILLS.border}
-                    strokeWidth={0.3}
-                    // A straggler's point-marker is its labelled target; the
-                    // polygon underneath stays clickable for players who zoom in.
-                    aria-label={
-                      code !== undefined && !stragglerCodes.has(code)
-                        ? countryNameByCode(code)
-                        : undefined
-                    }
-                    data-guess-state={
-                      code !== undefined ? stateFor(code) : undefined
-                    }
-                    onClick={
-                      code !== undefined ? () => armOrCommit(code) : undefined
-                    }
-                    onMouseEnter={
-                      code !== undefined
-                        ? () => handleMouseEnter(code)
-                        : undefined
-                    }
-                    onMouseLeave={
-                      code !== undefined ? handleMouseLeave : undefined
-                    }
-                    style={code !== undefined ? interactionStyle : undefined}
+                    strokeWidth={STRAGGLER_STROKE}
+                    aria-label={marker.name}
+                    data-guess-state={stateFor(marker.code)}
+                    onClick={() => armOrCommit(marker.code)}
+                    onMouseEnter={() => handleMouseEnter(marker.code)}
+                    onMouseLeave={handleMouseLeave}
+                    style={{ cursor }}
                   />
-                );
-              })
-            }
-          </Geographies>
+                </g>
+              </Marker>
+            ))}
 
-          {stragglerMarkers.map((marker) => (
-            <Marker key={marker.code} coordinates={marker.coordinates}>
-              <circle
-                r={3.5}
-                tabIndex={-1}
-                fill={fillFor(marker.code, true)}
-                stroke={FILLS.border}
-                strokeWidth={0.75}
-                aria-label={marker.name}
-                data-guess-state={stateFor(marker.code)}
-                onClick={() => armOrCommit(marker.code)}
-                onMouseEnter={() => handleMouseEnter(marker.code)}
-                onMouseLeave={handleMouseLeave}
-                style={{ cursor }}
-              />
-            </Marker>
-          ))}
-
-          {hintMarks.map(({ code, coordinates, distanceKm, angle }) => (
-            <Marker key={`hint-${code}`} coordinates={coordinates}>
-              <path
-                data-testid={`map-hint-arrow-${code}`}
-                d={ARROW_PATH}
-                transform={`rotate(${angle})`}
-                fill="#ffffff"
-                stroke={FILLS.border}
-                strokeWidth={0.75}
-                pointerEvents="none"
-              />
-              <text
-                y={22}
-                textAnchor="middle"
-                fontSize={11}
-                fill="#ffffff"
-                stroke={FILLS.border}
-                strokeWidth={3}
-                paintOrder="stroke"
-                pointerEvents="none"
-              >
-                {`${distanceKm.toFixed()} km`}
-              </text>
-            </Marker>
-          ))}
-        </ZoomableGroup>
-      </ComposableMap>
+            {hintMarks.map(({ code, coordinates, distanceKm, angle }) => (
+              <Marker key={`hint-${code}`} coordinates={coordinates}>
+                {/* Likewise fixed: a hint that grew with the zoom would blanket
+                    the countries the player zoomed in to reach. */}
+                <g transform={`scale(${fixed})`} pointerEvents="none">
+                  <path
+                    data-testid={`map-hint-arrow-${code}`}
+                    d={ARROW_PATH}
+                    transform={`rotate(${angle})`}
+                    fill="#ffffff"
+                    stroke={FILLS.border}
+                    strokeWidth={0.75}
+                  />
+                  <text
+                    y={HINT_LABEL_OFFSET}
+                    textAnchor="middle"
+                    fontSize={HINT_LABEL_SIZE}
+                    fill="#ffffff"
+                    stroke={FILLS.border}
+                    strokeWidth={2.5}
+                    paintOrder="stroke"
+                  >
+                    {`${distanceKm.toFixed()} km`}
+                  </text>
+                </g>
+              </Marker>
+            ))}
+          </ZoomableGroup>
+        </ComposableMap>
+      </Box>
 
       {previewedName && (
         <Box

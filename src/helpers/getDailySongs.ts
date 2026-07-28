@@ -16,19 +16,24 @@ function getDateSeed(): number {
   return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
 }
 
-export default function getDailySongs(albums: Album[], count: number = 10): Song[] {
+export default function getDailySongs(
+  albums: Album[],
+  count: number = 10,
+): Song[] {
   const rand = mulberry32(getDateSeed());
   const available = [...albums];
   const songs: Song[] = [];
 
   for (let i = 0; i < count && available.length > 0; i++) {
     const albumIndex = Math.floor(rand() * available.length);
-    const album = available[albumIndex];
+    // The loop guard keeps albumIndex in range, and every album in the data
+    // has at least one track.
+    const album = available[albumIndex]!;
     const trackIndex = Math.floor(rand() * album.tracks.length);
 
     songs.push({
       country: album.country,
-      link: album.tracks[trackIndex],
+      link: album.tracks[trackIndex]!,
       album: album.album_name,
     });
 

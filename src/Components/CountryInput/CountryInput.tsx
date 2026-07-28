@@ -57,7 +57,7 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
       const filtered = countries.filter(
         (country) =>
           country.substring(0, value.length).toUpperCase() ===
-          value.toUpperCase()
+          value.toUpperCase(),
       );
       setSuggestions(filtered);
       setActiveIndex(-1);
@@ -77,16 +77,19 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setActiveIndex((prev) =>
-          prev >= suggestions.length - 1 ? 0 : prev + 1
+          prev >= suggestions.length - 1 ? 0 : prev + 1,
         );
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setActiveIndex((prev) =>
-          prev <= 0 ? suggestions.length - 1 : prev - 1
+          prev <= 0 ? suggestions.length - 1 : prev - 1,
         );
       } else if (e.key === "Enter" && activeIndex > -1) {
         e.preventDefault();
-        selectSuggestion(suggestions[activeIndex]);
+        const active = suggestions[activeIndex];
+        if (active !== undefined) {
+          selectSuggestion(active);
+        }
       } else if (e.key === "Escape") {
         setShowSuggestions(false);
       }
@@ -191,7 +194,7 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
         </Box>
       </form>
     );
-  }
+  },
 );
 
 CountryInput.displayName = "CountryInput";

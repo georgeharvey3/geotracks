@@ -20,6 +20,7 @@ const createDefaultProps = (
   submitted: false,
   guesses: [] as Guess[],
   onNextSongClicked: vi.fn(),
+  onMapCommit: vi.fn(),
   song: {
     country: "France",
     link: "https://open.spotify.com/track/abc",

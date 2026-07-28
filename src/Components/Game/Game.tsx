@@ -7,6 +7,7 @@ import Guesses from "../Guesses/Guesses";
 import CurrentScore from "../CurrentScore/CurrentScore";
 import PlayerControls from "../PlayerControls/PlayerControls";
 import TrackReveal from "../TrackReveal/TrackReveal";
+import WorldMap from "../WorldMap/WorldMap";
 
 import { Guess, Song } from "../../types";
 
@@ -25,6 +26,7 @@ interface GameProps {
   submitted: boolean;
   guesses: Guess[];
   onNextSongClicked: () => void;
+  onMapCommit: (countryName: string) => void;
   song: Song;
   embedRef: React.Ref<HTMLDivElement>;
   isCompetition: boolean;
@@ -54,6 +56,23 @@ const Game = (props: GameProps) => {
 
       <Typography variant="body1" sx={{ my: 2, color: "text.secondary" }}>
         Which country does this song originate from?
+      </Typography>
+
+      <Box sx={{ my: 2 }}>
+        <WorldMap
+          guesses={props.guesses}
+          showGeoHints={props.showGeoHints}
+          answer={props.song.country}
+          finished={props.finished}
+          onCommit={props.onMapCommit}
+        />
+      </Box>
+
+      <Typography
+        variant="caption"
+        sx={{ display: "block", mb: 1, color: "text.secondary" }}
+      >
+        Click a country, or type its name
       </Typography>
 
       <CountryInput

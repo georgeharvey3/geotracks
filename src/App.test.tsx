@@ -16,6 +16,13 @@ import { leaderboardControl } from "./test/leaderboardFake";
 vi.mock("./hooks/useSpotifyPlayer", () => import("./test/spotifyPlayerFake"));
 vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
 
+// The map's pan/zoom wrapper is the one part jsdom cannot run (d3-zoom); the
+// rest of the map is real, so map guesses go through the real guess pipeline.
+vi.mock("react-simple-maps", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-simple-maps")>()),
+  ZoomableGroup: (await import("./test/zoomableGroupFake")).default,
+}));
+
 // The reducer seeds each round from getDailySongs(albums); compute the same
 // deterministic daily set here so tests know the correct answer per round.
 const dailySongs = getDailySongs(albumsJSON as Album[]);
@@ -59,6 +66,14 @@ async function submitGuess(country: string) {
     .getAllByRole("button")
     .find((b) => b.getAttribute("type") === "submit")!;
   await userEvent.click(submitButton);
+}
+
+// The map's clickable target for a country — its polygon, or its point-marker
+// when the country is too small to draw one.
+const mapTarget = (country: string) => screen.getByLabelText(country);
+
+async function guessOnMap(country: string) {
+  await userEvent.click(mapTarget(country));
 }
 
 const playButton = () => screen.getByTestId("PlayArrowIcon").closest("button")!;
@@ -206,7 +221,8 @@ describe("App integration", () => {
       const wrong = wrongCountriesFor(answerAt(0), 1)[0]!;
       await submitGuess(wrong);
 
-      expect(screen.getByText(/\d+\s*km/)).toBeInTheDocument();
+      // Once in the guess list, once on the map.
+      expect(screen.getAllByText(/\d+\s*km/)).toHaveLength(2);
       expect(hasDirectionIcon()).toBe(true);
     });
 
@@ -240,6 +256,63 @@ describe("App integration", () => {
       // Back to a fresh round: no reveal text, input re-enabled.
       expect(screen.queryByText(/Answer was:/)).not.toBeInTheDocument();
       expect(screen.getByPlaceholderText("Country")).not.toBeDisabled();
+    });
+
+    it("plays a whole round from the map alone", async () => {
+      render(<App />);
+      await startInfinite();
+      act(() => spotifyPlayerControl.emitReady());
+
+      const answer = answerAt(0);
+      const wrong = wrongCountriesFor(answer, 1)[0]!;
+
+      await guessOnMap(wrong);
+      expect(mapTarget(wrong)).toHaveAttribute("data-guess-state", "wrong");
+      expect(screen.queryByRole("button", { name: /Next Song/i })).toBeNull();
+
+      await guessOnMap(answer);
+      expect(mapTarget(answer)).toHaveAttribute("data-guess-state", "correct");
+      expect(
+        screen.getByRole("button", { name: /Next Song/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("marks a typed guess on the map, and a map guess in the list", async () => {
+      render(<App />);
+      await startInfinite();
+      act(() => spotifyPlayerControl.emitReady());
+
+      const [typed, clicked] = wrongCountriesFor(answerAt(0), 2) as [
+        string,
+        string,
+      ];
+
+      await submitGuess(typed);
+      expect(mapTarget(typed)).toHaveAttribute("data-guess-state", "wrong");
+
+      await guessOnMap(clicked);
+      // One shared board: both guesses are on the map and in the list.
+      expect(mapTarget(clicked)).toHaveAttribute("data-guess-state", "wrong");
+      expect(screen.getAllByTestId("CancelIcon")).toHaveLength(2);
+    });
+
+    it("reveals the answer on the map and stops taking guesses", async () => {
+      render(<App />);
+      await startInfinite();
+      act(() => spotifyPlayerControl.emitReady());
+
+      const answer = answerAt(0);
+      const wrongs = wrongCountriesFor(answer, 5);
+      for (const wrong of wrongs) {
+        await guessOnMap(wrong);
+      }
+
+      expect(screen.getByText(`Answer was: ${answer}`)).toBeInTheDocument();
+      expect(mapTarget(answer)).toHaveAttribute("data-guess-state", "answer");
+
+      const extra = wrongCountriesFor(answer, 6)[5]!;
+      await guessOnMap(extra);
+      expect(mapTarget(extra)).not.toHaveAttribute("data-guess-state");
     });
 
     it("auto-focuses the country input when typing while unfocused", async () => {
@@ -296,6 +369,16 @@ describe("App integration", () => {
           1500,
         ),
       );
+    });
+
+    it("scores a map guess exactly like a typed one", async () => {
+      render(<App />);
+      await startCompetition();
+      act(() => spotifyPlayerControl.emitReady());
+
+      await guessOnMap(answerAt(0));
+
+      expect(screen.getByText("Score: 150")).toBeInTheDocument();
     });
 
     it("halves the score for the round when GeoHints is enabled", async () => {

@@ -5,3 +5,6 @@ node_modules
 package-lock.json
 src/albums.json
 src/countries.json
+
+# Generated map geometry (see scripts/build-map-geometry.mjs)
+src/map/countries-50m.topo.json

@@ -5,12 +5,14 @@ import HomeIcon from "@mui/icons-material/Home";
 interface BaseProps {
   showMenuButton: boolean;
   onMenuClicked: () => void;
+  /** Widened for the game screen, where the map is the primary surface. */
+  wide?: boolean;
   children: React.ReactNode;
 }
 
 const Base = (props: BaseProps) => (
   <Container
-    maxWidth="sm"
+    maxWidth={props.wide ? "md" : "sm"}
     sx={{
       textAlign: "center",
       position: "relative",

@@ -66,6 +66,9 @@ const GameScreen = () => {
       submitted={state.submitted}
       guesses={state.guesses}
       onNextSongClicked={() => dispatch({ type: "NEXT_SONG" })}
+      onMapCommit={(countryAnswer) =>
+        dispatch({ type: "SUBMIT_GUESS", countryAnswer })
+      }
       song={song}
       embedRef={player.embedRef}
       isCompetition={state.gameMode === GAME_MODES.competition}

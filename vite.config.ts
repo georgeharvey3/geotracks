@@ -11,6 +11,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/setupTests.ts",
     css: true,
+    // Vitest's 5s default is a unit-test budget, and the integration suite in
+    // App.test.tsx plays whole games: the competition test alone drives ten
+    // rounds of typing, submitting and advancing against the real map. That
+    // lands around 2s on a dev machine and around 5s on a CI runner — i.e. on
+    // the wrong side of the default, intermittently. Give the long tests room
+    // rather than have the suite fail on runner speed.
+    testTimeout: 20000,
     // Agent worktrees under .claude/ carry their own (often stale) copy of the
     // suite; only this checkout's tests should run.
     exclude: [...configDefaults.exclude, ".claude/**"],

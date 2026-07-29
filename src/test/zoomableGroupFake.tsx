@@ -28,10 +28,15 @@ export const zoomTo = (zoom: number) => {
 
 interface ZoomableGroupFakeProps {
   children?: ReactNode;
+  translateExtent?: [[number, number], [number, number]];
   onMove?: (position: { zoom: number }) => void;
 }
 
-const ZoomableGroupFake = ({ children, onMove }: ZoomableGroupFakeProps) => {
+const ZoomableGroupFake = ({
+  children,
+  translateExtent,
+  onMove,
+}: ZoomableGroupFakeProps) => {
   useEffect(() => {
     reportMove = onMove;
     return () => {
@@ -39,7 +44,16 @@ const ZoomableGroupFake = ({ children, onMove }: ZoomableGroupFakeProps) => {
     };
   }, [onMove]);
 
-  return <g data-testid="zoomable-group">{children}</g>;
+  // d3-zoom enforces the pan bounds for real, so the fake can only report what
+  // it was handed; a test asserts the map hands it the world's own box.
+  return (
+    <g
+      data-testid="zoomable-group"
+      data-translate-extent={translateExtent && JSON.stringify(translateExtent)}
+    >
+      {children}
+    </g>
+  );
 };
 
 export default ZoomableGroupFake;

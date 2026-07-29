@@ -21,16 +21,17 @@ interface PlayerControlsProps {
   onPlayClicked: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-// Play/pause/replay button, with the load-failure retry fallback.
+// Play/pause/replay button, with the load-failure retry fallback. Sized to sit
+// in a row inside the control panel, so it carries no outer margins of its own.
 const PlayerControls = (props: PlayerControlsProps) => {
-  let buttonIcon = <CircularProgress size={32} color="inherit" />;
+  let buttonIcon = <CircularProgress size={24} color="inherit" />;
   if (props.songReady) {
     if (props.songFinished) {
-      buttonIcon = <ReplayIcon sx={{ fontSize: 36 }} />;
+      buttonIcon = <ReplayIcon sx={{ fontSize: 28 }} />;
     } else if (props.songPlaying) {
-      buttonIcon = <PauseIcon sx={{ fontSize: 36 }} />;
+      buttonIcon = <PauseIcon sx={{ fontSize: 28 }} />;
     } else {
-      buttonIcon = <PlayArrowIcon sx={{ fontSize: 36 }} />;
+      buttonIcon = <PlayArrowIcon sx={{ fontSize: 28 }} />;
     }
   }
 
@@ -39,21 +40,22 @@ const PlayerControls = (props: PlayerControlsProps) => {
       <Box
         sx={{
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          my: 3,
-          gap: 1.5,
+          justifyContent: "center",
+          flexWrap: "wrap",
+          gap: 1,
+          width: "100%",
         }}
       >
-        <ErrorOutlineIcon sx={{ fontSize: 48, color: "error.main" }} />
-        <Typography variant="body1" sx={{ color: "text.secondary" }}>
+        <ErrorOutlineIcon sx={{ fontSize: 24, color: "error.main" }} />
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           Song failed to load
         </Typography>
         <Button
+          size="small"
           variant="outlined"
           startIcon={<RefreshIcon />}
           onClick={props.onRetryLoad}
-          sx={{ mt: 0.5 }}
         >
           Retry
         </Button>
@@ -62,30 +64,29 @@ const PlayerControls = (props: PlayerControlsProps) => {
   }
 
   return (
-    <Box sx={{ display: "flex", justifyContent: "center", my: 2 }}>
-      <IconButton
-        disabled={!props.songReady}
-        onClick={props.onPlayClicked}
-        sx={{
-          width: 80,
-          height: 80,
+    <IconButton
+      disabled={!props.songReady}
+      onClick={props.onPlayClicked}
+      sx={{
+        flexShrink: 0,
+        width: 56,
+        height: 56,
+        bgcolor: "background.paper",
+        border: "2px solid",
+        borderColor: "divider",
+        color: "primary.main",
+        "&:hover": {
+          bgcolor: "action.hover",
+        },
+        "&:disabled": {
+          color: "text.disabled",
           bgcolor: "background.paper",
-          border: "2px solid",
           borderColor: "divider",
-          color: "primary.main",
-          "&:hover": {
-            bgcolor: "action.hover",
-          },
-          "&:disabled": {
-            color: "text.disabled",
-            bgcolor: "background.paper",
-            borderColor: "divider",
-          },
-        }}
-      >
-        {buttonIcon}
-      </IconButton>
-    </Box>
+        },
+      }}
+    >
+      {buttonIcon}
+    </IconButton>
   );
 };
 

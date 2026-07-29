@@ -4,6 +4,7 @@ import {
   TextField,
   Button,
   Paper,
+  Popper,
   List,
   ListItemButton,
   ListItemText,
@@ -145,15 +146,23 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
             </Button>
           </Box>
 
-          {showSuggestions && suggestions.length > 0 && (
+          {/* Portalled, not absolutely positioned inside the wrapper: on mobile
+              this input sits in a short scrolling tray, which would otherwise
+              clip the list. Floating it free lets it open over the map. */}
+          <Popper
+            open={showSuggestions && suggestions.length > 0}
+            anchorEl={wrapperRef.current}
+            placement="bottom-start"
+            sx={{
+              zIndex: (theme) => theme.zIndex.modal,
+              width: wrapperRef.current
+                ? wrapperRef.current.offsetWidth - 56
+                : undefined,
+            }}
+          >
             <Paper
               elevation={8}
               sx={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 56,
-                zIndex: 10,
                 maxHeight: 240,
                 overflow: "auto",
                 mt: 0.5,
@@ -165,7 +174,10 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
                     key={suggestion}
                     ref={index === activeIndex ? activeItemRef : null}
                     selected={index === activeIndex}
-                    onMouseDown={() => selectSuggestion(suggestion)}
+                    // On click, not mousedown: the list now floats over the
+                    // map, and closing it on mousedown would let the click
+                    // land on whatever country is underneath.
+                    onClick={() => selectSuggestion(suggestion)}
                     sx={{
                       "&.Mui-selected": {
                         bgcolor: "primary.main",
@@ -190,7 +202,7 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
                 ))}
               </List>
             </Paper>
-          )}
+          </Popper>
         </Box>
       </form>
     );

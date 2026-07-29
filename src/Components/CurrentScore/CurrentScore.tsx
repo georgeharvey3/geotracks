@@ -8,15 +8,17 @@ interface CurrentScoreProps {
 }
 
 const CurrentScore = (props: CurrentScoreProps) => (
-  <Box sx={{ mb: 2 }}>
-    <Stack direction="row" spacing={2} justifyContent="center">
+  <Box sx={{ mb: 1.5 }}>
+    <Stack direction="row" spacing={1} justifyContent="center">
       <Chip
+        size="small"
         icon={<TimerIcon />}
         label={`Turns: ${props.turnsRemaining}`}
         variant="outlined"
         color="primary"
       />
       <Chip
+        size="small"
         icon={<StarIcon />}
         label={`Score: ${props.score}`}
         variant="outlined"

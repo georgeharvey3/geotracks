@@ -228,6 +228,20 @@ describe("WorldMap", () => {
       expect(scaleOf(target("Monaco"))).toBe("scale(0.25)");
     });
 
+    it("bounds panning to the world, so the map can't be dragged off screen", () => {
+      renderMap();
+
+      // The map's own viewBox: d3-zoom measures its extent from the same box,
+      // so matching it means the viewport can never leave the world.
+      expect(screen.getByTestId("zoomable-group")).toHaveAttribute(
+        "data-translate-extent",
+        JSON.stringify([
+          [0, 0],
+          [800, 400],
+        ]),
+      );
+    });
+
     it("keeps country outlines hairline-thin as the map zooms in", () => {
       renderMap();
       const widthAtRest = Number(target("France").getAttribute("stroke-width"));

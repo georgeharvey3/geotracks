@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Box, useMediaQuery } from "@mui/material";
 import {
   ComposableMap,
@@ -42,6 +49,23 @@ const FILLS = {
 // counter-scaled: zooming is how you separate a crowded archipelago and reach
 // the country under a pile of hints.
 const MAX_ZOOM = 24;
+
+// The SVG viewBox, which the projection is sized to fill (`geoEqualEarth` at
+// scale 145 spans almost exactly this box).
+const MAP_WIDTH = 800;
+const MAP_HEIGHT = 400;
+
+// Panning is bounded to the world itself: d3-zoom measures its extent from the
+// viewBox, so clamping the translation to the same box means the viewport can
+// never leave the map. At zoom 1 that pins it outright; zoomed in, the player
+// can reach any edge but not drag the world off into empty sea and lose it.
+const WORLD_EXTENT: [[number, number], [number, number]] = [
+  [0, 0],
+  [MAP_WIDTH, MAP_HEIGHT],
+];
+
+// How far above the pointer the hover tooltip floats, in px.
+const TOOLTIP_LIFT = 12;
 
 // Sizes of the map's furniture — country outlines, straggler dots, hint arrows
 // and labels — in screen units at zoom 1. Everything inside the zoomable group
@@ -99,9 +123,11 @@ const WorldMap = (props: WorldMapProps) => {
   const isLandscape = useMediaQuery(LANDSCAPE_QUERY);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [armedCode, setArmedCode] = useState<string | null>(null);
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   // Panning reports every tick too, so only a real zoom change re-renders. The
   // callback is stable because react-simple-maps re-attaches d3-zoom whenever
@@ -188,34 +214,56 @@ const WorldMap = (props: WorldMapProps) => {
     if (hasHover) setHoveredCode(null);
   };
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+  // The tooltip is moved by writing to its DOM node rather than through state.
+  // The pointer moves more often than anything else on this screen — up to a
+  // few hundred times a second — and re-rendering for each one would rebuild
+  // every country path on the map, hundreds of them, just to shift one label.
+  const placeTooltip = useCallback(() => {
+    const tooltip = tooltipRef.current;
     const bounds = containerRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-    setPointer({
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top,
+    const at = pointerRef.current;
+    if (!tooltip || !bounds || !at) return;
+    tooltip.style.left = `${at.x - bounds.left}px`;
+    tooltip.style.top = `${at.y - bounds.top - TOOLTIP_LIFT}px`;
+  }, []);
+
+  // Coalesced to one write per frame: pointer events outrun paint.
+  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    pointerRef.current = { x: event.clientX, y: event.clientY };
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      placeTooltip();
     });
   };
+
+  // Place it the moment it appears, before paint — otherwise a tooltip shown on
+  // mouseenter sits at the map's origin until the next mousemove.
+  useLayoutEffect(placeTooltip, [placeTooltip, hoveredCode]);
+
+  useEffect(
+    () => () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    },
+    [],
+  );
 
   const previewedCode = hoveredCode ?? armedCode;
   const previewedName = previewedCode
     ? countryNameByCode(previewedCode)
     : undefined;
 
-  // The hovered name follows the cursor; an armed (tapped) name sits at the top
-  // of the map, clear of the finger and of the layout's overlay chrome.
-  const labelPosition =
-    hoveredCode && pointer
-      ? {
-          left: pointer.x,
-          top: pointer.y - 12,
-          transform: "translate(-50%, -100%)",
-        }
-      : {
-          left: "50%",
-          top: CHROME_CLEARANCE + 8,
-          transform: "translateX(-50%)",
-        };
+  // The hovered name follows the cursor (positioned by `placeTooltip`); an armed
+  // (tapped) name sits at the top of the map, clear of the finger and of the
+  // layout's overlay chrome.
+  const followsPointer = hoveredCode !== null;
+  const labelPosition = followsPointer
+    ? { transform: "translate(-50%, -100%)" }
+    : {
+        left: "50%",
+        top: CHROME_CLEARANCE + 8,
+        transform: "translateX(-50%)",
+      };
 
   const hintMarks: HintMark[] = props.showGeoHints
     ? [...guessByCode].flatMap(([code, guess]) => {
@@ -240,7 +288,7 @@ const WorldMap = (props: WorldMapProps) => {
   return (
     <Box
       ref={containerRef}
-      onMouseMove={handleMouseMove}
+      onMouseMove={hasHover ? handleMouseMove : undefined}
       sx={{
         position: "relative",
         width: "100%",
@@ -263,14 +311,19 @@ const WorldMap = (props: WorldMapProps) => {
         <ComposableMap
           projection="geoEqualEarth"
           projectionConfig={{ scale: 145 }}
-          width={800}
-          height={400}
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
           // Landscape covers the viewport, cropping the empty polar bands;
           // portrait fits the world into the band the layout reserves for it.
           preserveAspectRatio={isLandscape ? "xMidYMid slice" : "xMidYMid meet"}
           style={{ width: "100%", height: "100%", display: "block" }}
         >
-          <ZoomableGroup minZoom={1} maxZoom={MAX_ZOOM} onMove={handleMove}>
+          <ZoomableGroup
+            minZoom={1}
+            maxZoom={MAX_ZOOM}
+            translateExtent={WORLD_EXTENT}
+            onMove={handleMove}
+          >
             <Geographies geography={topology}>
               {({ geographies }: { geographies: MapGeography[] }) =>
                 geographies.map((geo) => {
@@ -373,6 +426,10 @@ const WorldMap = (props: WorldMapProps) => {
 
       {previewedName && (
         <Box
+          // Remounted when the tooltip changes mode, so the coordinates written
+          // straight onto the node can't outlive the pointer-following one.
+          key={followsPointer ? "pointer" : "armed"}
+          ref={followsPointer ? tooltipRef : null}
           sx={{
             position: "absolute",
             px: 1,

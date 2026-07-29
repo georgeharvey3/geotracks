@@ -1,6 +1,10 @@
 import { useSyncExternalStore } from "react";
 import { vi } from "vitest";
-import type { SpotifyPlayer, SongMetadata } from "../hooks/useSpotifyPlayer";
+import type {
+  SpotifyPlayer,
+  SpotifyPlayerOptions,
+  SongMetadata,
+} from "../hooks/useSpotifyPlayer";
 import type { Song } from "../types";
 
 /**
@@ -98,7 +102,10 @@ export const spotifyPlayerControl = {
 };
 
 // Mock implementation swapped in for the default export of useSpotifyPlayer.
-export default function useSpotifyPlayerFake(_song: Song): SpotifyPlayer {
+export default function useSpotifyPlayerFake(
+  _song: Song | undefined,
+  _options: SpotifyPlayerOptions = {},
+): SpotifyPlayer {
   const snap = useSyncExternalStore(subscribe, getSnapshot);
   return {
     embedRef,

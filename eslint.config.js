@@ -51,15 +51,14 @@ export default tseslint.config(
 
   // Files that deliberately export non-components alongside (or instead of)
   // components: test/test-utility files (not fast-refresh boundaries) and the
-  // context module, which co-locates its provider with the useGame/
-  // useLeaderboard hook seams by design.
+  // context modules, which co-locate each provider with its hook seam by design.
   {
     files: [
       "**/*.test.{ts,tsx}",
       "src/test-utils.tsx",
       "src/test/**/*.{ts,tsx}",
       "src/setupTests.ts",
-      "src/context/GameContext.tsx",
+      "src/context/*.tsx",
     ],
     rules: {
       "react-refresh/only-export-components": "off",

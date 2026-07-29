@@ -25,7 +25,15 @@ export interface SpotifyPlayer {
 
 const MAX_AUTO_RETRIES = 3;
 const LOAD_TIMEOUT_MS = 10000;
-const CLIP_DURATION_MS = 30000;
+
+export interface SpotifyPlayerOptions {
+  /**
+   * Cap playback at this many ms, the length of a Clip. Omit to play the whole
+   * Song — a listener signed in to Spotify hears all of it, and everyone else
+   * still gets Spotify's own preview limit.
+   */
+  clipDurationMs?: number;
+}
 
 // Convert a Spotify URL to a URI: .../track/XXX -> spotify:track:XXX
 function toSpotifyUri(url: string): string {
@@ -41,8 +49,13 @@ function toSpotifyUri(url: string): string {
  * oEmbed metadata, playback event handling (via the controller's `ready` /
  * `playback_update` listeners), and load retries. Kept outside the game reducer
  * so the whole side-effectful surface can be mocked at this seam.
+ *
+ * `song` may be undefined for a surface that has nothing chosen yet.
  */
-export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
+export default function useSpotifyPlayer(
+  song: Song | undefined,
+  options: SpotifyPlayerOptions = {},
+): SpotifyPlayer {
   const [songReady, setSongReady] = useState(false);
   const [songPlaying, setSongPlaying] = useState(false);
   const [songFinished, setSongFinished] = useState(false);
@@ -56,6 +69,13 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
   const songLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
   const replayPendingRef = useRef(false);
+
+  // The controller's listeners are wired once, so anything they need to read
+  // later travels by ref.
+  const clipDurationRef = useRef(options.clipDurationMs);
+  clipDurationRef.current = options.clipDurationMs;
+  const playingRef = useRef(false);
+  const selfPausedRef = useRef(false);
 
   const destroyController = useCallback(() => {
     if (controllerRef.current) {
@@ -98,12 +118,39 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
         });
         controller.addListener("playback_update", (e) => {
           const { isPaused, position, duration } = e.data;
-          const isClipFinished = duration > 0 && position >= CLIP_DURATION_MS;
-          const isFinished =
-            duration > 0 && (position >= duration || isClipFinished);
+          const clipDuration = clipDurationRef.current;
+
+          // Capped: the Clip ends where the cap says, and we stop it ourselves.
+          const isClipFinished =
+            clipDuration !== undefined &&
+            duration > 0 &&
+            position >= clipDuration;
           if (isClipFinished && !isPaused) {
             controller.togglePlay();
           }
+
+          // Uncapped, position reaching duration is not a signal we can rely
+          // on: the embed reports the whole Song's duration to a listener who
+          // is not signed in to Spotify, but only plays its own ~30s preview,
+          // so position never gets there and the Song would never read as
+          // ended. What holds either way is that playback stopped and we were
+          // not the ones who stopped it.
+          const stoppedItself =
+            clipDuration === undefined &&
+            isPaused &&
+            position > 0 &&
+            playingRef.current &&
+            !selfPausedRef.current;
+
+          const isFinished =
+            (duration > 0 && position >= duration) ||
+            isClipFinished ||
+            stoppedItself;
+
+          // A pause we asked for is spent once it has been reported.
+          if (isPaused) selfPausedRef.current = false;
+
+          playingRef.current = !isPaused && !isFinished;
           setSongPlaying(!isPaused && !isFinished);
           if (isFinished) {
             setSongFinished(true);
@@ -139,6 +186,8 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
       setSongReady(false);
       setSongPlaying(false);
       setSongLoadFailed(false);
+      playingRef.current = false;
+      selfPausedRef.current = false;
       if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
 
       songLoadTimerRef.current = setTimeout(() => {
@@ -213,6 +262,9 @@ export default function useSpotifyPlayer(song: Song): SpotifyPlayer {
   }, [song, attemptLoad]);
 
   const togglePlay = useCallback(() => {
+    // Remember a pause we asked for, so the next report of one isn't mistaken
+    // for playback stopping by itself.
+    if (playingRef.current) selfPausedRef.current = true;
     controllerRef.current?.togglePlay();
   }, []);
 

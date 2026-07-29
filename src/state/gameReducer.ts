@@ -26,7 +26,10 @@ export const NUM_COMPETITION_TURNS = 10;
 // This is the upper bound the leaderboard `.validate` rule enforces (issue #7).
 export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 
-export type Screen = "menu" | "scoreboard" | "playing" | "finalScore";
+// `screen` is the app's single router. Explore keeps its own state in its own
+// reducer (ADR-0003), but which surface is on screen is decided in one place.
+export type Screen =
+  "menu" | "scoreboard" | "playing" | "finalScore" | "explore";
 
 export interface GameState {
   screen: Screen;
@@ -52,6 +55,7 @@ export interface GameState {
 export type GameAction =
   | { type: "SET_MODE"; mode: string }
   | { type: "SHOW_SCOREBOARD" }
+  | { type: "SHOW_EXPLORE" }
   | { type: "SUBMIT_GUESS"; countryAnswer: string }
   | { type: "TOGGLE_GEO_HINTS"; checked: boolean }
   | { type: "NEXT_SONG" }
@@ -141,6 +145,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };
+
+    case "SHOW_EXPLORE":
+      return { ...state, screen: "explore" };
 
     case "SUBMIT_GUESS": {
       const { countryAnswer } = action;

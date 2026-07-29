@@ -5,6 +5,10 @@ import { GAME_MODES, NUM_COMPETITION_TURNS } from "../../state/gameReducer";
 import useSpotifyPlayer from "../../hooks/useSpotifyPlayer";
 import useKeyboardShortcuts from "../../hooks/useKeyboardShortcuts";
 
+// How long a round's Clip runs before the player pauses it: long enough to
+// place the music, short enough to keep the round moving.
+const CLIP_DURATION_MS = 30000;
+
 /**
  * Container for the active game screen. Owns the Spotify player and keyboard
  * seams and wires them to the game reducer via context, so <Game> stays purely
@@ -13,7 +17,10 @@ import useKeyboardShortcuts from "../../hooks/useKeyboardShortcuts";
 const GameScreen = () => {
   const { state, dispatch } = useGame();
   const countryInputRef = useRef<HTMLInputElement>(null);
-  const player = useSpotifyPlayer(state.song);
+  // A round hears a Clip, not the whole Song.
+  const player = useSpotifyPlayer(state.song, {
+    clipDurationMs: CLIP_DURATION_MS,
+  });
   const wasReadyRef = useRef(false);
 
   useKeyboardShortcuts({

@@ -24,21 +24,25 @@ Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.
 
 ## Architecture
 
-GeoTracks is a **React 18 + TypeScript** music geography guessing game (built with Vite, MUI for components/theming). Players listen to Spotify clips and guess the country of origin — by clicking it on the world map or by typing its name. Two game modes: **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard).
+GeoTracks is a **React 18 + TypeScript** music geography app (built with Vite, MUI for components/theming) built on one world map. In the **game**, players listen to Spotify clips and guess the country of origin — by clicking it on the map or by typing its name; two game modes, **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard). In **Explore**, they choose a country in order to listen to it. `CONTEXT.md` pins the vocabulary (Song, Album, Clip, Game mode, Explore, Playable country, Country queue, Skip).
 
 ### State Management
 
-Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `finalScore`). Side effects are isolated in hooks under `src/hooks/`:
+Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `finalScore` | `explore`). Side effects are isolated in hooks under `src/hooks/`:
 
 - `useSpotifyPlayer` — the entire imperative Spotify IFrame integration (controller lifecycle, oEmbed metadata, retries)
-- `useKeyboardShortcuts` — document-level key handlers for the game screen
+- `useKeyboardShortcuts` — document-level key handlers for the map screens
 - `useLeaderboard` — all Firebase leaderboard reads/writes
 
 `src/Components/GameScreen/GameScreen.tsx` is the container that wires the player and keyboard hooks to the reducer; everything below it (under `src/Components/`) stays purely presentational and receives everything through props.
 
+Explore has a reducer (`src/state/exploreReducer.ts`) and provider (`src/context/ExploreContext.tsx`) of its own, mounted as a **sibling** of the game's — neither reads the other. `screen` stays the single router inside the game reducer, so there is exactly one place that decides what is on screen (ADR-0003).
+
 ### Spotify Integration
 
-Playback uses the **Spotify IFrame API**, wrapped entirely by `src/hooks/useSpotifyPlayer.ts`: a controller is created against a hidden embed element (`IFrameAPI.createController`) and driven programmatically (`controller.togglePlay()`, `controller.loadUri()`). Clips auto-pause after ~30 seconds. Track title, artist, and thumbnail are fetched separately from the **Spotify oEmbed API** (`https://open.spotify.com/oembed?url=...`). Ready/playing/paused/finished states come from the controller's `ready` and `playback_update` listeners, and the hook has automatic retries plus a manual retry fallback when a track fails to load.
+Playback uses the **Spotify IFrame API**, wrapped entirely by `src/hooks/useSpotifyPlayer.ts`: a controller is created against a hidden embed element (`IFrameAPI.createController`) and driven programmatically (`controller.togglePlay()`, `controller.loadUri()`). Track title, artist, and thumbnail are fetched separately from the **Spotify oEmbed API** (`https://open.spotify.com/oembed?url=...`). Ready/playing/paused/finished states come from the controller's `ready` and `playback_update` listeners, and the hook has automatic retries plus a manual retry fallback when a track fails to load.
+
+The hook takes an optional **Clip cap** (`clipDurationMs`). The game passes 30 s (`CLIP_DURATION_MS` in `GameScreen`) and the hook pauses the embed there; Explore passes none, so a listener signed in to Spotify hears the whole Song and everyone else still gets Spotify's own preview limit. That splits end-of-Song detection in two: **capped**, the end is the cap; **uncapped**, `position >= duration` is unreliable — the embed reports the full Song's duration to a listener who is not signed in while playing only its ~30 s preview, so position never gets there. What holds either way is that _playback stopped and we were not the ones who stopped it_, so the hook tracks pauses it asked for (`togglePlay`) and treats any other stop as the Song ending. **This has not been verified against a real embed** — see the note in issue #37.
 
 ### Scoring & Firebase
 
@@ -50,16 +54,20 @@ Playback uses the **Spotify IFrame API**, wrapped entirely by `src/hooks/useSpot
 
 ### Map Interface
 
-The world map (`src/Components/WorldMap/WorldMap.tsx`) is the primary guessing surface, always on, with the text box retained as a compact secondary input. Both feed the same `SUBMIT_GUESS` action, so the map is a **unified board**: it marks every guess of the round whichever input committed it. Rendering is **react-simple-maps** (inline SVG, `geoEqualEarth`, `ZoomableGroup` pan/zoom, no tile provider — ADR-0001).
+The world map splits into a **surface-neutral base** (`src/Components/WorldMap/BaseMap.tsx`) and one thin wrapper per surface (ADR-0003). The base owns how a country is picked and nothing about what picking means: the projection, bounded panning, the `1/zoom` counter-scale, straggler markers, the hover tooltip and commit-on-click. Its caller supplies the fill for a country (`fillFor`), whether it may be chosen (`selectable`), what the tooltip says (`labelFor`), the touch rule (`armOnTouch`), per-country marking attributes and an optional `overlay`. **The base must stay state-agnostic** — the moment it branches on which surface is calling, the split has failed and a `mode` prop has been rebuilt by accident. Shared palette entries live in `src/map/fills.ts`.
+
+The two wrappers are `WorldMap.tsx` (guessing) and `src/Components/ExploreMap/ExploreMap.tsx` (Explore).
+
+The guessing map is the primary guessing surface, always on, with the text box retained as a compact secondary input. Both feed the same `SUBMIT_GUESS` action, so the map is a **unified board**: it marks every guess of the round whichever input committed it. Rendering is **react-simple-maps** (inline SVG, `geoEqualEarth`, `ZoomableGroup` pan/zoom, no tile provider — ADR-0001).
 
 - **Geometry** — Natural Earth 1:50m TopoJSON, committed at `src/map/countries-50m.topo.json` with each geometry's `id` already rewritten to the alpha-2 code used across the app. Generated by `node scripts/build-map-geometry.mjs` (re-run it after editing `src/countries.json`); see ADR-0002. `src/map/geography.ts` owns the join: `polygonCodes`, `stragglerMarkers`, and code↔name lookups.
 - **Stragglers** — countries under 15,000 km² (and the handful Natural Earth omits) also get a clickable **point-marker** at their `countries.json` centroid, so every guessable country has a target. The marker is that country's labelled target; its polygon, if any, stays clickable underneath.
-- **Commit-on-click** — a hovering pointer (`useHasHover`, i.e. `(hover: hover) and (pointer: fine)`) commits on a single click and previews via a hover tooltip; without one (touch), the first tap arms a country and a second tap on it commits.
+- **Commit-on-click** — a hovering pointer (`useHasHover`, i.e. `(hover: hover) and (pointer: fine)`) commits on a single click and previews via a hover tooltip; without one (touch), the first tap arms a country and a second tap on it commits. The touch rule is a **parameter** of the base map, not a property of it: the arm-then-commit guard exists to protect an irreversible Guess, so Explore, which has nothing irreversible to protect, passes `armOnTouch={false}` and commits on one tap.
 - **Markings** — a wrong guess persists as **proximity heat** (`src/helpers/getProximityColor.ts`, a yellow→red scale where yellow is closest) plus a direction arrow and km label when geo-hints are on, and as one flat desaturated red — identical for every wrong guess, near or far — when they are off, so the map never leaks proximity the player opted out of. On round end the answer is revealed and the map stops accepting guesses.
 - **Bounded panning** — `ZoomableGroup`'s `translateExtent` is pinned to the map's own viewBox (`[[0,0],[800,400]]`), the same box d3-zoom measures its extent from, so the viewport can never leave the world. At zoom 1 that pins the map outright; zoomed in, the player can reach any edge but can't drag the world off into empty sea and lose it.
 - **Zoom-invariant furniture** — the map tracks the zoom level (`ZoomableGroup`'s `onMove`) and counter-scales straggler markers, hint arrows/labels and country outlines by `1/zoom`, so they keep their on-screen size: zooming in separates crowded island dots and stops hints blanketing the countries the player zoomed in to reach.
 - **Hover tooltip** — the country name that follows the cursor is positioned by writing `left`/`top` straight onto its DOM node (rAF-coalesced), not through React state. Pointer moves outnumber every other event on this screen, and routing them through state re-rendered all ~250 country paths per mousemove.
-- **Not yet** — keyboard navigation of the map is deliberately deferred (issue #2); the text box remains the complete keyboard path, so map targets are `tabIndex={-1}`.
+- **Not yet** — keyboard navigation of the map is deliberately deferred on both surfaces (issues #2, #37); the text box remains the complete keyboard path, so map targets are `tabIndex={-1}`.
 
 ### Game screen layout
 
@@ -74,37 +82,57 @@ Nothing on this screen scrolls — the map claims touch gestures for pan/zoom (`
 
 The **guess board** (`src/Components/Guesses/Guesses.tsx`) shows only the latest guess by default, with a toggle to unfold the rest; the end of a round folds it back up so the reveal and Next Song button have the room. The map still carries every guess, so nothing is lost by keeping the board short. Because the panel is a short scrolling box, the country autocomplete opens in a `Popper` portalled out of it (and selects on click, not mousedown, so a dismissed list can't pass the click through to the map underneath).
 
+### Explore
+
+**Explore** (issue #37) is the surface where a player chooses a country in order to listen to it. It is **not a Game mode**: nothing is scored, recorded or submitted, there are no rounds, Guesses or Attempts, and it never touches the game's album pool, daily seeding, score or turn counter. It is reached from a third primary button on the menu (`SHOW_EXPLORE`), and it wears the same full-bleed layout as the game screen — map covering the viewport with `ExplorePanel` floating over a corner in landscape, a content-sized bottom tray in portrait (both via the shared `PanelSurface`).
+
+- **Playable countries** — a country is Playable when the app holds at least one Album for it: 123 of 245 today (121 polygons, 15 of the 87 straggler markers). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
+- **Fills** — four flat states: inert land (non-playable), land (Playable), the near-white highlight (hover), and green for the country now playing. No rings or halos; Explore leaves the base map's `overlay` slot unused.
+- **Country queue** — built on first selection from all of a country's Albums' Songs, shuffled. Skip advances it; it is exhausted before any Song repeats, then drawn afresh and continued (the fresh draw never opens with the Song just heard). Returning to a country **resumes** rather than restarts. Choosing the country already playing is a no-op.
+- **Playback** — choosing a country or skipping starts playback automatically on every device (the click on the map is itself the user gesture, so the game's desktop-width gate is deliberately not carried over). A finished Song advances the queue; pausing stops that run, because auto-advance is driven by the finished signal and nothing else. The track card is shown **un-gated** from the first note — artwork, title, artist, Album and the Spotify link — because Explore has nothing to withhold.
+- **Keyboard** — the same shortcuts as the game, with next-song wired to Skip: Space plays/pauses, Enter skips, any other key focuses the country input, Escape blurs it. `CountryInput` takes an optional `countries` list (defaulting to all of them, so the game is unaffected); Explore passes only the Playable ones, so the suggestions can never dead-end.
+- **Lifetime** — leaving Explore unmounts the player and therefore stops the music; the queues live in the provider above the screen, so a trip to the menu and back within a visit keeps the player's place. Nothing is persisted across a page reload — no storage, no schema to version.
+
 ### Geo Hints System
 
 When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E/SE/S/SW/W/NW) to the correct country. Uses the Haversine formula (`src/helpers/getDistance.ts`) and bearing calculation (`src/helpers/getBearing.ts`) with coordinates from `src/countries.json`.
 
 ### Key Files
 
-- `src/state/gameReducer.ts` — Pure game reducer, plus scoring/mode constants (`SCORE_VALUES`, `NUM_COMPETITION_TURNS`, `MAX_COMPETITION_SCORE`, `GAME_MODES`)
+- `src/state/gameReducer.ts` — Pure game reducer, plus scoring/mode constants (`SCORE_VALUES`, `NUM_COMPETITION_TURNS`, `MAX_COMPETITION_SCORE`, `GAME_MODES`) and the `Screen` router type
+- `src/state/exploreReducer.ts` — Pure Explore reducer: Playable countries, the selected country and each Country queue, plus the `currentSong()` selector
 - `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` context hooks
+- `src/context/ExploreContext.tsx` — `ExploreProvider` + `useExplore()`, mounted as GameProvider's sibling
 - `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`, `useHasHover`
 - `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }`
 - `src/countries.json` — Array of `{ code, name, lat, lon }` used for autocomplete, distance/bearing calculations, and the map join
-- `src/map/` — Map geometry: generated `countries-50m.topo.json` + `stragglers.json`, and the `geography.ts` join
-- `src/Components/WorldMap/WorldMap.tsx` — The clickable map (see “Map Interface”)
-- `src/Components/ControlPanel/ControlPanel.tsx` — The controls panel floating over the map (see “Game screen layout”)
+- `src/map/` — Map geometry: generated `countries-50m.topo.json` + `stragglers.json`, the `geography.ts` join, and the shared `fills.ts` palette
+- `src/Components/WorldMap/BaseMap.tsx` — The surface-neutral map (see “Map Interface”)
+- `src/Components/WorldMap/WorldMap.tsx` — The guessing wrapper around it
+- `src/Components/ExploreMap/ExploreMap.tsx` — The Explore wrapper around it
+- `src/Components/ExploreScreen/ExploreScreen.tsx` — Explore's container: player + keyboard seams wired to the Explore reducer
+- `src/Components/PanelSurface/PanelSurface.tsx` — The panel treatment both control panels sit on
+- `src/Components/ControlPanel/ControlPanel.tsx` — The game's controls panel (see “Game screen layout”)
+- `src/Components/ExplorePanel/ExplorePanel.tsx` — Explore's controls panel (see “Explore”)
 - `src/layout.ts` — Shared game-screen geometry: `LANDSCAPE_QUERY`/`LANDSCAPE_MEDIA`, `CHROME_CLEARANCE`, `PORTRAIT_PANEL_MAX_HEIGHT`
 - `src/types.ts` — Shared TypeScript types
 - `src/theme.ts` — MUI theme
 
 ### Testing
 
-Vitest + React Testing Library only — Cypress is retired. `src/App.test.tsx` holds the integration suite: it mounts the real `<App>` (real reducer, context, routing, keyboard shortcuts) and `vi.mock`s only the two side-effectful seams, using the controllable fakes in `src/test/` (`spotifyPlayerFake.ts`, `leaderboardFake.ts`). The map is real in those tests apart from its pan/zoom wrapper (`zoomableGroupFake.tsx` — jsdom cannot run d3-zoom); `hoverCapability.ts` stubs `matchMedia` so a test can choose pointer or touch behaviour. Unit tests sit next to their subjects (`*.test.ts(x)`). `src/test-utils.tsx` re-exports RTL with a theme-wrapped `render`. TypeScript is strict (including `noUncheckedIndexedAccess` and unused-code checks — see `tsconfig.json`).
+Vitest + React Testing Library only — Cypress is retired. Two integration suites mount the real `<App>` (real reducers, context, routing, keyboard shortcuts) and `vi.mock` only the side-effectful seams, using the controllable fakes in `src/test/` (`spotifyPlayerFake.ts`, `leaderboardFake.ts`): `src/App.test.tsx` for the game and `src/Explore.test.tsx` for Explore. The map is real in those tests apart from its pan/zoom wrapper (`zoomableGroupFake.tsx` — jsdom cannot run d3-zoom); `hoverCapability.ts` stubs `matchMedia` so a test can choose pointer or touch behaviour. Unit tests sit next to their subjects (`*.test.ts(x)`). `src/test-utils.tsx` re-exports RTL with a theme-wrapped `render`. TypeScript is strict (including `noUncheckedIndexedAccess` and unused-code checks — see `tsconfig.json`).
 
-### Keyboard Shortcuts (`src/hooks/useKeyboardShortcuts.ts`, wired in `GameScreen`)
+No new mocking boundaries have been added for Explore — it reuses those four, plus Album data injected as a **default parameter** (`createInitialExploreState(albums = albumsJSON)`, mirroring `createInitialState`). Because the Country queue is shuffled, **no test may assert which Song plays first**; every property tested is invariant under any shuffle, and the Song currently playing is observed through the track card's Spotify link, whose address comes from the real reducer rather than the fake. Note also that the map's ~250 country shapes are drawn a tick after the screen mounts, so a test must `await screen.findByLabelText(...)` before reaching for a country.
+
+### Keyboard Shortcuts (`src/hooks/useKeyboardShortcuts.ts`, wired in `GameScreen` and `ExploreScreen`)
 
 - Space: toggle playback
-- Enter: next song (when round finished)
+- Enter: next song (when round finished) — in Explore, Skip
 - Typing auto-focuses the country input; Escape blurs it
 
 ### CountryInput Component
 
-Custom autocomplete (`src/Components/CountryInput/`) built with React state — no external autocomplete library. Supports arrow-key navigation, Enter to select, and Escape/click-outside to close.
+Custom autocomplete (`src/Components/CountryInput/`) built with React state — no external autocomplete library. Supports arrow-key navigation, Enter to select, and Escape/click-outside to close. The optional `countries` prop narrows the suggestion list (Explore passes the Playable countries); it defaults to every country.
 
 ## Agent skills
 

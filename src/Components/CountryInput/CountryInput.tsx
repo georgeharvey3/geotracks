@@ -17,9 +17,15 @@ import countriesJSON from "../../countries.json";
 interface CountryInputProps {
   onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   disabled: boolean;
+  /**
+   * The countries to suggest. Defaults to every country, so guessing is
+   * unrestricted; Explore narrows it to the Playable ones, where a suggestion
+   * the player cannot choose would be a dead end.
+   */
+  countries?: string[];
 }
 
-const countries = countriesJSON.map((country) => country.name);
+const allCountries = countriesJSON.map((country) => country.name);
 
 const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
   (props, ref) => {
@@ -55,7 +61,7 @@ const CountryInput = forwardRef<HTMLInputElement, CountryInputProps>(
         setShowSuggestions(false);
         return;
       }
-      const filtered = countries.filter(
+      const filtered = (props.countries ?? allCountries).filter(
         (country) =>
           country.substring(0, value.length).toUpperCase() ===
           value.toUpperCase(),

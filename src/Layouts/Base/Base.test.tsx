@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { vi } from "vitest";
 
 import { render, screen } from "../../test-utils";
@@ -166,6 +167,50 @@ describe("Base", () => {
       );
 
       expect(animate).not.toHaveBeenCalled();
+    });
+
+    // The app is mounted inside StrictMode, which runs a layout effect twice on
+    // mount and cleans up in between — cancelling the flight within a frame. It
+    // is the whole app that is wrapped, so this is the only mode the glide is
+    // ever seen in during development.
+    it("makes the same flight again when StrictMode cancels the first", () => {
+      const { animate, measure } = stubGlide();
+
+      measure.mockReturnValue(rect(100, 40, 200, 50));
+      const { unmount } = render(
+        <StrictMode>
+          <Base showMenuButton={false} screenKey="menu" onMenuClicked={vi.fn()}>
+            <div>Child</div>
+          </Base>
+        </StrictMode>,
+      );
+      unmount();
+      animate.mockClear();
+
+      measure.mockReturnValue(rect(40, 10, 120, 30));
+      render(
+        <StrictMode>
+          <Base
+            showMenuButton
+            fullBleed
+            screenKey="playing"
+            onMenuClicked={vi.fn()}
+          >
+            <div>Child</div>
+          </Base>
+        </StrictMode>,
+      );
+
+      // Whatever it was asked to do, one flight has to be left flying — and it
+      // has to be the same flight, not the destination measured against itself.
+      const flying = animate.mock.results.filter(
+        (result) => result.value.cancel.mock.calls.length === 0,
+      );
+      expect(flying).toHaveLength(1);
+      const frames = animate.mock.calls.at(-1)![0];
+      expect(frames[0]!.transform).toMatch(
+        /^translate\(60px, 30px\) scale\(1\.66/,
+      );
     });
   });
 });

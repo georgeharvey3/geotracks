@@ -58,12 +58,27 @@ let lastWordmarkRect: DOMRect | null = null;
  */
 const useWordmarkGlide = () => {
   const ref = useRef<HTMLSpanElement>(null);
+  /**
+   * Where this wordmark flies *from*, held for as long as it is mounted.
+   *
+   * StrictMode runs a layout effect twice on mount — run, clean up, run again —
+   * and the cleanup cancels the flight. Reading the module-level rect a second
+   * time would measure the destination the first run had already recorded,
+   * against itself: no distance, no replay, and a glide that is requested and
+   * cancelled within a frame. Holding the origin here means the second run
+   * repeats the same flight instead of finding none to make.
+   *
+   * `undefined` is "not yet captured"; `null` is "nothing to fly from", which
+   * is the first screen of the session.
+   */
+  const originRef = useRef<DOMRect | null | undefined>(undefined);
 
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
 
-    const from = lastWordmarkRect;
+    if (originRef.current === undefined) originRef.current = lastWordmarkRect;
+    const from = originRef.current;
     const to = node.getBoundingClientRect();
     lastWordmarkRect = to;
 

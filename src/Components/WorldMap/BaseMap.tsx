@@ -3,25 +3,26 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { Box, useMediaQuery } from "@mui/material";
 import {
   ComposableMap,
-  Geographies,
   Geography,
   Marker,
   ZoomableGroup,
+  useMapContext,
 } from "react-simple-maps";
 
 import useHasHover from "../../hooks/useHasHover";
 import { MAP_FILLS } from "../../map/fills";
 import {
+  countryFeatures,
   countryNameByCode,
   polygonCodes,
   stragglerMarkers,
-  topology,
 } from "../../map/geography";
 import { CHROME_CLEARANCE, LANDSCAPE_QUERY } from "../../layout";
 
@@ -60,7 +61,39 @@ const STRAGGLER_MARK_STROKE = 1.5;
 
 const stragglerCodes = new Set(stragglerMarkers.map((marker) => marker.code));
 
-type MapGeography = { rsmKey: string; id?: string };
+type MapGeography = { rsmKey: string; id?: string; svgPath: string | null };
+
+/**
+ * The countries, drawn in the map's first render.
+ *
+ * This is react-simple-maps' `<Geographies>` with the flash taken out of it. The
+ * library expands the TopoJSON in an effect, so every map it is mounted in shows
+ * an empty world for one commit before the shapes appear — on the way into a
+ * screen that reads as the whole world blinking out and coming back. The shapes
+ * are already expanded (`countryFeatures`); all that is left is projecting them,
+ * and the projection is fixed for as long as a map is mounted, so this happens
+ * once per map and never again.
+ */
+const Countries = ({
+  children,
+}: {
+  children: (geographies: MapGeography[]) => ReactNode;
+}) => {
+  const { path } = useMapContext();
+  const geographies = useMemo(
+    () =>
+      countryFeatures.map((country, index) => ({
+        ...country,
+        // The key the library gives them, kept so nothing downstream can tell
+        // the difference.
+        rsmKey: `geo-${index}`,
+        svgPath: path(country as never),
+      })),
+    [path],
+  );
+
+  return <g>{children(geographies)}</g>;
+};
 
 interface BaseMapProps {
   /**
@@ -297,8 +330,8 @@ const BaseMap = (props: BaseMapProps) => {
             translateExtent={WORLD_EXTENT}
             onMove={handleMove}
           >
-            <Geographies geography={topology}>
-              {({ geographies }: { geographies: MapGeography[] }) =>
+            <Countries>
+              {(geographies) =>
                 geographies.map((geo) => {
                   // Undefined for shapes the app has no country for (disputed
                   // territories, and countries missing from countries.json):
@@ -351,7 +384,7 @@ const BaseMap = (props: BaseMapProps) => {
                   );
                 })
               }
-            </Geographies>
+            </Countries>
 
             {(props.showStragglers ?? true) &&
               stragglerMarkers.map((marker) => (

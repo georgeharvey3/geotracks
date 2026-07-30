@@ -207,6 +207,22 @@ describe("App integration", () => {
       ).toBeInTheDocument();
     });
 
+    // The backdrop is what says a screen is *about* the game without being made
+    // of it. Both content pages get it; the map surfaces are the map already.
+    it("stands both content pages on the map, and neither map surface", async () => {
+      render(<App />);
+      expect(screen.getByTestId("page-backdrop")).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Scoreboard/i }),
+      );
+      expect(screen.getByTestId("page-backdrop")).toBeInTheDocument();
+
+      await userEvent.click(homeButton());
+      await startInfinite();
+      expect(screen.queryByTestId("page-backdrop")).not.toBeInTheDocument();
+    });
+
     it("returns to the menu from a game via the home button", async () => {
       render(<App />);
       await startInfinite();

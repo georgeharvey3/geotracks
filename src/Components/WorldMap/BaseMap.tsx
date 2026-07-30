@@ -93,6 +93,15 @@ interface BaseMapProps {
    */
   cover?: boolean;
   /**
+   * Whether the straggler point-markers are drawn. They exist so that every
+   * *guessable* country has a target big enough to hit; a surface that picks
+   * nothing has no targets, and the dots are then the only thing on it that
+   * reads as UI — a scatter of cream freckles across open ocean, drawn at a
+   * constant screen size and so the loudest thing on the map. Defaults to on:
+   * a surface has to opt out of being playable, never into it.
+   */
+  showStragglers?: boolean;
+  /**
    * Whether a country carries an emphasis outline, drawn in place of the
    * ordinary hairline border. Every fill a surface marks with is lighter than
    * 3:1 against the land it sits on — the palette's warm end is 1.3:1 — so a
@@ -344,37 +353,43 @@ const BaseMap = (props: BaseMapProps) => {
               }
             </Geographies>
 
-            {stragglerMarkers.map((marker) => (
-              <Marker key={marker.code} coordinates={marker.coordinates}>
-                {/* Fixed on-screen size: zooming in separates crowded island
+            {(props.showStragglers ?? true) &&
+              stragglerMarkers.map((marker) => (
+                <Marker key={marker.code} coordinates={marker.coordinates}>
+                  {/* Fixed on-screen size: zooming in separates crowded island
                     dots instead of inflating them into each other. */}
-                <g transform={`scale(${fixed})`}>
-                  <circle
-                    r={STRAGGLER_RADIUS}
-                    tabIndex={-1}
-                    fill={props.fillFor(marker.code, isPreviewed(marker.code))}
-                    stroke={
-                      isMarked(marker.code) ? MAP_FILLS.mark : MAP_FILLS.border
-                    }
-                    strokeWidth={
-                      isMarked(marker.code)
-                        ? STRAGGLER_MARK_STROKE
-                        : STRAGGLER_STROKE
-                    }
-                    aria-label={marker.name}
-                    {...props.countryAttributes?.(marker.code)}
-                    onClick={() => armOrCommit(marker.code)}
-                    onMouseEnter={() => handleMouseEnter(marker.code)}
-                    onMouseLeave={handleMouseLeave}
-                    style={{
-                      cursor: props.selectable(marker.code)
-                        ? "pointer"
-                        : "default",
-                    }}
-                  />
-                </g>
-              </Marker>
-            ))}
+                  <g transform={`scale(${fixed})`}>
+                    <circle
+                      r={STRAGGLER_RADIUS}
+                      tabIndex={-1}
+                      fill={props.fillFor(
+                        marker.code,
+                        isPreviewed(marker.code),
+                      )}
+                      stroke={
+                        isMarked(marker.code)
+                          ? MAP_FILLS.mark
+                          : MAP_FILLS.border
+                      }
+                      strokeWidth={
+                        isMarked(marker.code)
+                          ? STRAGGLER_MARK_STROKE
+                          : STRAGGLER_STROKE
+                      }
+                      aria-label={marker.name}
+                      {...props.countryAttributes?.(marker.code)}
+                      onClick={() => armOrCommit(marker.code)}
+                      onMouseEnter={() => handleMouseEnter(marker.code)}
+                      onMouseLeave={handleMouseLeave}
+                      style={{
+                        cursor: props.selectable(marker.code)
+                          ? "pointer"
+                          : "default",
+                      }}
+                    />
+                  </g>
+                </Marker>
+              ))}
 
             {props.overlay?.(fixed)}
           </ZoomableGroup>

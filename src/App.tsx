@@ -3,7 +3,7 @@ import "./index.css";
 
 import Base from "./Layouts/Base/Base";
 import Menu from "./Components/Menu/Menu";
-import MenuMap from "./Components/MenuMap/MenuMap";
+import BackdropMap from "./Components/BackdropMap/BackdropMap";
 import RunSummaryScreen from "./Components/RunSummaryScreen/RunSummaryScreen";
 import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
@@ -56,9 +56,11 @@ function AppContent() {
     <Base
       showMenuButton={state.screen !== "menu"}
       fullBleed={isMapSurface}
-      // The menu alone gets the map as decoration — it is the way in to three
-      // surfaces made of it. The scoreboard stays a plain content page.
-      backdrop={state.screen === "menu" ? <MenuMap /> : undefined}
+      screenKey={state.screen}
+      // Both content pages stand on the map: they are the two screens that are
+      // about the game without being made of it, and the backdrop is what says
+      // so. The map surfaces have no use for it — they *are* the map.
+      backdrop={isMapSurface ? undefined : <BackdropMap />}
       onMenuClicked={() => dispatch({ type: "RESET_TO_MENU" })}
     >
       {content}

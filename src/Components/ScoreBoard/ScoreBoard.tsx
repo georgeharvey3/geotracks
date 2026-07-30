@@ -36,7 +36,9 @@ const Scoreboard = (props: ScoreboardProps) => {
           mb: 2,
         }}
       >
-        <LeaderboardIcon sx={{ color: "text.primary" }} />
+        {/* Inherits the page's foreground: this heading sits on the night
+            backdrop, unlike the table below it, which is its own cream card. */}
+        <LeaderboardIcon sx={{ color: "inherit" }} />
         <Typography variant="h2">Top Scores</Typography>
       </Box>
       <TableContainer

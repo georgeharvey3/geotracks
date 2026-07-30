@@ -40,6 +40,10 @@ Colours are chosen in exactly one place: **`src/tokens.ts`**. `src/tokens.css` i
 
 The rule that governs everything: **accents own fills, ink owns foregrounds.** On cream, pear is 1.4:1 and mint 2.5:1, so an accent may fill a shape carrying an ink label but may not be the colour a glyph or word is drawn in. Foreground-safe variants exist where an accent identity must be a foreground (`mintInk`, `accent3Deep`); there is deliberately no pear equivalent.
 
+**Two grounds, and which one a screen is on follows from its family.** The app pages (game, Explore, Run summary) are ink on cream. The **content pages** (menu, scoreboard) stand on the **night backdrop** — the map under a black veil (`BackdropMap`) — and draw their chrome in paper: `paper` for type, `paperMuted` for secondary, the light `accent3` for the wordmark's `T`, and a paper focus ring, scoped by `[data-surface="night"]` in `src/index.css`. Opaque surfaces inside them (the scoreboard's table card) are MUI `Paper`, which resets to cream and ink on its own.
+
+**Screen transitions** are staged and only ever inward — the outgoing screen is gone the moment it is replaced, because cross-fading would mean two maps mounted at once. The screen's content fades up (`screen-enter`), the wordmark flies from where it was to where it lands (FLIP, in `Base.tsx`), and the panel comes in last from the edge it is attached to (`panel-enter`, in `PanelSurface`). The chrome sits **outside** what fades, or the fade would hide the flight behind exactly the cut it exists to cover. See `design.md` § Motion.
+
 ### State Management
 
 Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `runSummary` | `explore`). Side effects are isolated in hooks under `src/hooks/`:
@@ -72,9 +76,9 @@ The hook takes an optional **Clip cap** (`clipDurationMs`). The game passes 30 s
 
 The world map splits into a **surface-neutral base** (`src/Components/WorldMap/BaseMap.tsx`) and one thin wrapper per surface (ADR-0003). The base owns how a country is picked and nothing about what picking means: the projection, bounded panning, the `1/zoom` counter-scale, straggler markers, the hover tooltip and commit-on-click. Its caller supplies the fill for a country (`fillFor`), whether it may be chosen (`selectable`), what the tooltip says (`labelFor`), the touch rule (`armOnTouch`), per-country marking attributes and an optional `overlay`. **The base must stay state-agnostic** — the moment it branches on which surface is calling, the split has failed and a `mode` prop has been rebuilt by accident. Shared palette entries live in `src/map/fills.ts`.
 
-The four wrappers are `WorldMap.tsx` (guessing), `src/Components/ExploreMap/ExploreMap.tsx` (Explore), `src/Components/RunSummaryMap/RunSummaryMap.tsx` (the Run summary) and `src/Components/MenuMap/MenuMap.tsx` (the menu's backdrop — decoration, and the only one that picks nothing).
+The four wrappers are `WorldMap.tsx` (guessing), `src/Components/ExploreMap/ExploreMap.tsx` (Explore), `src/Components/RunSummaryMap/RunSummaryMap.tsx` (the Run summary) and `src/Components/BackdropMap/BackdropMap.tsx` (the content pages' backdrop — decoration, and the only one that picks nothing).
 
-The base takes one layout parameter besides its behaviour, `cover`: by default it covers in landscape and fits the whole world in below the chrome in portrait, which is what a surface sharing the viewport with a panel and a title wants. A map that _is_ the ground under a page passes `cover` and covers in both — the menu backdrop is the only caller that does.
+The base takes two layout parameters besides its behaviour. `cover`: by default it covers in landscape and fits the whole world in below the chrome in portrait, which is what a surface sharing the viewport with a panel and a title wants; a map that _is_ the ground under a page passes `cover` and covers in both — the backdrop is the only caller that does. `showStragglers`: defaults to on, and the backdrop is again the only caller that turns it off — the dots are targets, and a surface that picks nothing has none.
 
 The guessing map is the primary guessing surface, always on, with the text box retained as a compact secondary input. Both feed the same `SUBMIT_GUESS` action, so the map is a **unified board**: it marks every guess of the round whichever input committed it. Rendering is **react-simple-maps** (inline SVG, `geoEqualEarth`, `ZoomableGroup` pan/zoom, no tile provider — ADR-0001).
 
@@ -145,7 +149,8 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/Components/WorldMap/WorldMap.tsx` — The guessing wrapper around it
 - `src/Components/ExploreMap/ExploreMap.tsx` — The Explore wrapper around it
 - `src/Components/RunSummaryMap/RunSummaryMap.tsx` — The Run summary wrapper around it
-- `src/Components/MenuMap/MenuMap.tsx` — The menu's backdrop: the map washed back into the paper, click-through and `aria-hidden` (see `design.md`)
+- `src/Components/BackdropMap/BackdropMap.tsx` — The content pages' backdrop: the map under a black veil, click-through and `aria-hidden` (see `design.md`)
+- `src/Layouts/Base/Base.tsx` — The layout both families are dressed in, and where the wordmark's glide lives
 - `src/Components/ExploreScreen/ExploreScreen.tsx` — Explore's container: player + keyboard seams wired to the Explore reducer
 - `src/Components/RunSummaryScreen/RunSummaryScreen.tsx` — The Run summary's container: the leaderboard write wired to the game reducer
 - `src/Components/RunSummary/RunSummary.tsx` — The Run summary's layout, and the row→map highlight

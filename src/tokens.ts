@@ -19,6 +19,19 @@ export const COLORS = {
   paper2: "#eeebdf", //       oklch(94% 0.016 95)
   /** Deeper still: hover on a surface, and inert chrome. */
   paper3: "#e5e1d3", //       oklch(91% 0.020 95)
+  /**
+   * Secondary copy *on* the night backdrop — the mirror of `inkMuted`, at
+   * 7.1:1 there. The content pages stand on a veiled map rather than on paper,
+   * so they need the muted step in the other direction.
+   */
+  paperMuted: "#b7b5ab", //   oklch(76% 0.008 95)
+
+  /**
+   * The black the content pages' map backdrop is veiled with. Darker and
+   * flatter than `ink`, because it is a ground rather than a mark: ink's cool
+   * tilt reads as a colour once it covers a whole screen.
+   */
+  night: "#05070a", //        oklch(11% 0.008 250)
 
   /** Near-black with a cool tilt, never pure black. */
   ink: "#12171b", //          oklch(20% 0.012 250)

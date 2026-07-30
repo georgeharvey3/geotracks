@@ -14,6 +14,8 @@
   --color-paper: #f7f5ec; /*        oklch(97% 0.012 95)  */
   --color-paper-2: #eeebdf; /*      oklch(94% 0.016 95)  */
   --color-paper-3: #e5e1d3; /*      oklch(91% 0.020 95)  */
+  --color-paper-muted: #b7b5ab; /*  oklch(76% 0.008 95)  secondary copy on night */
+  --color-night: #05070a; /*        oklch(11% 0.008 250) the backdrop's veil    */
 
   /* ---- ink ---------------------------------------------------------- */
   --color-ink: #12171b; /*          oklch(20% 0.012 250) */

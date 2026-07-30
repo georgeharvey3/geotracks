@@ -31,9 +31,13 @@ CSS. One resolved value in all three keeps a single red on screen.
 ## Macrostructure families
 
 - **Menu / Scoreboard (content pages)** — centred column on `Base`, capped at
-  `sm`. Typography and the button stack carry it; no enrichment. The menu alone
-  takes the map as a **backdrop** (below), which is ground rather than
-  enrichment: nothing is added to the column.
+  `sm`, standing on the **night backdrop** (below): the map under a black veil,
+  which is ground rather than enrichment — nothing is added to the column.
+  Typography and the button stack carry it. These are the two screens that are
+  _about_ the game without being made of it, and the backdrop is what says so.
+  Their foreground is **paper on night**, the mirror of the app pages' ink on
+  paper; opaque surfaces they contain (the scoreboard's table card) are cream
+  and take ink back.
 - **Game / Explore (app pages)** — **Workbench**: the map is a live surface
   covering the viewport, with `PanelSurface` floating over one corner in
   landscape and dropping to a content-sized bottom tray in portrait. Governed by
@@ -51,6 +55,8 @@ CSS. One resolved value in all three keeps a single red on screen.
 | `--color-paper`         | `#f7f5ec` · `oklch(97% 0.012 95)`  | cream, never pure white |
 | `--color-paper-2`       | `#eeebdf` · `oklch(94% 0.016 95)`  | tinted band             |
 | `--color-paper-3`       | `#e5e1d3` · `oklch(91% 0.020 95)`  | surface hover           |
+| `--color-paper-muted`   | `#b7b5ab` · `oklch(76% 0.008 95)`  | secondary copy on night |
+| `--color-night`         | `#05070a` · `oklch(11% 0.008 250)` | the backdrop's veil     |
 | `--color-ink`           | `#12171b` · `oklch(20% 0.012 250)` | near-black, cool tilt   |
 | `--color-ink-muted`     | `#54595e` · `oklch(46% 0.010 250)` | secondary copy, 6.5:1   |
 | `--color-rule`          | `#cdd1d6` · `oklch(86% 0.008 250)` | hairlines               |
@@ -74,6 +80,15 @@ Where an accent identity _must_ be a foreground, it gets its own darker value:
 `mintInk` (`#1c8742`, 4.2:1) and `accent3Deep` (`#c42942`, 5.1:1). There is no
 pear equivalent, deliberately — a pear dark enough to read as text stops looking
 like pear, so pear-as-text is simply not a move this system has.
+
+**On night the pairs swap ends.** `accent3Deep` is the coral that holds a
+foreground on cream and only 2.0:1 on the backdrop; the wordmark's `T` is drawn
+in the light `accent3` there instead (4.1:1, and it is display type). The same
+goes for chrome: ink becomes paper, `inkMuted` becomes `paperMuted`, and the
+focus ring — `--color-focus` is 1.6:1 on night, a ring nobody could find —
+becomes paper, scoped by `[data-surface="night"]` in `src/index.css`. Nothing
+else about the system changes: the pear button and its ink label are the same
+button on either ground.
 
 Each accent holds one job and does not appear where it doesn't mean something:
 pear = the primary action, cyan = links and the Spotify hand-off, coral = one
@@ -121,21 +136,33 @@ vanish into the land. Endpoints: `hsl(45, 100%, 48%)` → `hsl(348, 70%, 45%)`.
 **Turn outcomes** are mint / pear / coral-deep (`OUTCOME_FILLS`), which is the
 old green/amber/red run translated into the palette one for one.
 
-### The map as the menu's backdrop
+### The map as the content pages' backdrop
 
-The menu is the way in to three surfaces made of the map, so it stands on one:
-the game's map at rest, covering the viewport behind the column
-(`MenuMap`). It is **washed toward the paper, never dimmed toward black** —
-composited at 0.35 over the cream — because everything on this screen is ink on
-paper, and darkening the ground would take the wordmark and the outlined button
-with it. What survives the wash is the coastline: the sea lands on a pale blue
-that still carries ink at ~11:1.
+The content pages are the way in to three surfaces made of the map, so they
+stand on one: the game's map at rest, covering the viewport behind the column
+(`BackdropMap`). It is a **veil, not a wash** — the map is drawn at full
+strength and then covered in `night` at 0.82 — so what is left is a coastline in
+the dark rather than a picture of the world. Paper type lands at ~12:1 over it
+whatever the map has drawn underneath, which is what lets the veil be the same
+one on both pages and under any pan.
 
-It is decoration and nothing else. No country may be picked, none is named on
-hover, the whole thing is click-through and it is out of the accessibility tree,
-so the buttons remain the entire screen to a pointer, a keyboard and a screen
-reader alike. **The scoreboard does not get one** — one screen stands on the map
-because it is the door to it; a second would make the wash a page background.
+Three things are taken off the map on the way in, all for the same reason —
+nothing here is picked, so nothing here is a target:
+
+- **No straggler dots.** They exist so every guessable country has something big
+  enough to hit; drawn at a constant screen size out in open ocean, they are the
+  only thing on a decorative map that reads as UI (`BaseMap`'s `showStragglers`,
+  which defaults to on: a surface opts out of being playable, never into it).
+- **One land fill.** The playable/inert split is a statement about where there
+  is music. Under the veil the two land a hundredth of a stop apart anyway, so
+  all it would add is patchiness in a picture that means nothing.
+- **No name on hover, and no country selectable.** The whole thing is
+  click-through and out of the accessibility tree, so the column's buttons
+  remain the entire screen to a pointer, a keyboard and a screen reader alike.
+
+**Both content pages get it, and only they do.** The map surfaces are the map
+already; the backdrop is what marks a screen as being about the game without
+being made of it.
 
 ## Typography
 
@@ -169,8 +196,27 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
   which would make the edge narrower than the button and read as a dropped
   shadow. It lifts 2px on hover (edge grows to 6px) and presses _down_ 3px on
   `:active` (edge shrinks to 1px). No `scale()`, no spring overshoot.
+- **Arriving somewhere** is three things, staged, and only ever _in_ — the
+  outgoing screen is gone the instant it is replaced, and holding two screens
+  alive to cross-fade them would mean two maps mounted at once:
+  1. **The screen** fades up and settles the last 8px (`screen-enter`, 220ms).
+     Only the _content_ of the screen: the chrome is deliberately outside it.
+  2. **The wordmark glides.** It is the one element every screen shares, so it
+     is what carries the eye across an otherwise instant swap: the incoming one
+     is drawn where the outgoing one was and released (FLIP, 420ms, in
+     `Base.tsx`). It measures the word rather than the heading block — the
+     heading fills its container on both screens, so the block's own box would
+     put the two at the same width and the flight would never scale. Being
+     transform-only it runs on the compositor, which matters because the screen
+     it lands on is mounting ~250 country shapes on the main thread at the time.
+  3. **The panel** comes in last (`panel-enter`, 320ms after a 120ms beat) and
+     from the edge it is attached to: the tray up from the bottom in portrait,
+     the card down from the top in landscape. Staged, so the map reads as the
+     page and the panel as the thing placed on it.
 - `prefers-reduced-motion: reduce` collapses spatial motion globally in
-  `src/index.css`; the press still recolours, so nothing loses its feedback.
+  `src/index.css`; the press still recolours, so nothing loses its feedback. The
+  glide is the one piece of motion that rule cannot reach — it is a Web
+  Animation, not a CSS one — so it checks the query itself.
 - The focus ring is **never** animated.
 
 ## Microinteractions stance
@@ -203,12 +249,13 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
 
 - Which macrostructure family they belong to (above).
 - Panel content and its order.
-- Whether the map is the surface at all — the scoreboard has none, and the menu
-  has it only as the washed backdrop above.
+- Whether the map is the surface at all, or only the veiled backdrop above.
+- Which ground they are on: the content pages are paper on night, the app pages
+  ink on paper.
 
 ## Per-page allowances
 
-- Content pages: typography only, plus the menu's backdrop.
+- Content pages: typography only, plus the night backdrop.
 - App pages: no enrichment — the map is the artefact.
 - No screen gets a hero illustration, a mascot, or a character moment. Hum
   normally asks for one; GeoTracks already has 240 hand-drawn shapes on screen

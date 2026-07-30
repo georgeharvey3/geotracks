@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useLayoutEffect, useRef } from "react";
 import { Box, Container, IconButton, Typography } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
+
+import { COLORS } from "../../tokens";
 
 interface BaseProps {
   showMenuButton: boolean;
@@ -13,41 +15,147 @@ interface BaseProps {
   fullBleed?: boolean;
   /**
    * Decoration drawn behind the centred column, covering the viewport. The
-   * content page stays a column of type on paper — this is the ground it sits
-   * on, so it must be click-through and hidden from the accessibility tree.
-   * Ignored in `fullBleed`, where the content already is the surface.
+   * content page is a column of type on the night the backdrop makes — this is
+   * the ground it sits on, so it must be click-through and hidden from the
+   * accessibility tree. Ignored in `fullBleed`, where the content already is
+   * the surface.
    */
   backdrop?: React.ReactNode;
+  /**
+   * Which screen is showing. Nothing is read from it: it is the identity of the
+   * thing being animated, so that arriving somewhere new replays the entrance
+   * and a re-render of the same screen does not.
+   */
+  screenKey?: string;
   children: React.ReactNode;
 }
+
+// How long the wordmark takes to fly between the two places it lives. Long
+// enough to be followed by eye — following it is the whole point, since it is
+// what carries the player across an otherwise instant screen swap — and short
+// enough not to hold up the screen it lands on.
+const GLIDE_MS = 420;
+
+/**
+ * Where the wordmark last was on screen, across screen changes.
+ *
+ * The wordmark is the one element every screen shares, so it is what the
+ * transition hangs on: rather than cutting from the menu's centred display size
+ * to the game's chrome, the new one is drawn where the old one was and released
+ * (FLIP). One module-level rect is enough because there is only ever one
+ * wordmark, and the incoming one reads this before overwriting it.
+ */
+let lastWordmarkRect: DOMRect | null = null;
+
+/**
+ * Fly the wordmark from wherever it last was to where it is now.
+ *
+ * Mount-only: the screen key remounts it on every screen change, and measuring
+ * again mid-flight would record the animated position rather than the settled
+ * one. Everything here degrades to nothing rather than to something wrong — no
+ * previous position, a zero-sized box (jsdom measures nothing) or no Web
+ * Animations API and the wordmark simply appears where it belongs.
+ */
+const useWordmarkGlide = () => {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const from = lastWordmarkRect;
+    const to = node.getBoundingClientRect();
+    lastWordmarkRect = to;
+
+    if (!from || from.width === 0 || to.width === 0) return;
+    if (typeof node.animate !== "function") return;
+    // The one piece of motion in the app that CSS's global reduced-motion rule
+    // cannot reach, and it is pure spatial motion — so it asks for itself.
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const dx = from.left - to.left;
+    const dy = from.top - to.top;
+    const scale = from.width / to.width;
+    // The two content pages put it in the same place; there is nothing to fly.
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(scale - 1) < 0.01) {
+      return;
+    }
+
+    const animation = node.animate(
+      [
+        // The origin is the top-left corner both measurements are taken from,
+        // so translating then scaling about it lands the new box exactly on the
+        // old one — no drift for the eye to catch.
+        { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
+        { transform: "none" },
+      ],
+      {
+        duration: GLIDE_MS,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        composite: "replace",
+      },
+    );
+
+    return () => animation.cancel();
+  }, []);
+
+  return ref;
+};
 
 // The wordmark carries its emphasis in one coral letter rather than a gradient
 // across the whole word: gradient text can't be selected, ignores the user's
 // contrast settings, and is the most-copied generated-UI flourish there is.
-const Wordmark = ({ fontSize }: { fontSize?: string }) => (
-  <Typography
-    variant="h1"
-    // Splitting the word into elements to colour one letter also splits it for
-    // the accessibility tree, which announces "Geo T racks". The label puts the
-    // word back together: how it is read shouldn't follow how it is painted.
-    aria-label="GeoTracks"
-    sx={{ fontSize, py: fontSize ? 0 : 1 }}
-  >
-    Geo
-    <Box component="span" sx={{ color: "error.main" }}>
-      T
-    </Box>
-    racks
-  </Typography>
-);
+const Wordmark = ({
+  fontSize,
+  onNight,
+}: {
+  fontSize?: string;
+  onNight?: boolean;
+}) => {
+  const glideRef = useWordmarkGlide();
 
-const HomeButton = ({ onClick }: { onClick: () => void }) => (
+  return (
+    <Typography
+      variant="h1"
+      // Splitting the word into elements to colour one letter also splits it for
+      // the accessibility tree, which announces "Geo T racks". The label puts the
+      // word back together: how it is read shouldn't follow how it is painted.
+      aria-label="GeoTracks"
+      sx={{ fontSize, py: fontSize ? 0 : 1 }}
+    >
+      {/* The glide measures the *word*, not the block it is laid out in: the
+          heading fills its container on both screens, so its own box would put
+          the two at the same width and the flight would never scale. */}
+      <Box component="span" ref={glideRef} sx={{ display: "inline-block" }}>
+        Geo
+        <Box
+          component="span"
+          // Coral swaps ends with the ground it is drawn on. `accent3Deep` is
+          // the coral that holds a foreground on cream; over the night backdrop
+          // it is 2.0:1, and the light coral is the one that reads.
+          sx={{ color: onNight ? COLORS.accent3 : "error.main" }}
+        >
+          T
+        </Box>
+        racks
+      </Box>
+    </Typography>
+  );
+};
+
+const HomeButton = ({
+  onClick,
+  onNight,
+}: {
+  onClick: () => void;
+  onNight?: boolean;
+}) => (
   <IconButton
     onClick={onClick}
     aria-label="Back to menu"
     sx={{
-      color: "text.secondary",
-      "&:hover": { color: "text.primary" },
+      color: onNight ? COLORS.paperMuted : "text.secondary",
+      "&:hover": { color: onNight ? COLORS.paper : "text.primary" },
     }}
   >
     <HomeIcon />
@@ -62,6 +170,7 @@ const HomeButton = ({ onClick }: { onClick: () => void }) => (
 const OverlayChrome = (props: {
   showMenuButton: boolean;
   onMenuClicked: () => void;
+  screenKey?: string;
 }) => (
   <Box
     sx={{
@@ -86,10 +195,21 @@ const OverlayChrome = (props: {
     <Box sx={{ pointerEvents: "auto", minWidth: 40 }}>
       {props.showMenuButton && <HomeButton onClick={props.onMenuClicked} />}
     </Box>
-    <Wordmark fontSize="1.5rem" />
+    <Wordmark key={props.screenKey} fontSize="1.5rem" />
   </Box>
 );
 
+/**
+ * The layout every screen is dressed in: a centred column on the night backdrop
+ * for the content pages, and the viewport itself for the surfaces made of the
+ * map.
+ *
+ * The chrome — the wordmark and the home button — deliberately sits *outside*
+ * what enters. Only the content of a screen fades in; the wordmark is the one
+ * thing both screens have, so it flies between its two places (`useWordmarkGlide`)
+ * rather than fading with everything else, and fading it would hide the flight
+ * behind exactly the cut it exists to cover.
+ */
 const Base = (props: BaseProps) => {
   if (props.fullBleed) {
     return (
@@ -101,10 +221,19 @@ const Base = (props: BaseProps) => {
           bgcolor: "background.default",
         }}
       >
-        {props.children}
+        {/* Keyed, so the entrance plays once on arrival rather than on every
+            render of the screen already showing. */}
+        <Box
+          key={props.screenKey}
+          className="screen-enter"
+          sx={{ position: "absolute", inset: 0 }}
+        >
+          {props.children}
+        </Box>
         <OverlayChrome
           showMenuButton={props.showMenuButton}
           onMenuClicked={props.onMenuClicked}
+          screenKey={props.screenKey}
         />
       </Box>
     );
@@ -112,11 +241,18 @@ const Base = (props: BaseProps) => {
 
   return (
     <>
+      {/* Outside the column: the ground does not re-enter when the page
+          standing on it changes. */}
       {props.backdrop}
       <Container
         maxWidth="sm"
+        // The content pages stand on the night backdrop, so their chrome is
+        // drawn in paper rather than ink. Opaque surfaces inside them — the
+        // scoreboard's own card — are MUI `Paper` and reset to ink themselves.
+        data-surface="night"
         sx={{
           textAlign: "center",
+          color: COLORS.paper,
           // Above the backdrop, which is fixed at z-index 0: the column paints
           // over it rather than being tinted by it.
           position: "relative",
@@ -135,12 +271,14 @@ const Base = (props: BaseProps) => {
                 transform: "translateY(-50%)",
               }}
             >
-              <HomeButton onClick={props.onMenuClicked} />
+              <HomeButton onClick={props.onMenuClicked} onNight />
             </Box>
           )}
-          <Wordmark />
+          <Wordmark key={props.screenKey} onNight />
         </Box>
-        {props.children}
+        <Box key={props.screenKey} className="screen-enter">
+          {props.children}
+        </Box>
       </Container>
     </>
   );

@@ -4,6 +4,7 @@ import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import PublicIcon from "@mui/icons-material/Public";
 import { GameModes } from "../../types";
+import { COLORS } from "../../tokens";
 
 interface MenuProps {
   gameModes: GameModes;
@@ -40,11 +41,22 @@ const Menu = (props: MenuProps) => (
       >
         Explore
       </Button>
+      {/* The secondary action is drawn in the page's foreground, which on the
+          menu is paper rather than the theme's ink: the outlined button is the
+          one control here made of nothing but its own outline. */}
       <Button
         variant="outlined"
         size="large"
         startIcon={<LeaderboardIcon />}
         onClick={() => props.setShowScoreboard(true)}
+        sx={{
+          color: COLORS.paper,
+          borderColor: COLORS.paper,
+          "&:hover": {
+            borderColor: COLORS.paper,
+            bgcolor: "rgba(247, 245, 236, 0.12)",
+          },
+        }}
       >
         Scoreboard
       </Button>

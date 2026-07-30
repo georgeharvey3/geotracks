@@ -39,8 +39,14 @@ const PanelSurface = ({ children }: { children: ReactNode }) => (
       borderColor: "text.primary",
       bgcolor: "background.paper",
       boxShadow: "0 -10px 30px -18px rgba(18, 23, 27, 0.45)",
+      // Placed on the map rather than appearing with it: the panel comes in
+      // from the edge it is attached to, a beat after the screen it lands on.
+      // The keyframes are in `index.css`; which one to use is a question about
+      // where the panel sits, so it is asked here where the geometry is.
+      animation: "panel-enter 320ms var(--ease-snap) 120ms both",
 
       [LANDSCAPE_MEDIA]: {
+        animation: "panel-enter-landscape 320ms var(--ease-snap) 120ms both",
         position: "absolute",
         flex: "none",
         top: 72,

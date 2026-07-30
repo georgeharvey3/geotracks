@@ -3,7 +3,14 @@ import countriesJSON from "../countries.json";
 import getDistance from "../helpers/getDistance";
 import getBearing from "../helpers/getBearing";
 import getDailySongs from "../helpers/getDailySongs";
-import { Album, Song, Guess } from "../types";
+import {
+  Album,
+  Song,
+  SongMetadata,
+  Guess,
+  TurnOutcome,
+  TurnResult,
+} from "../types";
 
 export const GAME_MODES = {
   infinite: "infinite",
@@ -29,7 +36,7 @@ export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 // `screen` is the app's single router. Explore keeps its own state in its own
 // reducer (ADR-0003), but which surface is on screen is decided in one place.
 export type Screen =
-  "menu" | "scoreboard" | "playing" | "finalScore" | "explore";
+  "menu" | "scoreboard" | "playing" | "runSummary" | "explore";
 
 export interface GameState {
   screen: Screen;
@@ -49,7 +56,16 @@ export interface GameState {
   questionIndex: number;
   turnIndex: number;
   score: number;
+  /** Points this round has earned so far: 0 until the answer is named. */
+  roundPoints: number;
+  /**
+   * The Run so far, one entry per retired turn — Competition only, since
+   * Infinite has no end to summarise. Cleared when the Run is left behind.
+   */
+  turns: TurnResult[];
   nameInputValue: string;
+  /** Whether this Run's score has been written to the leaderboard. One per Run. */
+  scoreSubmitted: boolean;
 }
 
 export type GameAction =
@@ -60,7 +76,9 @@ export type GameAction =
   | { type: "TOGGLE_GEO_HINTS"; checked: boolean }
   | { type: "NEXT_SONG" }
   | { type: "RESET_TO_MENU" }
-  | { type: "SET_NAME"; value: string };
+  | { type: "SET_NAME"; value: string }
+  | { type: "SCORE_SUBMITTED" }
+  | { type: "SET_SONG_METADATA"; link: string; metadata: SongMetadata };
 
 // Pure song selection: mirrors the daily-seeded-then-random pool behaviour.
 // Returns the chosen song plus the album pool and daily index after selection.
@@ -125,7 +143,10 @@ export function createInitialState(albums: Album[] = albumsJSON): GameState {
     questionIndex: 0,
     turnIndex: 0,
     score: 0,
+    roundPoints: 0,
+    turns: [],
     nameInputValue: "",
+    scoreSubmitted: false,
   };
 }
 
@@ -136,7 +157,28 @@ const roundReset = {
   finished: false,
   correct: false,
   errorMessage: "",
+  roundPoints: 0,
 };
+
+/**
+ * The finished round, snapshotted as the Run's record of it. Called as the round
+ * is retired, so `state` is still the round that just ended.
+ */
+function turnResultFrom(state: GameState): TurnResult {
+  const outcome: TurnOutcome = !state.correct
+    ? "missed"
+    : state.guesses.length === 1
+      ? "named-first"
+      : "named-later";
+
+  return {
+    song: state.song,
+    outcome,
+    attempts: state.guesses.length,
+    points: state.roundPoints,
+    geoHintsUsed: state.geoHintsEnabled,
+  };
+}
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
@@ -179,6 +221,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           finished: true,
           correct: true,
           score: state.score + scoreDelta,
+          // Banked here so the Turn result can copy it rather than re-derive
+          // the scoring rule in a second place.
+          roundPoints: scoreDelta,
         };
       }
 
@@ -251,7 +296,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           geoHintsEnabled: false,
           showGeoHints: false,
           turnIndex: state.turnIndex + 1,
-          screen: reachedFinalTurn ? "finalScore" : base.screen,
+          // The retired turn joins the Run's record. Only Competition keeps one:
+          // Infinite never ends, so nothing would ever read it.
+          turns: [...state.turns, turnResultFrom(state)],
+          screen: reachedFinalTurn ? "runSummary" : base.screen,
         };
       }
 
@@ -275,6 +323,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         questionIndex: 0,
         turnIndex: 0,
         score: 0,
+        // Leaving the screen discards the Run: it lives in memory only, for as
+        // long as the player stays on it. The name box goes with it — the
+        // leaderboard write no longer reloads the page, so nothing else would
+        // stop one player's name carrying into the next Run.
+        turns: [],
+        nameInputValue: "",
+        scoreSubmitted: false,
         song: picked.song,
         albums: picked.albums,
         dailySongIndex: picked.dailySongIndex,
@@ -284,6 +339,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SET_NAME":
       return action.value.length <= 10
         ? { ...state, nameInputValue: action.value }
+        : state;
+
+    case "SCORE_SUBMITTED":
+      return { ...state, scoreSubmitted: true };
+
+    case "SET_SONG_METADATA":
+      // Keyed by the link it was fetched for, so a late-resolving fetch cannot
+      // put one Song's title on the next one.
+      return action.link === state.song.link
+        ? { ...state, song: { ...state.song, ...action.metadata } }
         : state;
 
     default:

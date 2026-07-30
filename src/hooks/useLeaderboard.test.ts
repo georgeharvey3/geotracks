@@ -106,6 +106,8 @@ describe("useLeaderboard", () => {
       score: 300,
       createdAt: { ".sv": "timestamp" },
     });
-    expect(reload).toHaveBeenCalled();
+    // Never reloads: the Run summary the player is reading sits on the same
+    // screen as the name box, and a reload would take it with it.
+    expect(reload).not.toHaveBeenCalled();
   });
 });

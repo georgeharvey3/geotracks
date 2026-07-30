@@ -1,3 +1,5 @@
+import { TurnOutcome } from "../types";
+
 // The map's palette, shared by every surface that draws on it.
 //
 // Land sits well above the sea in lightness so the coastline reads at a glance,
@@ -12,3 +14,12 @@ export const MAP_FILLS = {
   highlight: "#eaf4ff",
   border: "#0b1a30",
 } as const;
+
+// The Run summary's marking, one fill per Turn outcome. A green-amber-red run,
+// so ten countries read as a shape of the Run at a glance; green matches the
+// guessing map's correct-guess green, since it means the same thing there.
+export const OUTCOME_FILLS: Record<TurnOutcome, string> = {
+  "named-first": "#4caf50",
+  "named-later": "#fbc02d",
+  missed: "#b0413f",
+};

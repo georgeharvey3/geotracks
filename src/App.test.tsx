@@ -35,6 +35,34 @@ function wrongCountriesFor(answer: string, count: number): string[] {
     .slice(0, count);
 }
 
+// The ten turns a Competition Run asks for today. The daily seed moves with the
+// date, so nothing about today's ten may be hard-coded — including whether they
+// are ten different countries.
+const runTurns = Array.from({ length: 10 }, (_, turn) => answerAt(turn));
+
+/** Countries no turn of this Run asks for: safe to guess wrongly, or to hover. */
+function countriesOutsideTheRun(count: number): string[] {
+  const inRun = new Set(runTurns.map((name) => name.toLowerCase()));
+  return allCountryNames
+    .filter((name) => !inRun.has(name.toLowerCase()))
+    .slice(0, count);
+}
+
+/**
+ * Turns whose country answers only once in this Run. The daily seed splices out
+ * the Album, not the country, so a Run can ask for one country twice — and a
+ * mark on the map then belongs to two turns, not one. Assertions that tie a
+ * country to a single turn use these.
+ */
+function turnsWithSoleAnswers(count: number): number[] {
+  return runTurns
+    .map((_, turn) => turn)
+    .filter(
+      (turn) => runTurns.filter((name) => name === runTurns[turn]).length === 1,
+    )
+    .slice(0, count);
+}
+
 const DIRECTION_TESTIDS = [
   "NorthIcon",
   "NorthEastIcon",
@@ -78,6 +106,52 @@ async function guessOnMap(country: string) {
 
 const playButton = () => screen.getByTestId("PlayArrowIcon").closest("button")!;
 const homeButton = () => screen.getByTestId("HomeIcon").closest("button")!;
+
+interface TurnPlan {
+  /** Wrong guesses to make before naming the answer. */
+  wrongGuesses?: number;
+  /** Burn all five attempts without naming the answer. */
+  miss?: boolean;
+  /** Turn geo-hints on for the turn, halving its points. */
+  hints?: boolean;
+}
+
+/**
+ * Play one Competition turn to its end and retire it. Guesses go through the
+ * map, the cheaper of the two inputs to drive — ten turns of typing re-renders
+ * the world's ~250 shapes on every keystroke. Wrong guesses are drawn from
+ * countries no turn of this Run asks for, so one can never be mistaken for
+ * another turn's answer.
+ */
+async function playTurn(turn: number, plan: TurnPlan = {}) {
+  if (plan.hints) await userEvent.click(screen.getByLabelText("GeoHints"));
+
+  const wrongCount = plan.miss ? 5 : (plan.wrongGuesses ?? 0);
+  for (const wrong of countriesOutsideTheRun(wrongCount)) {
+    await guessOnMap(wrong);
+  }
+  if (!plan.miss) await guessOnMap(answerAt(turn));
+
+  await userEvent.click(screen.getByRole("button", { name: /Next Song/i }));
+}
+
+/** Play a whole Competition Run, landing on the Run summary. */
+async function playRun(plans: Record<number, TurnPlan> = {}) {
+  render(<App />);
+  await startCompetition();
+  act(() => spotifyPlayerControl.emitReady());
+  for (let turn = 0; turn < 10; turn += 1) {
+    await playTurn(turn, plans[turn]);
+  }
+  // The world's ~250 shapes are drawn a tick after the screen mounts.
+  await screen.findByLabelText(answerAt(0));
+}
+
+/** One Turn result row, found by the country it belongs to. */
+const summaryRow = (turnNumber: number, country: string) =>
+  screen
+    .getByText(`${turnNumber}. ${country}`)
+    .closest("[data-turn-outcome]") as HTMLElement;
 
 beforeEach(() => {
   spotifyPlayerControl.reset();
@@ -348,7 +422,7 @@ describe("App integration", () => {
       ).toBeInTheDocument();
     });
 
-    it("scores across turns and reaches the final score", async () => {
+    it("scores across turns and reaches the Run summary", async () => {
       render(<App />);
       await startCompetition();
       act(() => spotifyPlayerControl.emitReady());
@@ -365,18 +439,6 @@ describe("App integration", () => {
       }
 
       expect(screen.getByText("1500 points")).toBeInTheDocument();
-
-      // Submitting the name hits the leaderboard seam (no network).
-      const nameInput = screen.getByPlaceholderText("Name...");
-      await userEvent.type(nameInput, "Ada");
-      await userEvent.click(screen.getByRole("button", { name: /Save/i }));
-
-      await waitFor(() =>
-        expect(leaderboardControl.submitScore).toHaveBeenCalledWith(
-          "Ada",
-          1500,
-        ),
-      );
     });
 
     it("scores a map guess exactly like a typed one", async () => {
@@ -399,6 +461,160 @@ describe("App integration", () => {
 
       // 150 base, halved to 75 because hints were enabled this round.
       expect(screen.getByText("Score: 75")).toBeInTheDocument();
+    });
+  });
+
+  describe("Run summary", () => {
+    it("ends a Run on the score, the count, the name box and ten rows", async () => {
+      await playRun();
+
+      expect(screen.getByText("1500 points")).toBeInTheDocument();
+      expect(screen.getByText("10 of 10 named")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Name...")).toBeInTheDocument();
+      // One row per turn, each handing off to Spotify.
+      expect(screen.getAllByRole("link", { name: /Spotify/i })).toHaveLength(
+        10,
+      );
+      // No player mounts here: the rows identify the Songs, they don't play them.
+      expect(screen.queryByTestId("PlayArrowIcon")).not.toBeInTheDocument();
+    });
+
+    it("names each Song where the metadata arrived, and says so where it didn't", async () => {
+      render(<App />);
+      await startCompetition();
+      act(() => spotifyPlayerControl.emitReady());
+      // The first turn's oEmbed metadata lands while it is playing.
+      act(() =>
+        spotifyPlayerControl.setMetadata({
+          trackTitle: "Turn One Track",
+          artistName: "Turn One Artist",
+        }),
+      );
+      for (let turn = 0; turn < 10; turn += 1) {
+        await playTurn(turn);
+      }
+      await screen.findByLabelText(answerAt(0));
+
+      const firstSong = dailySongs[0]!;
+      const row = summaryRow(1, firstSong.country);
+      expect(row).toHaveTextContent("Turn One Track");
+      expect(row).toHaveTextContent("Turn One Artist");
+      expect(row).toHaveTextContent(firstSong.album);
+      expect(row.querySelector("a")).toHaveAttribute("href", firstSong.link);
+
+      // The other nine Songs are still identified by country and Album.
+      expect(screen.getAllByText("Unknown Track")).toHaveLength(9);
+    });
+
+    it("shows the outcome, the attempts it took and the points earned", async () => {
+      await playRun({
+        0: { hints: true },
+        1: { wrongGuesses: 2 },
+        2: { miss: true },
+      });
+
+      // 75 + 60 + 0 + seven clean turns.
+      expect(screen.getByText("1185 points")).toBeInTheDocument();
+      expect(screen.getByText("9 of 10 named")).toBeInTheDocument();
+
+      const hinted = summaryRow(1, answerAt(0));
+      expect(hinted).toHaveTextContent("Named first guess");
+      expect(hinted).toHaveTextContent("75 pts");
+      // The only thing that explains the halved figure.
+      expect(hinted).toHaveTextContent("GeoHints");
+
+      const later = summaryRow(2, answerAt(1));
+      expect(later).toHaveTextContent("Named on guess 3");
+      expect(later).toHaveTextContent("60 pts");
+
+      // A missed turn still names the country the player never got.
+      const missed = summaryRow(3, answerAt(2));
+      expect(missed).toHaveTextContent("Missed in 5 guesses");
+      expect(missed).toHaveTextContent("0 pts");
+
+      expect(screen.getAllByText("Named first guess")).toHaveLength(8);
+      // Hints were on for exactly one turn.
+      expect(screen.getAllByText("GeoHints")).toHaveLength(1);
+    });
+
+    it("marks the answer countries on the map, and takes no guesses", async () => {
+      // Turns whose country answers only once, so each mark belongs to one turn.
+      const [first, later, missed] = turnsWithSoleAnswers(3) as [
+        number,
+        number,
+        number,
+      ];
+      await playRun({ [later]: { wrongGuesses: 1 }, [missed]: { miss: true } });
+
+      expect(mapTarget(answerAt(first))).toHaveAttribute(
+        "data-run-outcome",
+        "named-first",
+      );
+      expect(mapTarget(answerAt(later))).toHaveAttribute(
+        "data-run-outcome",
+        "named-later",
+      );
+      expect(mapTarget(answerAt(missed))).toHaveAttribute(
+        "data-run-outcome",
+        "missed",
+      );
+
+      // The Run's wrong guesses are not kept, and are not drawn.
+      const [wrong] = countriesOutsideTheRun(1) as [string];
+      expect(mapTarget(wrong)).not.toHaveAttribute("data-run-outcome");
+
+      // Nothing here commits: clicking a country leaves the summary as it was.
+      await userEvent.click(mapTarget(wrong));
+      expect(mapTarget(wrong)).not.toHaveAttribute("data-guess-state");
+      expect(screen.getByText("9 of 10 named")).toBeInTheDocument();
+
+      // Hover still names every country, answer or not.
+      fireEvent.mouseEnter(mapTarget(wrong));
+      expect(screen.getByText(wrong)).toBeInTheDocument();
+    });
+
+    it("saves the score once, in place, without losing the recap", async () => {
+      await playRun();
+
+      await userEvent.type(screen.getByPlaceholderText("Name..."), "Ada");
+      await userEvent.click(screen.getByRole("button", { name: /Save/i }));
+
+      await waitFor(() =>
+        expect(screen.getByText("Saved as Ada")).toBeInTheDocument(),
+      );
+      expect(leaderboardControl.submitScore).toHaveBeenCalledTimes(1);
+      expect(leaderboardControl.submitScore).toHaveBeenCalledWith("Ada", 1500);
+
+      // A reload would have taken all of this with it.
+      expect(screen.getByText("1500 points")).toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: /Spotify/i })).toHaveLength(
+        10,
+      );
+      // And there is no second submit to make.
+      expect(screen.queryByPlaceholderText("Name...")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Save/i })).toBeNull();
+    });
+
+    it("leads on to the leaderboard, and home to the menu", async () => {
+      leaderboardControl.setScores([{ name: "Ada", score: 1500 }]);
+      await playRun();
+
+      await userEvent.type(screen.getByPlaceholderText("Name..."), "Ada");
+      await userEvent.click(screen.getByRole("button", { name: /Save/i }));
+      await waitFor(() =>
+        expect(screen.getByText("Saved as Ada")).toBeInTheDocument(),
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Leaderboard/i }),
+      );
+      expect(screen.getByText("Top Scores")).toBeInTheDocument();
+
+      await userEvent.click(homeButton());
+      expect(
+        screen.getByRole("button", { name: /Competition Mode/i }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("1500 points")).not.toBeInTheDocument();
     });
   });
 });

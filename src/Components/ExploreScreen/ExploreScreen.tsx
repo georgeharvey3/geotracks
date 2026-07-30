@@ -59,8 +59,10 @@ const ExploreScreen = () => {
     if (country) dispatch({ type: "SELECT_COUNTRY", country });
   };
 
-  // Merge live oEmbed metadata onto the Song for display.
-  const displayedSong = song && { ...song, ...player.metadata };
+  // Merge live oEmbed metadata onto the Song for display — only the metadata
+  // fetched for this Song, so a fetch that resolves after a skip is ignored.
+  const metadata = player.metadataLink === song?.link ? player.metadata : {};
+  const displayedSong = song && { ...song, ...metadata };
 
   return (
     <Explore

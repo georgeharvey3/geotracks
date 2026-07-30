@@ -36,6 +36,22 @@ _Avoid_: Solution.
 **Geo-hint**:
 Feedback shown after an incorrect guess: how far (km) and in which compass direction the answer lies from the guessed country. Enabling it halves that round's score.
 
+### The end of a Competition
+
+**Run**:
+One playthrough of Competition — the fixed set of turns from the first Song to the Run summary. Infinite has no Run: with no end, there is nothing to summarise.
+_Avoid_: Test, session, game (a session may hold several Runs).
+
+**Turn result**:
+What a Run keeps about one finished turn: the Song as it was heard, the Turn outcome, how many attempts it took, the points it contributed, and whether geo-hints were on. The turn's individual Guesses are _not_ kept — how the player got there stops mattering once the turn is over.
+
+**Turn outcome**:
+How a turn ended, in three states: the answer named on the first attempt, named on a later attempt, or missed. The one distinction both the Run summary's rows and its Map marking are drawn in.
+
+**Run summary**:
+The screen a completed Run ends on, and the only place a Run is ever seen whole: the score, each Turn result, the Map showing where the Run's music came from, and the one chance to put the score on the leaderboard. It answers two questions at once — how the player did, and _what that Song was_ — because a player who has just heard ten countries' music has earned the names of all ten. Lives only as long as the player stays on it.
+_Avoid_: Scorecard, results screen (half its job is a music recap, not a report card).
+
 ### Map interface
 
 **Map**:

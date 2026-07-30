@@ -19,7 +19,8 @@ const MAX_LEADERBOARD_ENTRIES = 20;
 export interface Leaderboard {
   // Scores sorted high-to-low.
   scores: ScoreEntry[];
-  // Persist a score and refresh the app (behaviour preserved from before).
+  // Append one score record. Resolves when the write lands; rejects if it
+  // doesn't, so the caller can say so and let the player try again.
   submitScore: (name: string, score: number) => Promise<void>;
 }
 
@@ -64,13 +65,14 @@ export default function useLeaderboard(): Leaderboard {
   const submitScore = useCallback(async (name: string, score: number) => {
     await ensureAnonymousAuth();
 
+    // No reload: the Run summary the player is reading sits on the same screen
+    // as the name box, and reloading would destroy it (and hand them a fresh
+    // game). The subscription above brings the new record back on its own.
     await push(ref(db, "scores"), {
       name,
       score,
       createdAt: serverTimestamp(),
     });
-
-    window.location.reload();
   }, []);
 
   return { scores, submitScore };

@@ -3,9 +3,8 @@ import { vi } from "vitest";
 import type {
   SpotifyPlayer,
   SpotifyPlayerOptions,
-  SongMetadata,
 } from "../hooks/useSpotifyPlayer";
-import type { Song } from "../types";
+import type { Song, SongMetadata } from "../types";
 
 /**
  * Stateful fake for the `useSpotifyPlayer` seam used by the integration suite.
@@ -24,6 +23,7 @@ interface Snapshot {
   songFinished: boolean;
   songLoadFailed: boolean;
   metadata: SongMetadata;
+  metadataLink: string | undefined;
 }
 
 const INITIAL: Snapshot = {
@@ -32,7 +32,14 @@ const INITIAL: Snapshot = {
   songFinished: false,
   songLoadFailed: false,
   metadata: {},
+  metadataLink: undefined,
 };
+
+// The Song the fake is currently loaded with. Metadata a test emits is filed
+// against it, the way a real oEmbed fetch resolves for the Song it was made for.
+// Written during render, which is safe only because one screen — and therefore
+// one instance of this hook — is mounted at a time.
+let loadedLink: string | undefined;
 
 let snapshot: Snapshot = INITIAL;
 const listeners = new Set<() => void>();
@@ -86,13 +93,15 @@ export const spotifyPlayerControl = {
   emitFinished: () => emit({ songPlaying: false, songFinished: true }),
   emitLoadFailure: () =>
     emit({ songReady: false, songPlaying: false, songLoadFailed: true }),
-  setMetadata: (metadata: SongMetadata) => emit({ metadata }),
+  setMetadata: (metadata: SongMetadata) =>
+    emit({ metadata, metadataLink: loadedLink }),
   onPlayClicked,
   togglePlay,
   onRetryLoad,
   embedRef,
   reset: () => {
     snapshot = INITIAL;
+    loadedLink = undefined;
     listeners.forEach((listener) => listener());
     onPlayClicked.mockClear();
     togglePlay.mockClear();
@@ -103,10 +112,11 @@ export const spotifyPlayerControl = {
 
 // Mock implementation swapped in for the default export of useSpotifyPlayer.
 export default function useSpotifyPlayerFake(
-  _song: Song | undefined,
+  song: Song | undefined,
   _options: SpotifyPlayerOptions = {},
 ): SpotifyPlayer {
   const snap = useSyncExternalStore(subscribe, getSnapshot);
+  loadedLink = song?.link;
   return {
     embedRef,
     songReady: snap.songReady,
@@ -114,6 +124,7 @@ export default function useSpotifyPlayerFake(
     songFinished: snap.songFinished,
     songLoadFailed: snap.songLoadFailed,
     metadata: snap.metadata,
+    metadataLink: snap.metadataLink,
     onPlayClicked,
     togglePlay,
     onRetryLoad,

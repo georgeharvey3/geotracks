@@ -5,11 +5,11 @@ import SkipNextIcon from "@mui/icons-material/SkipNext";
 import CountryInput from "../CountryInput/CountryInput";
 import CurrentScore from "../CurrentScore/CurrentScore";
 import Guesses from "../Guesses/Guesses";
+import PanelSurface from "../PanelSurface/PanelSurface";
 import PlayerControls from "../PlayerControls/PlayerControls";
 import Slider from "../Slider/Slider";
 import TrackReveal from "../TrackReveal/TrackReveal";
 
-import { LANDSCAPE_MEDIA, PORTRAIT_PANEL_MAX_HEIGHT } from "../../layout";
 import { Guess, Song } from "../../types";
 
 interface ControlPanelProps {
@@ -36,54 +36,11 @@ interface ControlPanelProps {
 
 /**
  * Everything that isn't the map, gathered into one panel: player, prompt, both
- * guess inputs, the running board, and the round-end reveal.
- *
- * Portrait: a tray in normal flow, no taller than its own content — the map
- * gets everything it doesn't claim, and the guess board stays collapsed so
- * everything in the tray is visible without scrolling.
- * Landscape: a card floating over the top-right of the map, deliberately
- * occluding it — the map pans and zooms underneath, and the panel is the one
- * thing the player needs pinned in place.
+ * guess inputs, the running board, and the round-end reveal. The guess board
+ * stays collapsed so everything in the tray is visible without scrolling.
  */
 const ControlPanel = (props: ControlPanelProps) => (
-  <Box
-    sx={{
-      position: "relative",
-      zIndex: 3,
-      // Sized to content, capped so an expanded guess board can never squeeze
-      // the map out; past the cap the tray scrolls on its own.
-      flex: "0 1 auto",
-      minHeight: 0,
-      maxHeight: PORTRAIT_PANEL_MAX_HEIGHT,
-      overflowY: "auto",
-      // The map claims every touch gesture for pan/zoom; the panel needs its
-      // own back so a long guess list can be scrolled.
-      touchAction: "auto",
-      textAlign: "center",
-      px: 2,
-      pt: 1.5,
-      pb: "calc(12px + env(safe-area-inset-bottom))",
-      borderRadius: "16px 16px 0 0",
-      borderTop: "1px solid",
-      borderColor: "divider",
-      bgcolor: "rgba(22, 33, 62, 0.92)",
-      backdropFilter: "blur(12px)",
-      boxShadow: "0 -8px 32px rgba(0, 0, 0, 0.45)",
-
-      [LANDSCAPE_MEDIA]: {
-        position: "absolute",
-        flex: "none",
-        top: 72,
-        right: 24,
-        width: 380,
-        maxHeight: "calc(100vh - 96px)",
-        pb: 1.5,
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
-      },
-    }}
-  >
+  <PanelSurface>
     {props.isCompetition && (
       <CurrentScore score={props.score} turnsRemaining={props.turnsRemaining} />
     )}
@@ -163,7 +120,7 @@ const ControlPanel = (props: ControlPanelProps) => (
         <TrackReveal song={props.song} />
       </Stack>
     )}
-  </Box>
+  </PanelSurface>
 );
 
 export default ControlPanel;

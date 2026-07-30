@@ -87,6 +87,32 @@ describe("Base", () => {
     expect(container.querySelector('[data-surface="night"]')).toBeNull();
   });
 
+  // A content page fades up over the night backdrop, which is already there. A
+  // map surface must not: fading a map means drawing it at less than full
+  // opacity, and what shows through is the cream underneath — the whole screen
+  // washing out to white on the way in. The map is revealed by the veil coming
+  // off it instead (`BaseMap`'s `veil="lift"`).
+  it("fades a content page up, and never a map surface", () => {
+    const { container, rerender } = render(
+      <Base showMenuButton={false} screenKey="menu" onMenuClicked={vi.fn()}>
+        <div>Child</div>
+      </Base>,
+    );
+    expect(container.querySelector(".screen-enter")).not.toBeNull();
+
+    rerender(
+      <Base
+        showMenuButton={false}
+        fullBleed
+        screenKey="playing"
+        onMenuClicked={vi.fn()}
+      >
+        <div>Child</div>
+      </Base>,
+    );
+    expect(container.querySelector(".screen-enter")).toBeNull();
+  });
+
   describe("the wordmark's glide", () => {
     // jsdom implements no Web Animations API and measures every box as zero,
     // and the glide is built to do nothing without either — so a test of it has

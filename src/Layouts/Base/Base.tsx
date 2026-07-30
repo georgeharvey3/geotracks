@@ -236,13 +236,14 @@ const Base = (props: BaseProps) => {
           bgcolor: "background.default",
         }}
       >
-        {/* Keyed, so the entrance plays once on arrival rather than on every
-            render of the screen already showing. */}
-        <Box
-          key={props.screenKey}
-          className="screen-enter"
-          sx={{ position: "absolute", inset: 0 }}
-        >
+        {/* No fade here, unlike the content pages: the map surfaces enter by
+            the night coming off the map (`veil="lift"`, see `BaseMap`). Fading
+            a map up means drawing it at less than full opacity over the cream
+            underneath, which the player sees as the whole screen washing out to
+            white before it arrives — and the map is the one thing on these
+            screens that was already there to be revealed. Still keyed, so what
+            does animate restarts on arrival rather than on every render. */}
+        <Box key={props.screenKey} sx={{ position: "absolute", inset: 0 }}>
           {props.children}
         </Box>
         <OverlayChrome

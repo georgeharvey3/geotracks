@@ -24,9 +24,45 @@ body {
   outline-color: var(--color-paper);
 }
 
-/* Arriving somewhere. The screen fades up and settles the last few pixels
-   rather than cutting in, so the wordmark flying to its new place (see
-   `Base.tsx`) has something to arrive over. */
+/* Arriving on a map surface: the night comes off the map it was already on.
+   The content pages stand on the map under a black veil, and a map surface is
+   the same world with the veil taken away — so the way in is to take it away in
+   front of the player, from exactly the darkness the page before it ended on.
+   Nothing fades *up* here: a map at less than full opacity shows the cream
+   underneath it, which is the white flash this replaced. */
+@keyframes veil-lift {
+  from {
+    opacity: var(--night-veil-opacity);
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.veil-lift {
+  animation: veil-lift var(--dur-reveal) var(--ease-reveal) both;
+}
+
+/* And the way back: the night settling over the map again, rather than the
+   content page cutting to black. The same veil, the same easing, the other
+   direction. */
+@keyframes veil-settle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--night-veil-opacity);
+  }
+}
+
+.veil-settle {
+  animation: veil-settle var(--dur-settle) var(--ease-reveal) both;
+}
+
+/* Arriving on a content page. The screen fades up and settles the last few
+   pixels rather than cutting in, so the wordmark flying to its new place (see
+   `Base.tsx`) has something to arrive over. Content pages only: they fade up
+   over the night backdrop, which is already there and stays. */
 @keyframes screen-enter {
   from {
     opacity: 0;

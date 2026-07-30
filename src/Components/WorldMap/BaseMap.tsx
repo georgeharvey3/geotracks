@@ -18,6 +18,7 @@ import {
 
 import useHasHover from "../../hooks/useHasHover";
 import { MAP_FILLS } from "../../map/fills";
+import { COLORS, NIGHT_VEIL_OPACITY } from "../../tokens";
 import {
   countryFeatures,
   countryNameByCode,
@@ -60,6 +61,15 @@ const STRAGGLER_STROKE = 0.75;
 const STRAGGLER_MARK_STROKE = 1.5;
 
 const stragglerCodes = new Set(stragglerMarkers.map((marker) => marker.code));
+
+// Which way the veil moves on mount, if it moves at all. The keyframes are in
+// `index.css`, next to the other entrances.
+const VEIL_ANIMATIONS = {
+  none: undefined,
+  night: undefined,
+  lift: "veil-lift",
+  settle: "veil-settle",
+} as const;
 
 type MapGeography = { rsmKey: string; id?: string; svgPath: string | null };
 
@@ -154,6 +164,21 @@ interface BaseMapProps {
    * size.
    */
   overlay?: (fixed: number) => ReactNode;
+  /**
+   * The black veil over the map, and what it does when the map mounts.
+   *
+   * `night` holds it at full strength: the map at rest in the dark, which is
+   * the ground a content page stands on. `lift` starts it there and takes it
+   * off — how a map surface arrives, revealing the same world the page before
+   * it was standing on rather than fading a new one up over the cream.
+   * `settle` is the way back: it starts at nothing and draws the night on.
+   * `none` is a map that was never under anything.
+   *
+   * It is a parameter and not a fact about the map, like `cover` and
+   * `showStragglers`: this component still knows nothing about which surface is
+   * calling it (ADR-0003).
+   */
+  veil?: "none" | "night" | "lift" | "settle";
 }
 
 /**
@@ -167,7 +192,7 @@ interface BaseMapProps {
  * the tooltip says and anything drawn over the top come from the caller, so
  * this component never has to know which surface is using it (ADR-0003).
  */
-const BaseMap = (props: BaseMapProps) => {
+const BaseMap = ({ veil = "none", ...props }: BaseMapProps) => {
   const hasHover = useHasHover();
   const isLandscape = useMediaQuery(LANDSCAPE_QUERY);
   // Covering crops the world; fitting shows all of it under the layout's
@@ -428,6 +453,24 @@ const BaseMap = (props: BaseMapProps) => {
           </ZoomableGroup>
         </ComposableMap>
       </Box>
+
+      {/* Over the map and under everything a surface floats on it — the panel,
+          the standings — so the world is what is revealed, not the controls. */}
+      {veil !== "none" && (
+        <Box
+          data-testid="map-veil"
+          className={VEIL_ANIMATIONS[veil]}
+          sx={{
+            position: "absolute",
+            inset: 0,
+            bgcolor: COLORS.night,
+            // Where it comes to rest, which is also where it stays if the
+            // animation never runs — reduced motion, or a browser without it.
+            opacity: veil === "lift" ? 0 : NIGHT_VEIL_OPACITY,
+            pointerEvents: "none",
+          }}
+        />
+      )}
 
       {previewedLabel && (
         <Box

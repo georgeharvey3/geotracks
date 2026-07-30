@@ -63,6 +63,25 @@
   /* ---- motion ------------------------------------------------------- */
   --ease-press: cubic-bezier(0.2, 0.7, 0.3, 1);
   --ease-snap: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The veil coming off a map, and the one easing here that is not front-loaded.
+     Brightness climbs much faster than a veil's opacity falls — halfway off is
+     already ~80% of the way to full — so a `--ease-snap` reveal spends its first
+     70ms doing most of the visible work and the rest crawling. Symmetric
+     (ease-in-out cubic): slow enough at the start that the darkness lets go
+     rather than jumping, slow enough at the end to settle. */
+  --ease-reveal: cubic-bezier(0.65, 0, 0.35, 1);
   --dur-short: 140ms;
   --dur-mid: 220ms;
+  --dur-reveal: 520ms;
+  /* The night settling back over the map, on the way to a content page. Brisker
+     than the reveal on purpose: the page's paper type is fading up over the same
+     seconds, and until the veil is most of the way in it is doing so over a lit
+     map. The way in is worth lingering over; the way back should get out of the
+     way. */
+  --dur-settle: 320ms;
+
+  /* ---- the night ground --------------------------------------------- */
+  /* How much black lies over the map. Mirrored from `tokens.ts`, where the
+     reasoning is; the keyframe that lifts it needs the value in CSS. */
+  --night-veil-opacity: 0.82;
 }

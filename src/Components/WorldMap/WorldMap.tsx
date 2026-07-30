@@ -135,6 +135,9 @@ const WorldMap = (props: WorldMapProps) => {
       labelFor={(code) =>
         props.finished ? undefined : countryNameByCode(code)
       }
+      // Arrived at from a page standing on this same map in the dark, so the
+      // way in is the night coming off it.
+      veil="lift"
       // A guess is irreversible, so on touch it costs a tap to arm first.
       armOnTouch
       onCommit={props.onCommit}

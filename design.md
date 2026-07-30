@@ -146,6 +146,12 @@ the dark rather than a picture of the world. Paper type lands at ~12:1 over it
 whatever the map has drawn underneath, which is what lets the veil be the same
 one on both pages and under any pan.
 
+The veil belongs to the **map** rather than to the backdrop (`BaseMap`'s `veil`:
+`night` holds it, `lift` takes it off on mount, `settle` draws it on, `none`
+never had one), because it is also how a screen arrives in both directions — see
+Motion. All of them must start and end on the same darkness, so there is one
+value, in `tokens.ts` and mirrored into `tokens.css` for the keyframes.
+
 Three things are taken off the map on the way in, all for the same reason —
 nothing here is picked, so nothing here is a target:
 
@@ -190,7 +196,14 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
 ## Motion
 
 - Easings: `--ease-press: cubic-bezier(0.2, 0.7, 0.3, 1)` for the button,
-  `--ease-snap: cubic-bezier(0.22, 1, 0.36, 1)` for reveals.
+  `--ease-snap: cubic-bezier(0.22, 1, 0.36, 1)` for reveals, and
+  `--ease-reveal: cubic-bezier(0.65, 0, 0.35, 1)` for the veil alone. It is the
+  one easing here that is not front-loaded, because the thing it moves is not:
+  brightness climbs much faster than a veil's opacity falls — halfway off is
+  already ~80% of the way to full — so `--ease-snap` spent the first 70ms of a
+  reveal doing most of the visible work and the rest crawling, which is a flash
+  with a long tail. Symmetric: the darkness lets go rather than jumping, and
+  settles rather than stopping.
 - **The press is the feedback.** A filled button has a solid colour edge beneath
   it (`0 4px 0 0 accentDeep`) giving it thickness — never a negative spread,
   which would make the edge narrower than the button and read as a dropped
@@ -199,8 +212,25 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
 - **Arriving somewhere** is three things, staged, and only ever _in_ — the
   outgoing screen is gone the instant it is replaced, and holding two screens
   alive to cross-fade them would mean two maps mounted at once:
-  1. **The screen** fades up and settles the last 8px (`screen-enter`, 220ms).
-     Only the _content_ of the screen: the chrome is deliberately outside it.
+  1. **The screen arrives**, and how depends on which family it is in.
+     - A **content page** fades up and settles the last 8px (`screen-enter`,
+       220ms). Only the _content_: the chrome is deliberately outside it. If it
+       was reached from a map surface, the night is drawn back over that map
+       underneath it (`veil-settle`, 320ms) instead of the page cutting to
+       black. Brisker than the reveal, because the page's paper type is fading
+       up over the same seconds and does it over a lit map until the veil is
+       most of the way in. On the first page of a session the veil is simply
+       already there: there is nothing to come back from, and animating it would
+       show a lit world and then put it out.
+     - A **map surface** does not fade. It is the map the page before it was
+       standing on, so it arrives by that map's **veil lifting** (`veil-lift`,
+       520ms, from exactly the 0.82 the page ended on). Fading a map means
+       drawing it at less than full opacity, and what shows through is the cream
+       underneath: the player sees the whole screen wash out to white and then
+       resolve. The one thing on these screens that was already there is the
+       world, so the way in is to uncover it rather than to draw a new one.
+       The Run summary is the exception — it is reached from the game screen,
+       which is this same map already revealed, so it lifts nothing.
   2. **The wordmark glides.** It is the one element every screen shares, so it
      is what carries the eye across an otherwise instant swap: the incoming one
      is drawn where the outgoing one was and released (FLIP, 420ms, in

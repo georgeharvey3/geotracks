@@ -292,6 +292,20 @@ describe("WorldMap", () => {
     });
   });
 
+  // The menu stands on this same map under a black veil, so the way in is that
+  // veil coming off — never a fade, which would draw the map at less than full
+  // opacity and show the cream page underneath as a white flash.
+  it("arrives by lifting the night off the map, and never stays under it", async () => {
+    renderMap();
+    await screen.findByLabelText("France");
+
+    const veil = screen.getByTestId("map-veil");
+    expect(veil).toHaveClass("veil-lift");
+    // Its resting state is gone rather than dark: if the animation never runs —
+    // reduced motion, or a browser without it — the map is revealed, not lost.
+    expect(veil).toHaveStyle({ opacity: "0" });
+  });
+
   // A map that arrives empty and fills in on the next commit is a map that
   // blinks the whole world out on the way into a screen, which is what
   // react-simple-maps' own <Geographies> did — it expands the TopoJSON in an

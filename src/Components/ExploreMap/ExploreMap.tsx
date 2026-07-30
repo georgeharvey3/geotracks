@@ -56,6 +56,8 @@ const ExploreMap = (props: ExploreMapProps) => {
       // Silent countries still answer to hover: an absence of music is not an
       // absence of geography.
       labelFor={(code) => countryNameByCode(code)}
+      // Reached from the menu, which stands on this map in the dark.
+      veil="lift"
       // Nothing here is irreversible, so a single tap is enough on touch too.
       armOnTouch={false}
       onCommit={props.onSelect}

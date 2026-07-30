@@ -9,14 +9,16 @@ permissions:
   contents: read
 
 # Cancel superseded runs on feature branches / PRs, but never interrupt
-# an in-progress run on main (its deploy must be allowed to finish).
+# an in-progress run on main (its deploy — the release — must be allowed
+# to finish).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Job id is the status-check context that branch protection requires on
-  # main; keep it stable ("quality") — don't add a custom `name:`.
+  # both develop and main; keep it stable ("quality") — don't add a custom
+  # `name:`.
   quality:
     runs-on: ubuntu-latest
     steps:

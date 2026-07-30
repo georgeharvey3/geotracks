@@ -14,7 +14,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### CI/CD & deployment
 
-Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) — there is no local `deploy` script. Every push and PR runs a `quality` job (lint + `tsc --noEmit` + `vitest run` + `vite build`) on the Node version pinned in `.nvmrc`. On push to `main`, a `deploy` job (gated `needs: quality`) publishes `dist/` to GitHub Pages via `actions/configure-pages` → `actions/upload-pages-artifact` → `actions/deploy-pages`. The repo's Pages **Source** must be set to **"GitHub Actions"** (Settings → Pages), and `main` is branch-protected to require a PR and a passing `quality` check.
+Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) — there is no local `deploy` script. Every push and PR runs a `quality` job (lint + `tsc --noEmit` + `vitest run` + `vite build`) on the Node version pinned in `.nvmrc`. On push to `main`, a `deploy` job (gated `needs: quality`) publishes `dist/` to GitHub Pages via `actions/configure-pages` → `actions/upload-pages-artifact` → `actions/deploy-pages`. The repo's Pages **Source** must be set to **"GitHub Actions"** (Settings → Pages).
+
+### Branching
+
+**`develop` is the default branch and the target of all work; `main` is what is deployed.** Branch off `develop`, PR back into `develop`, squash-merge. A **release** is a PR from `develop` into `main` merged with a **merge commit** — that merge is what ships the site, and it must not be squashed, or `main` flattens into one commit and its history permanently diverges from `develop`'s.
+
+Both branches require a PR and a passing `quality` check and refuse force-pushes and deletion. `develop` requires linear history and up-to-date branches (concurrent feature branches land there); `main` requires neither, because `develop` is its only source and the release merge commit is by definition non-linear. Never open a PR straight into `main` — the only thing that belongs there is a release.
 
 ### Configuration / env
 

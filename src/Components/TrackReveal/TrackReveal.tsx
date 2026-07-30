@@ -1,46 +1,8 @@
-import { useState } from "react";
 import { Box, Button, Paper, Typography } from "@mui/material";
-import AlbumIcon from "@mui/icons-material/Album";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+
+import AlbumArt from "../AlbumArt/AlbumArt";
 import { Song } from "../../types";
-
-const AlbumArt = ({ src, alt }: { src?: string; alt: string }) => {
-  const [failed, setFailed] = useState(false);
-
-  if (!src || failed) {
-    return (
-      <Box
-        sx={{
-          width: 80,
-          height: 80,
-          borderRadius: 1,
-          flexShrink: 0,
-          bgcolor: "action.hover",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <AlbumIcon sx={{ fontSize: 40, color: "text.secondary" }} />
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      component="img"
-      src={src}
-      alt={alt}
-      onError={() => setFailed(true)}
-      sx={{
-        width: 80,
-        height: 80,
-        borderRadius: 1,
-        flexShrink: 0,
-      }}
-    />
-  );
-};
 
 // The answer-reveal card: album art plus track/artist/album and a Spotify link.
 const TrackReveal = ({ song }: { song: Song }) => (

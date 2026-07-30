@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Song } from "../types";
-
-export interface SongMetadata {
-  trackTitle?: string;
-  artistName?: string;
-  thumbnailUrl?: string;
-}
+import { Song, SongMetadata } from "../types";
 
 export interface SpotifyPlayer {
   // Callback ref for the hidden embed element; wiring this triggers controller
@@ -16,6 +10,13 @@ export interface SpotifyPlayer {
   songFinished: boolean;
   songLoadFailed: boolean;
   metadata: SongMetadata;
+  /**
+   * The Song link `metadata` was fetched for, or undefined while none has
+   * resolved for the current Song. A caller that stores metadata needs this:
+   * the two travel together, so metadata can never be filed under the wrong
+   * Song when a fetch resolves after the Song has moved on.
+   */
+  metadataLink: string | undefined;
   // Play/pause with replay handling when the clip has finished.
   onPlayClicked: () => void;
   // Raw play/pause toggle (used for desktop auto-play on a new question).
@@ -25,6 +26,10 @@ export interface SpotifyPlayer {
 
 const MAX_AUTO_RETRIES = 3;
 const LOAD_TIMEOUT_MS = 10000;
+
+// One frozen empty object, so "nothing fetched yet" keeps a stable identity for
+// consumers that depend on `metadata`.
+const NO_METADATA: SongMetadata = {};
 
 export interface SpotifyPlayerOptions {
   /**
@@ -60,7 +65,12 @@ export default function useSpotifyPlayer(
   const [songPlaying, setSongPlaying] = useState(false);
   const [songFinished, setSongFinished] = useState(false);
   const [songLoadFailed, setSongLoadFailed] = useState(false);
-  const [metadata, setMetadata] = useState<SongMetadata>({});
+  // Metadata and the link it describes are one value, so they can never be read
+  // apart from each other.
+  const [fetchedMetadata, setFetchedMetadata] = useState<{
+    link: string;
+    metadata: SongMetadata;
+  } | null>(null);
 
   const embedElementRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<SpotifyEmbedController | null>(null);
@@ -220,7 +230,7 @@ export default function useSpotifyPlayer(
 
     retryCountRef.current = 0;
     setSongFinished(false);
-    setMetadata({});
+    setFetchedMetadata(null);
     attemptLoad(songLink);
 
     let cancelled = false;
@@ -232,10 +242,13 @@ export default function useSpotifyPlayer(
         .then((res) => res.json())
         .then((data) => {
           if (cancelled) return;
-          setMetadata({
-            trackTitle: data.title,
-            artistName: data.author_name,
-            thumbnailUrl: data.thumbnail_url,
+          setFetchedMetadata({
+            link: songLink,
+            metadata: {
+              trackTitle: data.title,
+              artistName: data.author_name,
+              thumbnailUrl: data.thumbnail_url,
+            },
           });
         })
         .catch((err) => {
@@ -305,7 +318,8 @@ export default function useSpotifyPlayer(
     songPlaying,
     songFinished,
     songLoadFailed,
-    metadata,
+    metadata: fetchedMetadata?.metadata ?? NO_METADATA,
+    metadataLink: fetchedMetadata?.link,
     onPlayClicked,
     togglePlay,
     onRetryLoad,

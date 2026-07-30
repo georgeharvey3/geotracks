@@ -160,13 +160,13 @@ describe("gameReducer", () => {
       expect(next.guesses).toHaveLength(0);
     });
 
-    it("NEXT_SONG reaches the final score on the last competition turn", () => {
+    it("NEXT_SONG reaches the Run summary on the last competition turn", () => {
       const state = stateWith({
         finished: true,
         turnIndex: NUM_COMPETITION_TURNS - 1,
       });
       const next = gameReducer(state, { type: "NEXT_SONG" });
-      expect(next.screen).toBe("finalScore");
+      expect(next.screen).toBe("runSummary");
       expect(next.turnIndex).toBe(NUM_COMPETITION_TURNS);
     });
 
@@ -220,6 +220,140 @@ describe("gameReducer", () => {
         value: "12345678901",
       });
       expect(tooLong.nameInputValue).toBe("1234567890");
+    });
+  });
+
+  describe("the displayed Song's metadata", () => {
+    it("SET_SONG_METADATA lands on the song it was fetched for", () => {
+      const next = gameReducer(stateWith(), {
+        type: "SET_SONG_METADATA",
+        link: FRANCE_SONG.link,
+        metadata: {
+          trackTitle: "Non, je ne regrette rien",
+          artistName: "Édith Piaf",
+          thumbnailUrl: "https://i.scdn.co/image/abc",
+        },
+      });
+      expect(next.song.trackTitle).toBe("Non, je ne regrette rien");
+      expect(next.song.artistName).toBe("Édith Piaf");
+      expect(next.song.thumbnailUrl).toBe("https://i.scdn.co/image/abc");
+      // The rest of the Song is untouched.
+      expect(next.song.country).toBe("France");
+      expect(next.song.link).toBe(FRANCE_SONG.link);
+    });
+
+    it("ignores metadata fetched for a song that is no longer playing", () => {
+      const state = stateWith();
+      const next = gameReducer(state, {
+        type: "SET_SONG_METADATA",
+        link: "https://open.spotify.com/track/stale",
+        metadata: { trackTitle: "The Previous Song" },
+      });
+      expect(next).toBe(state);
+    });
+  });
+
+  describe("Run summary", () => {
+    // A Turn result is snapshotted when the turn is retired, so drive each turn
+    // the way the game does: guess, then NEXT_SONG.
+    function playTurn(
+      state: GameState,
+      guesses: string[],
+      geoHints = false,
+    ): GameState {
+      let next = geoHints
+        ? gameReducer(state, { type: "TOGGLE_GEO_HINTS", checked: true })
+        : state;
+      for (const country of guesses) {
+        next = gameReducer(next, {
+          type: "SUBMIT_GUESS",
+          countryAnswer: country,
+        });
+      }
+      return gameReducer(next, { type: "NEXT_SONG" });
+    }
+
+    it("keeps a first-attempt answer with its attempts and points", () => {
+      const next = playTurn(stateWith(), ["France"]);
+      expect(next.turns).toHaveLength(1);
+      expect(next.turns[0]).toMatchObject({
+        outcome: "named-first",
+        attempts: 1,
+        points: 150,
+        geoHintsUsed: false,
+      });
+      expect(next.turns[0]!.song.link).toBe(FRANCE_SONG.link);
+    });
+
+    it("keeps a later-attempt answer with the attempts it took", () => {
+      const next = playTurn(stateWith(), ["Japan", "Spain", "France"]);
+      expect(next.turns[0]).toMatchObject({
+        outcome: "named-later",
+        attempts: 3,
+        points: 60,
+      });
+    });
+
+    it("keeps a missed turn with no points", () => {
+      const next = playTurn(stateWith(), [
+        "Japan",
+        "Spain",
+        "Italy",
+        "Brazil",
+        "Chile",
+      ]);
+      expect(next.turns[0]).toMatchObject({
+        outcome: "missed",
+        attempts: 5,
+        points: 0,
+      });
+    });
+
+    it("marks a turn played with geo-hints on, and halves its points", () => {
+      const next = playTurn(stateWith(), ["France"], true);
+      expect(next.turns[0]).toMatchObject({
+        geoHintsUsed: true,
+        points: 75,
+      });
+    });
+
+    it("keeps the metadata the Song was heard with", () => {
+      const withMetadata = gameReducer(stateWith(), {
+        type: "SET_SONG_METADATA",
+        link: FRANCE_SONG.link,
+        metadata: { trackTitle: "La Vie en rose" },
+      });
+      const next = playTurn(withMetadata, ["France"]);
+      expect(next.turns[0]!.song.trackTitle).toBe("La Vie en rose");
+    });
+
+    it("accumulates one Turn result per turn of the Run", () => {
+      let state = stateWith();
+      for (let turn = 0; turn < NUM_COMPETITION_TURNS; turn += 1) {
+        state = playTurn({ ...state, song: FRANCE_SONG }, ["France"]);
+      }
+      expect(state.turns).toHaveLength(NUM_COMPETITION_TURNS);
+      expect(state.screen).toBe("runSummary");
+    });
+
+    it("keeps nothing in Infinite, which has no Run to summarise", () => {
+      const state = stateWith({ gameMode: GAME_MODES.infinite });
+      const next = playTurn(state, ["France"]);
+      expect(next.turns).toHaveLength(0);
+    });
+
+    it("SCORE_SUBMITTED records the Run's one leaderboard write", () => {
+      const next = gameReducer(stateWith(), { type: "SCORE_SUBMITTED" });
+      expect(next.scoreSubmitted).toBe(true);
+    });
+
+    it("RESET_TO_MENU discards the Run", () => {
+      const played = playTurn(stateWith(), ["France"]);
+      const submitted = gameReducer(played, { type: "SCORE_SUBMITTED" });
+      const next = gameReducer(submitted, { type: "RESET_TO_MENU" });
+      expect(next.turns).toHaveLength(0);
+      expect(next.scoreSubmitted).toBe(false);
+      expect(next.nameInputValue).toBe("");
     });
   });
 });

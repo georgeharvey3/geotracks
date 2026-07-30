@@ -54,8 +54,14 @@ const GameScreen = () => {
     dispatch({ type: "TOGGLE_GEO_HINTS", checked: e.target.checked });
   };
 
-  // Merge live oEmbed metadata onto the round's song for display.
-  const song = { ...state.song, ...player.metadata };
+  // oEmbed metadata is handed to the reducer rather than merged for display, so
+  // the Song the player heard is the one the Run summary can later snapshot. The
+  // link travels with it: the reducer drops metadata that has outlived its Song.
+  const { metadata, metadataLink } = player;
+  useEffect(() => {
+    if (metadataLink === undefined) return;
+    dispatch({ type: "SET_SONG_METADATA", link: metadataLink, metadata });
+  }, [metadata, metadataLink, dispatch]);
 
   return (
     <Game
@@ -76,7 +82,7 @@ const GameScreen = () => {
       onMapCommit={(countryAnswer) =>
         dispatch({ type: "SUBMIT_GUESS", countryAnswer })
       }
-      song={song}
+      song={state.song}
       embedRef={player.embedRef}
       isCompetition={state.gameMode === GAME_MODES.competition}
       turnsRemaining={NUM_COMPETITION_TURNS - state.turnIndex}

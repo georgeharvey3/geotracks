@@ -24,11 +24,11 @@ Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.
 
 ## Architecture
 
-GeoTracks is a **React 18 + TypeScript** music geography app (built with Vite, MUI for components/theming) built on one world map. In the **game**, players listen to Spotify clips and guess the country of origin — by clicking it on the map or by typing its name; two game modes, **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard). In **Explore**, they choose a country in order to listen to it. `CONTEXT.md` pins the vocabulary (Song, Album, Clip, Game mode, Explore, Playable country, Country queue, Skip).
+GeoTracks is a **React 18 + TypeScript** music geography app (built with Vite, MUI for components/theming) built on one world map. In the **game**, players listen to Spotify clips and guess the country of origin — by clicking it on the map or by typing its name; two game modes, **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard). A completed Competition **Run** ends on the **Run summary**. In **Explore**, they choose a country in order to listen to it. `CONTEXT.md` pins the vocabulary (Song, Album, Clip, Game mode, Explore, Playable country, Country queue, Skip, Run, Turn result, Turn outcome, Run summary).
 
 ### State Management
 
-Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `finalScore` | `explore`). Side effects are isolated in hooks under `src/hooks/`:
+Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `runSummary` | `explore`). Side effects are isolated in hooks under `src/hooks/`:
 
 - `useSpotifyPlayer` — the entire imperative Spotify IFrame integration (controller lifecycle, oEmbed metadata, retries)
 - `useKeyboardShortcuts` — document-level key handlers for the map screens
@@ -42,11 +42,13 @@ Explore has a reducer (`src/state/exploreReducer.ts`) and provider (`src/context
 
 Playback uses the **Spotify IFrame API**, wrapped entirely by `src/hooks/useSpotifyPlayer.ts`: a controller is created against a hidden embed element (`IFrameAPI.createController`) and driven programmatically (`controller.togglePlay()`, `controller.loadUri()`). Track title, artist, and thumbnail are fetched separately from the **Spotify oEmbed API** (`https://open.spotify.com/oembed?url=...`). Ready/playing/paused/finished states come from the controller's `ready` and `playback_update` listeners, and the hook has automatic retries plus a manual retry fallback when a track fails to load.
 
+The hook reports metadata together with the **link it was fetched for** (`metadata` + `metadataLink`), because the two must never be read apart: a fetch that resolves after the Song has moved on would otherwise put one Song's title on the next. The game hands both to the reducer (`SET_SONG_METADATA`), which merges the metadata onto `state.song` only when the link still matches — so the reducer owns the displayed Song and the Run summary can snapshot the Song the player actually heard. Explore merges for display only, under the same link check.
+
 The hook takes an optional **Clip cap** (`clipDurationMs`). The game passes 30 s (`CLIP_DURATION_MS` in `GameScreen`) and the hook pauses the embed there; Explore passes none, so a listener signed in to Spotify hears the whole Song and everyone else still gets Spotify's own preview limit. That splits end-of-Song detection in two: **capped**, the end is the cap; **uncapped**, `position >= duration` is unreliable — the embed reports the full Song's duration to a listener who is not signed in while playing only its ~30 s preview, so position never gets there. What holds either way is that _playback stopped and we were not the ones who stopped it_, so the hook tracks pauses it asked for (`togglePlay`) and treats any other stop as the Song ending. **This has not been verified against a real embed** — see the note in issue #37.
 
 ### Scoring & Firebase
 
-- Scores are stored in Firebase Realtime Database via the **Firebase JS SDK** with **anonymous auth**, all behind the `useLeaderboard` hook (`src/hooks/useLeaderboard.ts`); the SDK is initialised in `src/firebase.ts`. Records are append-only (`scores/{pushId}: { name, score, createdAt }`, written with `push()`); reads are bounded (`orderByChild("score").limitToLast(20)`). Access is locked down by committed security rules (`database.rules.json` + `firebase.json`): public read, per-record create-only write (`auth != null && !data.exists()`), and strict `.validate` (name 1–10 chars, integer score 0–1500, `createdAt == now`, no extra fields). Deploy with `firebase deploy --only database`; migrate legacy `{name:score}` data first via `node scripts/migrate-scores.mjs --apply`.
+- Scores are stored in Firebase Realtime Database via the **Firebase JS SDK** with **anonymous auth**, all behind the `useLeaderboard` hook (`src/hooks/useLeaderboard.ts`); the SDK is initialised in `src/firebase.ts`. `submitScore` deliberately **does not reload the page** — the Run summary the player is reading sits on the same screen as the name box, so the write is confirmed in place (`SCORE_SUBMITTED`, one per Run) and the read subscription brings the new record back on its own. Records are append-only (`scores/{pushId}: { name, score, createdAt }`, written with `push()`); reads are bounded (`orderByChild("score").limitToLast(20)`). Access is locked down by committed security rules (`database.rules.json` + `firebase.json`): public read, per-record create-only write (`auth != null && !data.exists()`), and strict `.validate` (name 1–10 chars, integer score 0–1500, `createdAt == now`, no extra fields). Deploy with `firebase deploy --only database`; migrate legacy `{name:score}` data first via `node scripts/migrate-scores.mjs --apply`.
 - Score values by guess attempt: 1st=150, 2nd=80, 3rd=60, 4th=40, 5th=20
 - Enabling geo hints halves the score for that round
 - Canonical competition score range is **0–1500** (`MAX_COMPETITION_SCORE` in `src/state/gameReducer.ts` = `SCORE_VALUES[1] * NUM_COMPETITION_TURNS`, i.e. 10 first-guess correct answers with no hints). This is the bound the leaderboard `.validate` rule enforces (issue #7).
@@ -56,7 +58,7 @@ The hook takes an optional **Clip cap** (`clipDurationMs`). The game passes 30 s
 
 The world map splits into a **surface-neutral base** (`src/Components/WorldMap/BaseMap.tsx`) and one thin wrapper per surface (ADR-0003). The base owns how a country is picked and nothing about what picking means: the projection, bounded panning, the `1/zoom` counter-scale, straggler markers, the hover tooltip and commit-on-click. Its caller supplies the fill for a country (`fillFor`), whether it may be chosen (`selectable`), what the tooltip says (`labelFor`), the touch rule (`armOnTouch`), per-country marking attributes and an optional `overlay`. **The base must stay state-agnostic** — the moment it branches on which surface is calling, the split has failed and a `mode` prop has been rebuilt by accident. Shared palette entries live in `src/map/fills.ts`.
 
-The two wrappers are `WorldMap.tsx` (guessing) and `src/Components/ExploreMap/ExploreMap.tsx` (Explore).
+The three wrappers are `WorldMap.tsx` (guessing), `src/Components/ExploreMap/ExploreMap.tsx` (Explore) and `src/Components/RunSummaryMap/RunSummaryMap.tsx` (the Run summary).
 
 The guessing map is the primary guessing surface, always on, with the text box retained as a compact secondary input. Both feed the same `SUBMIT_GUESS` action, so the map is a **unified board**: it marks every guess of the round whichever input committed it. Rendering is **react-simple-maps** (inline SVG, `geoEqualEarth`, `ZoomableGroup` pan/zoom, no tile provider — ADR-0001).
 
@@ -93,13 +95,27 @@ The **guess board** (`src/Components/Guesses/Guesses.tsx`) shows only the latest
 - **Keyboard** — the same shortcuts as the game, with next-song wired to Skip: Space plays/pauses, Enter skips, any other key focuses the country input, Escape blurs it. `CountryInput` takes an optional `countries` list (defaulting to all of them, so the game is unaffected); Explore passes only the Playable ones, so the suggestions can never dead-end.
 - **Lifetime** — leaving Explore unmounts the player and therefore stops the music; the queues live in the provider above the screen, so a trip to the menu and back within a visit keeps the player's place. Nothing is persisted across a page reload — no storage, no schema to version.
 
+### Run summary
+
+The **Run summary** (issue #3) is where a completed Competition **Run** ends — the only place a Run is ever seen whole. It answers both questions a player has at the end: how did I do, and _what was that track?_ **Competition only**: Infinite has no end to summarise.
+
+It is the third full-bleed map surface, wearing the game screen's layout exactly (map covering the viewport with `RunSummaryPanel` floating over a corner in landscape, a scrolling bottom tray in portrait, both via the shared `PanelSurface`). No player mounts here — the rows identify each Song and hand off to Spotify, and Explore is where music is actually listened to.
+
+- **The Run lives in the game reducer** — `turns: TurnResult[]`, appended by `NEXT_SONG` (already where a round is retired) and cleared by `RESET_TO_MENU`. Unlike Explore this is derived from the game's own Run, so ADR-0003's single-router rule holds and no second reducer is needed. `SUBMIT_GUESS` banks the round's points (`roundPoints`) so the scoring rule is never re-derived in a second place.
+- **The panel, in this order** — the score headline and an "N of 10 named" line (the score alone doesn't say whether 340 points came from eight lucky third guesses or four clean ones); then the leaderboard name box, so it and the confirmation that replaces it are above the fold on any device; then the ten **Turn result** rows, scrolling inside the panel. Each row carries artwork, track title, artist, country, Album, a Spotify link, the Turn outcome with attempts used and points earned, and a **GeoHints** chip on turns played with hints on — the only thing that explains a halved points figure. Missing metadata falls back to "Unknown Track" / "Unknown Artist", as `TrackReveal` already does.
+- **The map** marks only the Run's **answer** countries, in three fills by Turn outcome (`OUTCOME_FILLS` in `src/map/fills.ts`: green / amber / red). Wrong guesses are not marked — the Run doesn't keep them, and the surface is a picture of where the music came from rather than a trace of mistakes. `selectable={false}` throughout, so nothing commits; hover still names every country and pan/zoom come free from the base.
+- **A country can answer twice in one Run** — the daily seed splices out the Album, not the country, and 88 countries hold more than one Album. A marked shape is therefore not a 1:1 index of a turn: the **rows are the record**, the map is the picture, and a shape carries its country's _best_ outcome.
+- **Row → map** — hovering a row lights that row's country. Pointer-only (`useHasHover`); on touch the country printed in every row carries the job instead.
+- **Exits** — the floating home button, plus the leaderboard button that appears in place of the name box once the score is saved. **No "Play again"**: `RESET_TO_MENU` keeps the shrunken album pool and the advanced `dailySongIndex`, so a second Run in the same session draws random songs rather than the day's seeded ten, and a replay shortcut would advertise a Run that isn't comparable.
+- **Lifetime** — in memory only, like Explore's queues. Leaving the screen discards the Run and a reload loses it; persisting it belongs with #1, which has to introduce device storage anyway.
+
 ### Geo Hints System
 
 When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E/SE/S/SW/W/NW) to the correct country. Uses the Haversine formula (`src/helpers/getDistance.ts`) and bearing calculation (`src/helpers/getBearing.ts`) with coordinates from `src/countries.json`.
 
 ### Key Files
 
-- `src/state/gameReducer.ts` — Pure game reducer, plus scoring/mode constants (`SCORE_VALUES`, `NUM_COMPETITION_TURNS`, `MAX_COMPETITION_SCORE`, `GAME_MODES`) and the `Screen` router type
+- `src/state/gameReducer.ts` — Pure game reducer, plus scoring/mode constants (`SCORE_VALUES`, `NUM_COMPETITION_TURNS`, `MAX_COMPETITION_SCORE`, `GAME_MODES`), the Run's `turns`, and the `Screen` router type
 - `src/state/exploreReducer.ts` — Pure Explore reducer: Playable countries, the selected country and each Country queue, plus the `currentSong()` selector
 - `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` context hooks
 - `src/context/ExploreContext.tsx` — `ExploreProvider` + `useExplore()`, mounted as GameProvider's sibling
@@ -110,10 +126,16 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/Components/WorldMap/BaseMap.tsx` — The surface-neutral map (see “Map Interface”)
 - `src/Components/WorldMap/WorldMap.tsx` — The guessing wrapper around it
 - `src/Components/ExploreMap/ExploreMap.tsx` — The Explore wrapper around it
+- `src/Components/RunSummaryMap/RunSummaryMap.tsx` — The Run summary wrapper around it
 - `src/Components/ExploreScreen/ExploreScreen.tsx` — Explore's container: player + keyboard seams wired to the Explore reducer
-- `src/Components/PanelSurface/PanelSurface.tsx` — The panel treatment both control panels sit on
+- `src/Components/RunSummaryScreen/RunSummaryScreen.tsx` — The Run summary's container: the leaderboard write wired to the game reducer
+- `src/Components/RunSummary/RunSummary.tsx` — The Run summary's layout, and the row→map highlight
+- `src/Components/PanelSurface/PanelSurface.tsx` — The panel treatment all three control panels sit on
 - `src/Components/ControlPanel/ControlPanel.tsx` — The game's controls panel (see “Game screen layout”)
 - `src/Components/ExplorePanel/ExplorePanel.tsx` — Explore's controls panel (see “Explore”)
+- `src/Components/RunSummaryPanel/RunSummaryPanel.tsx` — The Run summary's panel (see “Run summary”)
+- `src/Components/TurnResultRow/TurnResultRow.tsx` — One turn of the Run, as a row
+- `src/Components/AlbumArt/AlbumArt.tsx` — A Song's artwork with its placeholder, shared by the reveal card and the summary rows
 - `src/layout.ts` — Shared game-screen geometry: `LANDSCAPE_QUERY`/`LANDSCAPE_MEDIA`, `CHROME_CLEARANCE`, `PORTRAIT_PANEL_MAX_HEIGHT`
 - `src/types.ts` — Shared TypeScript types
 - `src/theme.ts` — MUI theme
@@ -121,6 +143,12 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 ### Testing
 
 Vitest + React Testing Library only — Cypress is retired. Two integration suites mount the real `<App>` (real reducers, context, routing, keyboard shortcuts) and `vi.mock` only the side-effectful seams, using the controllable fakes in `src/test/` (`spotifyPlayerFake.ts`, `leaderboardFake.ts`): `src/App.test.tsx` for the game and `src/Explore.test.tsx` for Explore. The map is real in those tests apart from its pan/zoom wrapper (`zoomableGroupFake.tsx` — jsdom cannot run d3-zoom); `hoverCapability.ts` stubs `matchMedia` so a test can choose pointer or touch behaviour. Unit tests sit next to their subjects (`*.test.ts(x)`). `src/test-utils.tsx` re-exports RTL with a theme-wrapped `render`. TypeScript is strict (including `noUncheckedIndexedAccess` and unused-code checks — see `tsconfig.json`).
+
+The Run summary is covered from `src/App.test.tsx` (a Competition Run played to completion, asserting the panel, the rows and the map behind them) plus component tests for the pieces a whole Run can't pin down deterministically: `RunSummaryMap.test.tsx` (the three outcome fills, and a country that answered twice), `RunSummary.test.tsx` (the row→map highlight, on a pointer and on touch) and `RunSummaryPanel.test.tsx` (the panel's own states: the named count, the save button, the saved confirmation and the failed write). Three notes for anyone adding to these:
+
+- **Today's ten are not ten countries.** The daily seed can hand the same country to two turns, so nothing may assume a country identifies a turn — `turnsWithSoleAnswers()` in the suite picks turns that do.
+- **Guesses in the Run helpers go through the map**, not the text box: typing re-renders the world's ~250 shapes on every keystroke, and ten turns of it took the suite from 16s to 74s.
+- **Hover assertions use `fireEvent.mouseEnter`**, as the map's own hover tests do; a hover update is low priority and `userEvent.hover`'s `act` does not settle it before the assertion.
 
 No new mocking boundaries have been added for Explore — it reuses those four, plus Album data injected as a **default parameter** (`createInitialExploreState(albums = albumsJSON)`, mirroring `createInitialState`). Because the Country queue is shuffled, **no test may assert which Song plays first**; every property tested is invariant under any shuffle, and the Song currently playing is observed through the track card's Spotify link, whose address comes from the real reducer rather than the fake. Note also that the map's ~250 country shapes are drawn a tick after the screen mounts, so a test must `await screen.findByLabelText(...)` before reaching for a country.
 

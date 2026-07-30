@@ -1,10 +1,9 @@
 import "./App.css";
 import "./index.css";
-import React from "react";
 
 import Base from "./Layouts/Base/Base";
 import Menu from "./Components/Menu/Menu";
-import FinalScore from "./Components/FinalScore/FinalScore";
+import RunSummaryScreen from "./Components/RunSummaryScreen/RunSummaryScreen";
 import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
 import ExploreScreen from "./Components/ExploreScreen/ExploreScreen";
@@ -19,28 +18,13 @@ function AppContent() {
   const { state, dispatch } = useGame();
   const leaderboard = useLeaderboard();
 
-  const onScoreFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    await leaderboard.submitScore(state.nameInputValue, state.score);
-  };
-
   let content;
   switch (state.screen) {
     case "scoreboard":
       content = <Scoreboard scores={leaderboard.scores.slice(0, 10)} />;
       break;
-    case "finalScore":
-      content = (
-        <FinalScore
-          score={state.score}
-          setGameMode={(mode) => dispatch({ type: "SET_MODE", mode })}
-          nameInputValue={state.nameInputValue}
-          onNameInputChange={(e) =>
-            dispatch({ type: "SET_NAME", value: e.target.value })
-          }
-          onScoreFormSubmit={onScoreFormSubmit}
-        />
-      );
+    case "runSummary":
+      content = <RunSummaryScreen />;
       break;
     case "playing":
       content = <GameScreen />;
@@ -60,9 +44,12 @@ function AppContent() {
       );
   }
 
-  // Both map surfaces are full-bleed: the map is the screen, and the title and
+  // Every map surface is full-bleed: the map is the screen, and the title and
   // home button float over it as chrome.
-  const isMapSurface = state.screen === "playing" || state.screen === "explore";
+  const isMapSurface =
+    state.screen === "playing" ||
+    state.screen === "explore" ||
+    state.screen === "runSummary";
 
   return (
     <Base

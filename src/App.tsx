@@ -3,6 +3,7 @@ import "./index.css";
 
 import Base from "./Layouts/Base/Base";
 import Menu from "./Components/Menu/Menu";
+import MenuMap from "./Components/MenuMap/MenuMap";
 import RunSummaryScreen from "./Components/RunSummaryScreen/RunSummaryScreen";
 import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
@@ -55,6 +56,9 @@ function AppContent() {
     <Base
       showMenuButton={state.screen !== "menu"}
       fullBleed={isMapSurface}
+      // The menu alone gets the map as decoration — it is the way in to three
+      // surfaces made of it. The scoreboard stays a plain content page.
+      backdrop={state.screen === "menu" ? <MenuMap /> : undefined}
       onMenuClicked={() => dispatch({ type: "RESET_TO_MENU" })}
     >
       {content}

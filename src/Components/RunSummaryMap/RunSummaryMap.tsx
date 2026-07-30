@@ -72,6 +72,9 @@ const RunSummaryMap = (props: RunSummaryMapProps) => {
       // Nothing commits here, so there is nothing for a first tap to guard.
       armOnTouch={false}
       onCommit={() => {}}
+      // The Run's answers are the only thing carrying colour here, so they are
+      // also the only thing that has to survive the land underneath them.
+      marked={(code) => outcomeByCode.has(code)}
       countryAttributes={(code) => ({
         "data-run-outcome": outcomeByCode.get(code),
       })}

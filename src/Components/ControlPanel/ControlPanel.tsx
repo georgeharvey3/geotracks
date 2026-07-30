@@ -3,7 +3,6 @@ import { Box, Button, Divider, Stack, Typography } from "@mui/material";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 
 import CountryInput from "../CountryInput/CountryInput";
-import CurrentScore from "../CurrentScore/CurrentScore";
 import Guesses from "../Guesses/Guesses";
 import PanelSurface from "../PanelSurface/PanelSurface";
 import PlayerControls from "../PlayerControls/PlayerControls";
@@ -30,21 +29,18 @@ interface ControlPanelProps {
   song: Song;
   isCompetition: boolean;
   turnsRemaining: number;
-  score: number;
   countryInputRef: React.RefObject<HTMLInputElement>;
 }
 
 /**
- * Everything that isn't the map, gathered into one panel: player, prompt, both
- * guess inputs, the running board, and the round-end reveal. The guess board
- * stays collapsed so everything in the tray is visible without scrolling.
+ * Everything the player *acts* with, gathered into one panel: player, prompt,
+ * both guess inputs, the running board, and the round-end reveal. The guess
+ * board stays collapsed so everything in the tray is visible without scrolling.
+ * The Competition standings are deliberately not here — they are read, not
+ * acted on, and live on their own plaque over the map (`CurrentScore`).
  */
 const ControlPanel = (props: ControlPanelProps) => (
   <PanelSurface>
-    {props.isCompetition && (
-      <CurrentScore score={props.score} turnsRemaining={props.turnsRemaining} />
-    )}
-
     {/* The retry fallback replaces the play button with a full-width row, so
         the prompt steps aside: there is nothing to listen to yet. */}
     <Stack direction="row" alignItems="center" spacing={1.5}>
@@ -84,15 +80,18 @@ const ControlPanel = (props: ControlPanelProps) => (
         next guess, and the board below it grows tall enough to scroll. */}
     <Divider sx={{ mt: 1 }} />
 
-    <Slider checked={props.showGeoHints} onCheck={props.onCheck} />
-    {props.isCompetition && (
-      <Typography
-        variant="caption"
-        sx={{ display: "block", color: "warning.main", fontStyle: "italic" }}
-      >
-        Enabling GeoHints will score half points
-      </Typography>
-    )}
+    {/* What hints cost rides alongside the toggle as a quiet aside. It was a
+        standing red warning underneath, which spent the screen's one loud
+        colour on a line that is true whether or not the player ever touches
+        the switch. */}
+    <Stack direction="row" alignItems="center" justifyContent="space-between">
+      <Slider checked={props.showGeoHints} onCheck={props.onCheck} />
+      {props.isCompetition && (
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          half points
+        </Typography>
+      )}
+    </Stack>
 
     {props.errorMessage && (
       <Typography color="error" variant="body2" sx={{ mt: 1 }}>

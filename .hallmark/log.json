@@ -1,0 +1,13 @@
+[
+  {
+    "date": "2026-07-30",
+    "scope": "app",
+    "genre": "playful",
+    "macrostructure": "Workbench (app) + centred column (content)",
+    "theme": "Hum",
+    "theme_axes": "light / rounded-sans / multi",
+    "enrichment": "none",
+    "design_system": "design.md",
+    "brief": "GeoTracks — whole-app redesign onto the Hum system"
+  }
+]

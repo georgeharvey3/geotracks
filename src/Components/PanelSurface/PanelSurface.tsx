@@ -31,12 +31,14 @@ const PanelSurface = ({ children }: { children: ReactNode }) => (
       px: 2,
       pt: 1.5,
       pb: "calc(12px + env(safe-area-inset-bottom))",
-      borderRadius: "16px 16px 0 0",
-      borderTop: "1px solid",
-      borderColor: "divider",
-      bgcolor: "rgba(22, 33, 62, 0.92)",
-      backdropFilter: "blur(12px)",
-      boxShadow: "0 -8px 32px rgba(0, 0, 0, 0.45)",
+      borderRadius: "20px 20px 0 0",
+      // Opaque, and outlined rather than blurred. A translucent blur over a map
+      // fights the thing it sits on: the panel is the one surface that has to
+      // stay readable whatever the player has panned underneath it.
+      borderTop: "1.5px solid",
+      borderColor: "text.primary",
+      bgcolor: "background.paper",
+      boxShadow: "0 -10px 30px -18px rgba(18, 23, 27, 0.45)",
 
       [LANDSCAPE_MEDIA]: {
         position: "absolute",
@@ -46,9 +48,10 @@ const PanelSurface = ({ children }: { children: ReactNode }) => (
         width: 380,
         maxHeight: "calc(100vh - 96px)",
         pb: 1.5,
-        borderRadius: 3,
-        border: "1px solid",
-        borderColor: "divider",
+        borderRadius: "20px",
+        border: "1.5px solid",
+        borderColor: "text.primary",
+        boxShadow: "0 16px 34px -20px rgba(18, 23, 27, 0.45)",
       },
     }}
   >

@@ -1,5 +1,29 @@
+@import "./tokens.css";
+
 body {
   margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Figures line up wherever they appear — scores, distances, turn counts. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible on cream at 6.7:1, and never animated: a focus ring that fades in is
+   a focus ring that is missed. */
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

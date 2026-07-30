@@ -1,6 +1,7 @@
 import React from "react";
 import { Box } from "@mui/material";
 import ControlPanel from "../ControlPanel/ControlPanel";
+import CurrentScore from "../CurrentScore/CurrentScore";
 import WorldMap from "../WorldMap/WorldMap";
 
 import { Guess, Song } from "../../types";
@@ -30,12 +31,12 @@ interface GameProps {
 }
 
 /**
- * The game screen: the map is the surface and every control lives in a single
- * panel. In landscape the map covers the viewport and the panel floats over a
- * corner of it; in portrait they stack, the panel taking only the height its
- * content needs and the map taking the rest. Nothing here scrolls — the page
- * must not move under a pan gesture — so only the panel's own content can
- * overflow.
+ * The game screen: the map is the surface, every control lives in a single
+ * panel, and Competition's standings float over the map on their own plaque.
+ * In landscape the map covers the viewport and the panel floats over a corner
+ * of it; in portrait they stack, the panel taking only the height its content
+ * needs and the map taking the rest. Nothing here scrolls — the page must not
+ * move under a pan gesture — so only the panel's own content can overflow.
  */
 const Game = (props: GameProps) => {
   return (
@@ -64,6 +65,13 @@ const Game = (props: GameProps) => {
         />
       </Box>
 
+      {props.isCompetition && (
+        <CurrentScore
+          score={props.score}
+          turnsRemaining={props.turnsRemaining}
+        />
+      )}
+
       <ControlPanel
         songReady={props.songReady}
         songLoadFailed={props.songLoadFailed}
@@ -82,7 +90,6 @@ const Game = (props: GameProps) => {
         song={props.song}
         isCompetition={props.isCompetition}
         turnsRemaining={props.turnsRemaining}
-        score={props.score}
         countryInputRef={props.countryInputRef}
       />
 

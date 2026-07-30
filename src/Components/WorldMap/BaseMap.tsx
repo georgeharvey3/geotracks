@@ -53,8 +53,10 @@ const TOOLTIP_LIFT = 12;
 // neighbouring straggler dots merge and any overlay swells to cover whole
 // regions.
 const BORDER_WIDTH = 0.3;
+const MARK_WIDTH = 0.9;
 const STRAGGLER_RADIUS = 3.5;
 const STRAGGLER_STROKE = 0.75;
+const STRAGGLER_MARK_STROKE = 1.5;
 
 const stragglerCodes = new Set(stragglerMarkers.map((marker) => marker.code));
 
@@ -82,6 +84,24 @@ interface BaseMapProps {
   armOnTouch: boolean;
   onCommit: (countryName: string) => void;
   /**
+   * Whether the map covers its box whatever the shape of it. The default is the
+   * app surfaces' rule — cover in landscape, and in portrait fit the whole world
+   * into the band the layout leaves below the chrome, because covering a tall
+   * box crops away most of the world's width. A map that is only the ground
+   * under a page, with nothing laid out beside it and no chrome to stay clear
+   * of, passes `true` and covers in both.
+   */
+  cover?: boolean;
+  /**
+   * Whether a country carries an emphasis outline, drawn in place of the
+   * ordinary hairline border. Every fill a surface marks with is lighter than
+   * 3:1 against the land it sits on — the palette's warm end is 1.3:1 — so a
+   * fill on its own cannot be what makes a mark visible. The outline does that;
+   * the fill is left to carry the meaning. Like `fillFor`, this says nothing
+   * about *what* is marked: that stays with the caller (ADR-0003).
+   */
+  marked?: (code: string) => boolean;
+  /**
    * Extra attributes for one country's shape — the handle a surface marks its
    * own state through.
    */
@@ -108,6 +128,10 @@ interface BaseMapProps {
 const BaseMap = (props: BaseMapProps) => {
   const hasHover = useHasHover();
   const isLandscape = useMediaQuery(LANDSCAPE_QUERY);
+  // Covering crops the world; fitting shows all of it under the layout's
+  // chrome. Landscape covers because the crop it takes is only the empty polar
+  // bands, and a caller that owns the whole box covers whatever its shape.
+  const covers = props.cover === true || isLandscape;
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [armedCode, setArmedCode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -210,6 +234,12 @@ const BaseMap = (props: BaseMapProps) => {
 
   const isPreviewed = (code: string) => code === previewedCode;
 
+  // A marked country trades its hairline for the emphasis outline, so the mark
+  // reads against land it has too little contrast with on its own.
+  const { marked } = props;
+  const isMarked = (code: string | undefined) =>
+    code !== undefined && (marked?.(code) ?? false);
+
   const interactionStyle = (code: string) => {
     const cursor = props.selectable(code) ? "pointer" : "default";
     return {
@@ -239,7 +269,7 @@ const BaseMap = (props: BaseMapProps) => {
         sx={{
           position: "absolute",
           inset: 0,
-          top: isLandscape ? 0 : `${CHROME_CLEARANCE}px`,
+          top: covers ? 0 : `${CHROME_CLEARANCE}px`,
         }}
       >
         <ComposableMap
@@ -249,7 +279,7 @@ const BaseMap = (props: BaseMapProps) => {
           height={MAP_HEIGHT}
           // Landscape covers the viewport, cropping the empty polar bands;
           // portrait fits the world into the band the layout reserves for it.
-          preserveAspectRatio={isLandscape ? "xMidYMid slice" : "xMidYMid meet"}
+          preserveAspectRatio={covers ? "xMidYMid slice" : "xMidYMid meet"}
           style={{ width: "100%", height: "100%", display: "block" }}
         >
           <ZoomableGroup
@@ -278,8 +308,12 @@ const BaseMap = (props: BaseMapProps) => {
                         code,
                         code !== undefined && isPreviewed(code),
                       )}
-                      stroke={MAP_FILLS.border}
-                      strokeWidth={BORDER_WIDTH * fixed}
+                      stroke={
+                        isMarked(code) ? MAP_FILLS.mark : MAP_FILLS.border
+                      }
+                      strokeWidth={
+                        (isMarked(code) ? MARK_WIDTH : BORDER_WIDTH) * fixed
+                      }
                       // A straggler's point-marker is its labelled target; the
                       // polygon underneath stays clickable for players who zoom in.
                       aria-label={
@@ -319,8 +353,14 @@ const BaseMap = (props: BaseMapProps) => {
                     r={STRAGGLER_RADIUS}
                     tabIndex={-1}
                     fill={props.fillFor(marker.code, isPreviewed(marker.code))}
-                    stroke={MAP_FILLS.border}
-                    strokeWidth={STRAGGLER_STROKE}
+                    stroke={
+                      isMarked(marker.code) ? MAP_FILLS.mark : MAP_FILLS.border
+                    }
+                    strokeWidth={
+                      isMarked(marker.code)
+                        ? STRAGGLER_MARK_STROKE
+                        : STRAGGLER_STROKE
+                    }
                     aria-label={marker.name}
                     {...props.countryAttributes?.(marker.code)}
                     onClick={() => armOrCommit(marker.code)}
@@ -351,11 +391,13 @@ const BaseMap = (props: BaseMapProps) => {
             position: "absolute",
             px: 1,
             py: 0.25,
-            borderRadius: 1,
-            bgcolor: "rgba(26, 26, 46, 0.9)",
-            border: "1px solid",
-            borderColor: "divider",
+            borderRadius: 999,
+            bgcolor: "background.paper",
+            color: "text.primary",
+            border: "1.5px solid",
+            borderColor: "text.primary",
             fontSize: "0.8rem",
+            fontWeight: 600,
             pointerEvents: "none",
             whiteSpace: "nowrap",
             ...labelPosition,

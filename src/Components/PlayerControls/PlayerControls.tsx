@@ -10,6 +10,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import ReplayIcon from "@mui/icons-material/Replay";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import { COLORS } from "../../tokens";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 interface PlayerControlsProps {
@@ -71,17 +72,33 @@ const PlayerControls = (props: PlayerControlsProps) => {
         flexShrink: 0,
         width: 56,
         height: 56,
-        bgcolor: "background.paper",
-        border: "2px solid",
-        borderColor: "divider",
-        color: "primary.main",
+        // The screen's primary action, so it takes the primary action's shape:
+        // filled in pear with an ink glyph, and the same solid edge the buttons
+        // have. Drawn as a pear glyph on cream it was 1.4:1 and barely there.
+        bgcolor: "primary.main",
+        color: "primary.contrastText",
+        boxShadow: `0 4px 0 0 ${COLORS.accentDeep}`,
+        transition:
+          "transform 140ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 140ms cubic-bezier(0.2, 0.7, 0.3, 1)",
         "&:hover": {
-          bgcolor: "action.hover",
+          bgcolor: "primary.main",
+          boxShadow: `0 6px 0 0 ${COLORS.accentDeep}`,
+          transform: "translateY(-2px)",
+        },
+        "&:active": {
+          boxShadow: `0 1px 0 0 ${COLORS.accentDeep}`,
+          transform: "translateY(3px)",
+          transitionDuration: "70ms",
         },
         "&:disabled": {
           color: "text.disabled",
-          bgcolor: "background.paper",
-          borderColor: "divider",
+          bgcolor: "action.disabledBackground",
+          boxShadow: `0 4px 0 0 ${COLORS.rule}`,
+          transform: "none",
+        },
+        "@media (prefers-reduced-motion: reduce)": {
+          transition: "none",
+          "&:hover, &:active": { transform: "none" },
         },
       }}
     >

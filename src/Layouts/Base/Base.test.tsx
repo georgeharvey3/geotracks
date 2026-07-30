@@ -2,13 +2,17 @@ import { render, screen } from "../../test-utils";
 import Base from "./Base";
 
 describe("Base", () => {
+  // The wordmark sets one letter in the accent colour, so it is several text
+  // nodes; what matters is that it still reads as the one word.
   it("renders the GeoTracks title", () => {
     render(
       <Base showMenuButton={false} onMenuClicked={vi.fn()}>
         <div>Child</div>
       </Base>,
     );
-    expect(screen.getByText("GeoTracks")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "GeoTracks" }),
+    ).toBeInTheDocument();
   });
 
   it("renders children", () => {

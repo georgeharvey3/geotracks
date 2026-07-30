@@ -1,0 +1,66 @@
+/* Hallmark · genre: playful · theme: Hum · design-system: design.md · designed-as-app
+ *
+ * The design system's tokens as CSS custom properties. This is the portable
+ * export of `src/tokens.ts` — the colours are the same resolved sRGB values, so
+ * a colour written here and a colour written there are the same colour. Each
+ * one's OKLCH design value is in the comment beside it.
+ *
+ * It lives under src/ rather than at the repo root because it is imported by
+ * `src/index.css`; a second copy at the root would drift from this one.
+ */
+
+:root {
+  /* ---- surfaces ---------------------------------------------------- */
+  --color-paper: #f7f5ec; /*        oklch(97% 0.012 95)  */
+  --color-paper-2: #eeebdf; /*      oklch(94% 0.016 95)  */
+  --color-paper-3: #e5e1d3; /*      oklch(91% 0.020 95)  */
+
+  /* ---- ink ---------------------------------------------------------- */
+  --color-ink: #12171b; /*          oklch(20% 0.012 250) */
+  --color-ink-muted: #54595e; /*    oklch(46% 0.010 250) */
+  --color-rule: #cdd1d6; /*         oklch(86% 0.008 250) */
+
+  /* ---- accents: one job each ---------------------------------------- */
+  --color-accent: #f6ce00; /*       oklch(86% 0.18 95)   pear, primary action */
+  --color-accent-deep: #d19c00; /*  oklch(72% 0.17 88)   the button's edge     */
+  --color-accent-2: #009fef; /*     oklch(66% 0.18 235)  cyan, links           */
+  --color-accent-3: #ff3a5d; /*     oklch(68% 0.24 18)   coral, large only     */
+  --color-accent-3-deep: #c42942; /* oklch(54% 0.19 18)  coral that holds text */
+  --color-mint: #66da85; /*         oklch(80% 0.16 150)  correct               */
+  --color-mint-deep: #45b164; /*    oklch(68% 0.15 150)  correct, on the map   */
+  --color-focus: #0055a9; /*        oklch(45% 0.16 250)  */
+
+  /* ---- the map ------------------------------------------------------ */
+  --map-sea: #528eb3; /*            oklch(62% 0.085 238) */
+  --map-land: #e6dbb2; /*           oklch(89% 0.055 95)  */
+  --map-inert: #b4b8bc; /*          oklch(78% 0.008 250) */
+  --map-hover: #faf8f1; /*          oklch(98% 0.010 95)  */
+  --map-border: #8c8675; /*         oklch(62% 0.025 88)  hairline between countries */
+  --map-mark: #12171b; /*           = ink; outlines a marked country */
+
+  /* ---- type --------------------------------------------------------- */
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-label: "JetBrains Mono", ui-monospace, monospace;
+
+  /* ---- 4-point spacing scale ---------------------------------------- */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+
+  /* ---- radii -------------------------------------------------------- */
+  --radius-card: 20px;
+  --radius-pill: 999px;
+  --radius-input: 12px;
+
+  /* ---- motion ------------------------------------------------------- */
+  --ease-press: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-snap: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-short: 140ms;
+  --dur-mid: 220ms;
+}

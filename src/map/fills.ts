@@ -1,3 +1,4 @@
+import { COLORS, MAP_COLORS } from "../tokens";
 import { TurnOutcome } from "../types";
 
 // The map's palette, shared by every surface that draws on it.
@@ -6,20 +7,17 @@ import { TurnOutcome } from "../types";
 // and the hover highlight goes near-white — a colour nothing else on the map
 // uses — so the country under the pointer is unmistakable against its
 // neighbours. `inertLand` is what a shape gets when it can't be chosen at all:
-// a disputed territory in the game, a country with no music in Explore.
-export const MAP_FILLS = {
-  sea: "#0b1a30",
-  land: "#7d9cbb",
-  inertLand: "#4c5f75",
-  highlight: "#eaf4ff",
-  border: "#0b1a30",
-} as const;
+// a disputed territory in the game, a country with no music in Explore; it is
+// neutral *and* a step darker, because hue alone never separated it from land.
+//
+// The values live in `src/tokens.ts`; this is the map's naming of them.
+export const MAP_FILLS = MAP_COLORS;
 
-// The Run summary's marking, one fill per Turn outcome. A green-amber-red run,
-// so ten countries read as a shape of the Run at a glance; green matches the
-// guessing map's correct-guess green, since it means the same thing there.
+// The Run summary's marking, one fill per Turn outcome. A mint-pear-coral run,
+// so ten countries read as a shape of the Run at a glance; mint matches the
+// guessing map's correct-guess fill, since it means the same thing there.
 export const OUTCOME_FILLS: Record<TurnOutcome, string> = {
-  "named-first": "#4caf50",
-  "named-later": "#fbc02d",
-  missed: "#b0413f",
+  "named-first": COLORS.mintDeep,
+  "named-later": COLORS.accent,
+  missed: COLORS.accent3Deep,
 };

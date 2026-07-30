@@ -224,9 +224,16 @@ export default function useSpotifyPlayer(
   );
 
   // Load the track (and fetch its oEmbed metadata) whenever the song changes.
+  //
+  // Keyed on the link rather than the Song, because the link is the only part of
+  // a Song the embed can act on. A caller may well hand back a new Song object
+  // for the same track — the game reducer does exactly that when it merges this
+  // hook's own oEmbed metadata onto the round's Song — and reloading on that
+  // would drop the player back to Loading and stop the music mid-Clip, then
+  // re-fetch, re-merge and do it again.
+  const songLink = song?.link;
   useEffect(() => {
-    if (!song || !song.link) return;
-    const songLink = song.link;
+    if (!songLink) return;
 
     retryCountRef.current = 0;
     setSongFinished(false);
@@ -272,7 +279,7 @@ export default function useSpotifyPlayer(
       cancelled = true;
       if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
     };
-  }, [song, attemptLoad]);
+  }, [songLink, attemptLoad]);
 
   const togglePlay = useCallback(() => {
     // Remember a pause we asked for, so the next report of one isn't mistaken

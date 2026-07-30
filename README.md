@@ -101,6 +101,17 @@ For the client to sign in, add **Anonymous** as a sign-in provider in the Fireba
 
 Tests are Vitest + React Testing Library throughout: unit tests live next to their subjects, and `src/App.test.tsx` is an integration suite that mounts the real app with only the Spotify player and leaderboard seams faked (`src/test/`).
 
+## Branching
+
+Two long-lived branches, and the difference between them is what is live:
+
+- **`develop`** — the default branch, and where all work lands. Branch off it, open a PR back into it, **squash-merge**. Its history stays linear.
+- **`main`** — what is deployed. It only ever receives `develop`.
+
+**A release is a PR from `develop` into `main`, merged with a merge commit** (not squashed — squashing would flatten the release into one commit and permanently diverge the two histories). Merging it is what ships the site, so open one when `develop` is in a state worth publishing.
+
+Both branches require a PR and a passing `quality` check, and neither accepts force-pushes or deletion. `develop` additionally requires branches to be up to date before merging, because feature branches land there concurrently; `main` does not, since `develop` is its only source.
+
 ## Deployment
 
-Deployment is automated by GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — there is no local deploy step. Every push and pull request runs a `quality` job (lint, type-check, tests, build) on the Node version pinned in [`.nvmrc`](.nvmrc). Merges to `main` trigger a gated `deploy` job that publishes `dist/` to GitHub Pages. The repo's Pages **Source** is set to **"GitHub Actions"**.
+Deployment is automated by GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — there is no local deploy step. Every push and pull request runs a `quality` job (lint, type-check, tests, build) on the Node version pinned in [`.nvmrc`](.nvmrc). Merges to `main` — i.e. releases — trigger a gated `deploy` job that publishes `dist/` to GitHub Pages. Pushes to `develop` run `quality` but deploy nothing. The repo's Pages **Source** is set to **"GitHub Actions"**.

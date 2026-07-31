@@ -91,7 +91,22 @@ describe("Explore", () => {
       expect(document.getElementById("embed-iframe")).toBeNull();
     });
 
-    it("remembers the country and the place within it on return", async () => {
+    it("comes back with nothing chosen and nothing playing", async () => {
+      render(<App />);
+      await enterExplore();
+      await choose(PLAYABLE);
+
+      await userEvent.click(homeButton());
+      await enterExplore();
+
+      expect(
+        screen.getByText("Choose a country to hear its music"),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: PLAYABLE })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Skip/i })).toBeNull();
+    });
+
+    it("picks the country up where it was left when it is chosen again", async () => {
       render(<App />);
       await enterExplore();
       await choose(PLAYABLE);
@@ -100,8 +115,8 @@ describe("Explore", () => {
 
       await userEvent.click(homeButton());
       await enterExplore();
+      await choose(PLAYABLE);
 
-      expect(screen.getByRole("heading", { name: PLAYABLE })).toBeVisible();
       expect(playingLink()).toBe(wasPlaying);
     });
   });

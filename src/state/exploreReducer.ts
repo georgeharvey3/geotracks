@@ -23,7 +23,9 @@ export interface ExploreState {
 }
 
 export type ExploreAction =
-  { type: "SELECT_COUNTRY"; country: string } | { type: "SKIP" };
+  | { type: "SELECT_COUNTRY"; country: string }
+  | { type: "SKIP" }
+  | { type: "LEAVE" };
 
 function shuffle(songs: Song[]): Song[] {
   const shuffled = [...songs];
@@ -125,6 +127,13 @@ export function exploreReducer(
 
       return { ...state, queues: { ...state.queues, [country]: advanced } };
     }
+
+    // Leaving Explore ends the listening: nothing is chosen on the way back in,
+    // so a return opens on the map in silence rather than resuming mid-Song.
+    // The queues are kept — they are what stops a country repeating itself, so
+    // choosing that country again picks up where it left off.
+    case "LEAVE":
+      return state.country === null ? state : { ...state, country: null };
 
     default:
       return state;

@@ -36,10 +36,13 @@ const STRAGGLER_MAX_AREA_KM2 = 15_000;
 const EARTH_RADIUS_KM = 6371;
 const STERADIAN_TO_KM2 = EARTH_RADIUS_KM ** 2;
 
-// Territories Natural Earth carries without an ISO numeric id. Kosovo is the
-// only one the app can guess (`XK` in countries.json); the rest stay id-less
-// and render as non-interactive background land.
-const NAME_TO_ALPHA2 = { Kosovo: "XK" };
+// Territories Natural Earth carries without an ISO numeric id; anything not
+// named here stays id-less and renders as non-interactive background land.
+// Kosovo is a country the app can guess in its own right (`XK` in
+// countries.json). Somaliland is not: the app follows the majority of world
+// maps in drawing it as part of Somalia, so it is given Somalia's code and
+// folded into that geometry by `mergeDuplicateIds` below.
+const NAME_TO_ALPHA2 = { Kosovo: "XK", Somaliland: "SO" };
 
 /** A geometry's polygons, in the nested-arc shape MultiPolygon uses. */
 function polygonsOf(geometry) {

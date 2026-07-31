@@ -109,4 +109,20 @@ describe("RunSummaryMap", () => {
       MAP_FILLS.highlight,
     );
   });
+
+  // The other two app surfaces arrive by lifting the night off the map, because
+  // they are reached from a page standing on it in the dark. This one is reached
+  // from the game screen — the same map, already revealed — so a veil here would
+  // mean darkening the world in order to uncover it.
+  it("does not veil a map that is already showing", async () => {
+    render(
+      <RunSummaryMap
+        turns={[turn("France", "named-first")]}
+        highlightedCountry={null}
+      />,
+    );
+    await screen.findByLabelText("France");
+
+    expect(screen.queryByTestId("map-veil")).not.toBeInTheDocument();
+  });
 });

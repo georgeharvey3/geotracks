@@ -11,10 +11,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` — ESLint over the repo; `npm run format` / `npm run format:check` for Prettier
 - `npm run test:coverage` — Run the suite with a V8 coverage report (`coverage/`); reported only, no enforced gate
 - `node scripts/build-map-geometry.mjs` — Regenerate the map's bundled country geometry (only needed after changing `src/countries.json` or the straggler threshold; see ADR-0002)
+- `node scripts/build-logo-assets.ts` — Regenerate `public/`'s favicon, PWA icons and `logo.svg` from the mark's geometry (only needed after changing the mark; needs Chrome on the machine)
 
 ### CI/CD & deployment
 
-Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) — there is no local `deploy` script. Every push and PR runs a `quality` job (lint + `tsc --noEmit` + `vitest run` + `vite build`) on the Node version pinned in `.nvmrc`. On push to `main`, a `deploy` job (gated `needs: quality`) publishes `dist/` to GitHub Pages via `actions/configure-pages` → `actions/upload-pages-artifact` → `actions/deploy-pages`. The repo's Pages **Source** must be set to **"GitHub Actions"** (Settings → Pages), and `main` is branch-protected to require a PR and a passing `quality` check.
+Deployment is fully automated via GitHub Actions (`.github/workflows/ci.yml`) — there is no local `deploy` script. Every push and PR runs a `quality` job (lint + `tsc --noEmit` + `vitest run` + `vite build`) on the Node version pinned in `.nvmrc`. On push to `main`, a `deploy` job (gated `needs: quality`) publishes `dist/` to GitHub Pages via `actions/configure-pages` → `actions/upload-pages-artifact` → `actions/deploy-pages`. The repo's Pages **Source** must be set to **"GitHub Actions"** (Settings → Pages).
+
+### Branching
+
+**`develop` is the default branch and the target of all work; `main` is what is deployed.** Branch off `develop`, PR back into `develop`, squash-merge. A **release** is a PR from `develop` into `main` merged with a **merge commit** — that merge is what ships the site, and it must not be squashed, or `main` flattens into one commit and its history permanently diverges from `develop`'s.
+
+Both branches require a PR and a passing `quality` check and refuse force-pushes and deletion. `develop` requires linear history and up-to-date branches (concurrent feature branches land there); `main` requires neither, because `develop` is its only source and the release merge commit is by definition non-linear. Never open a PR straight into `main` — the only thing that belongs there is a release.
 
 ### Configuration / env
 
@@ -25,6 +32,20 @@ Client config is read from Vite env vars (`import.meta.env.VITE_*`). Copy `.env.
 ## Architecture
 
 GeoTracks is a **React 18 + TypeScript** music geography app (built with Vite, MUI for components/theming) built on one world map. In the **game**, players listen to Spotify clips and guess the country of origin — by clicking it on the map or by typing its name; two game modes, **Infinite** (unlimited rounds) and **Competition** (10 turns with scoring and a Firebase-backed leaderboard). A completed Competition **Run** ends on the **Run summary**. In **Explore**, they choose a country in order to listen to it. `CONTEXT.md` pins the vocabulary (Song, Album, Clip, Game mode, Explore, Playable country, Country queue, Skip, Run, Turn result, Turn outcome, Run summary).
+
+### Design system
+
+**`design.md` at the repo root is the locked design system — read it before changing anything visual.** The app wears **Hum**: cream paper, a multi-accent palette (pear = primary action, cyan = links, coral = the one loud moment, mint = correct), Plus Jakarta Sans with JetBrains Mono kept for figures that line up, pill buttons whose press is their feedback, and no glassmorphism, gradient text or italic emphasis.
+
+Colours are chosen in exactly one place: **`src/tokens.ts`**. `src/tokens.css` is the same set as CSS custom properties (imported by `src/index.css`) and doubles as the portable export. The system is designed in OKLCH but ships as sRGB hex, because the values are consumed through MUI's palette (whose colour manipulators cannot decompose `oklch()`), as SVG attributes on the map, and as plain CSS — one resolved value in all three keeps a single red on screen.
+
+The rule that governs everything: **accents own fills, ink owns foregrounds.** On cream, pear is 1.4:1 and mint 2.5:1, so an accent may fill a shape carrying an ink label but may not be the colour a glyph or word is drawn in. Foreground-safe variants exist where an accent identity must be a foreground (`mintInk`, `accent3Deep`); there is deliberately no pear equivalent.
+
+**Two grounds, and which one a screen is on follows from its family.** The app pages (game, Explore, Run summary) are ink on cream. The **content pages** (menu, scoreboard) stand on the **night backdrop** — the map under a black veil (`BackdropMap`) — and draw their chrome in paper: `paper` for type, `paperMuted` for secondary and for the wordmark's `Geo`, and a paper focus ring, scoped by `[data-surface="night"]` in `src/index.css`. Opaque surfaces inside them (the scoreboard's table card) are MUI `Paper`, which resets to cream and ink on its own.
+
+**Screen transitions** are staged and only ever inward — the outgoing screen is gone the moment it is replaced, because cross-fading would mean two maps mounted at once. The screen arrives, the lockup — mark and wordmark together — flies from where it was to where it lands (FLIP, in `Base.tsx`), and the panel comes in last from the edge it is attached to (`panel-enter`, in `PanelSurface`). The chrome sits **outside** what animates, or it would hide the flight behind exactly the cut it exists to cover.
+
+How the screen arrives depends on its family, and the two are not interchangeable. A **content page** fades up (`screen-enter`), and if it was reached from a map surface the night is drawn back over the map underneath it (`veil="settle"`, 320ms) rather than the page cutting to black. A **map surface** must never fade: a map at less than full opacity shows the cream underneath it, which the player sees as the whole screen washing out to white and resolving. It arrives instead by the **veil lifting off the map** (`veil="lift"`, 520ms), starting at exactly the darkness the content page it came from was standing on. Two exceptions, both because the map is already in the state the animation would have to fake: the Run summary lifts nothing (it is reached from the game screen — the same map, already revealed), and the first page of a session settles nothing (`BackdropMap` tracks whether a backdrop has stood under a page yet; there is nothing to come back from). See `design.md` § Motion.
 
 ### State Management
 
@@ -58,14 +79,16 @@ The hook takes an optional **Clip cap** (`clipDurationMs`). The game passes 30 s
 
 The world map splits into a **surface-neutral base** (`src/Components/WorldMap/BaseMap.tsx`) and one thin wrapper per surface (ADR-0003). The base owns how a country is picked and nothing about what picking means: the projection, bounded panning, the `1/zoom` counter-scale, straggler markers, the hover tooltip and commit-on-click. Its caller supplies the fill for a country (`fillFor`), whether it may be chosen (`selectable`), what the tooltip says (`labelFor`), the touch rule (`armOnTouch`), per-country marking attributes and an optional `overlay`. **The base must stay state-agnostic** — the moment it branches on which surface is calling, the split has failed and a `mode` prop has been rebuilt by accident. Shared palette entries live in `src/map/fills.ts`.
 
-The three wrappers are `WorldMap.tsx` (guessing), `src/Components/ExploreMap/ExploreMap.tsx` (Explore) and `src/Components/RunSummaryMap/RunSummaryMap.tsx` (the Run summary).
+The four wrappers are `WorldMap.tsx` (guessing), `src/Components/ExploreMap/ExploreMap.tsx` (Explore), `src/Components/RunSummaryMap/RunSummaryMap.tsx` (the Run summary) and `src/Components/BackdropMap/BackdropMap.tsx` (the content pages' backdrop — decoration, and the only one that picks nothing).
+
+The base takes two layout parameters besides its behaviour. `cover`: by default it covers in landscape and fits the whole world in below the chrome in portrait, which is what a surface sharing the viewport with a panel and a title wants; a map that _is_ the ground under a page passes `cover` and covers in both — the backdrop is the only caller that does. `showStragglers`: defaults to on, and the backdrop is again the only caller that turns it off — the dots are targets, and a surface that picks nothing has none. `veil`: the black over the map and what it does on mount — `night` holds it (the backdrop, on the first page of a session), `settle` draws it on (the backdrop, returning from a map surface), `lift` takes it off (the game and Explore, arriving from a content page that stood on this map in the dark), `none` is the default and what the Run summary takes.
 
 The guessing map is the primary guessing surface, always on, with the text box retained as a compact secondary input. Both feed the same `SUBMIT_GUESS` action, so the map is a **unified board**: it marks every guess of the round whichever input committed it. Rendering is **react-simple-maps** (inline SVG, `geoEqualEarth`, `ZoomableGroup` pan/zoom, no tile provider — ADR-0001).
 
-- **Geometry** — Natural Earth 1:50m TopoJSON, committed at `src/map/countries-50m.topo.json` with each geometry's `id` already rewritten to the alpha-2 code used across the app. Generated by `node scripts/build-map-geometry.mjs` (re-run it after editing `src/countries.json`); see ADR-0002. `src/map/geography.ts` owns the join: `polygonCodes`, `stragglerMarkers`, and code↔name lookups.
+- **Geometry** — Natural Earth 1:50m TopoJSON, committed at `src/map/countries-50m.topo.json` with each geometry's `id` already rewritten to the alpha-2 code used across the app. Generated by `node scripts/build-map-geometry.mjs` (re-run it after editing `src/countries.json`); see ADR-0002. `src/map/geography.ts` owns the join: `polygonCodes`, `stragglerMarkers`, and code↔name lookups. It also **expands the TopoJSON to GeoJSON once, at module scope** (`countryFeatures`), and `BaseMap` projects it in a `Countries` component of its own rather than using react-simple-maps' `<Geographies>` — the library expands in an _effect_, so every map it is mounted in drew an empty world for one commit and the countries for the next. On the way into a screen that is the whole world blinking out and back (~345 ms of blank map, measured). The shapes must be in a map's **first render**; `WorldMap.test.tsx` pins that by rendering to static markup, where no effect ever runs.
 - **Stragglers** — countries under 15,000 km² (and the handful Natural Earth omits) also get a clickable **point-marker** at their `countries.json` centroid, so every guessable country has a target. The marker is that country's labelled target; its polygon, if any, stays clickable underneath.
 - **Commit-on-click** — a hovering pointer (`useHasHover`, i.e. `(hover: hover) and (pointer: fine)`) commits on a single click and previews via a hover tooltip; without one (touch), the first tap arms a country and a second tap on it commits. The touch rule is a **parameter** of the base map, not a property of it: the arm-then-commit guard exists to protect an irreversible Guess, so Explore, which has nothing irreversible to protect, passes `armOnTouch={false}` and commits on one tap.
-- **Markings** — a wrong guess persists as **proximity heat** (`src/helpers/getProximityColor.ts`, a yellow→red scale where yellow is closest) plus a direction arrow and km label when geo-hints are on, and as one flat desaturated red — identical for every wrong guess, near or far — when they are off, so the map never leaks proximity the player opted out of. On round end the answer is revealed and the map stops accepting guesses.
+- **Markings** — a wrong guess persists as **proximity heat** (`src/helpers/getProximityColor.ts`, an amber→coral scale where amber is closest) plus a direction arrow and km label when geo-hints are on, and as one flat desaturated red — identical for every wrong guess, near or far — when they are off, so the map never leaks proximity the player opted out of. On round end the answer is revealed and the map stops accepting guesses. The scale descends in **lightness** as well as hue, because hue alone orders it only for players who can tell amber from red. Every marked country also takes an **ink outline** (`BaseMap`'s `marked` predicate): on cream land the scale's warm end is 1.3:1, so the fill cannot be what makes a mark visible — the outline does that and the fill carries the meaning.
 - **Bounded panning** — `ZoomableGroup`'s `translateExtent` is pinned to the map's own viewBox (`[[0,0],[800,400]]`), the same box d3-zoom measures its extent from, so the viewport can never leave the world. At zoom 1 that pins the map outright; zoomed in, the player can reach any edge but can't drag the world off into empty sea and lose it.
 - **Zoom-invariant furniture** — the map tracks the zoom level (`ZoomableGroup`'s `onMove`) and counter-scales straggler markers, hint arrows/labels and country outlines by `1/zoom`, so they keep their on-screen size: zooming in separates crowded island dots and stops hints blanketing the countries the player zoomed in to reach.
 - **Hover tooltip** — the country name that follows the cursor is positioned by writing `left`/`top` straight onto its DOM node (rAF-coalesced), not through React state. Pointer moves outnumber every other event on this screen, and routing them through state re-rendered all ~250 country paths per mousemove.
@@ -73,7 +96,9 @@ The guessing map is the primary guessing surface, always on, with the text box r
 
 ### Game screen layout
 
-The game screen is full-bleed: `Base` switches to a fixed, non-scrolling viewport (`fullBleed`) where the title and home button become chrome floating over the map, and `Game` composes exactly two things — the map and `ControlPanel` (`src/Components/ControlPanel/ControlPanel.tsx`), which gathers the player, prompt, text input, hints toggle, guess board and round-end reveal into one surface.
+The game screen is full-bleed: `Base` switches to a fixed, non-scrolling viewport (`fullBleed`) where the title and home button become chrome floating over the map, and `Game` composes the map, `ControlPanel` (`src/Components/ControlPanel/ControlPanel.tsx`), which gathers the player, prompt, text input, hints toggle, guess board and round-end reveal into one surface, and — in Competition only — `CurrentScore`.
+
+**`CurrentScore` is the standings, and it is deliberately not in the panel.** The panel is where the player _acts_; score and turn are only ever read, so they sit on their own plaque floating over the map, in the corner furthest from the panel (bottom-left in landscape, top-right of the map band in portrait) with `pointerEvents: "none"` so the map keeps the gesture. Both figures are mono, and the turn counts _up_ ("4/10") while the reducer counts down (`turnsRemaining`). A corner of the screen to itself is what makes a figure prominent — it was a pair of small outlined chips crowning the panel before, and they read as decoration.
 
 Shared geometry lives in `src/layout.ts`, and the whole split follows from the world being roughly 2:1 in `geoEqualEarth`:
 
@@ -88,12 +113,12 @@ The **guess board** (`src/Components/Guesses/Guesses.tsx`) shows only the latest
 
 **Explore** (issue #37) is the surface where a player chooses a country in order to listen to it. It is **not a Game mode**: nothing is scored, recorded or submitted, there are no rounds, Guesses or Attempts, and it never touches the game's album pool, daily seeding, score or turn counter. It is reached from a third primary button on the menu (`SHOW_EXPLORE`), and it wears the same full-bleed layout as the game screen — map covering the viewport with `ExplorePanel` floating over a corner in landscape, a content-sized bottom tray in portrait (both via the shared `PanelSurface`).
 
-- **Playable countries** — a country is Playable when the app holds at least one Album for it: 123 of 245 today (121 polygons, 15 of the 87 straggler markers). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
+- **Playable countries** — a country is Playable when the app holds at least one Album for it: 123 of 246 today (121 polygons, 15 of the 87 straggler markers). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
 - **Fills** — four flat states: inert land (non-playable), land (Playable), the near-white highlight (hover), and green for the country now playing. No rings or halos; Explore leaves the base map's `overlay` slot unused.
-- **Country queue** — built on first selection from all of a country's Albums' Songs, shuffled. Skip advances it; it is exhausted before any Song repeats, then drawn afresh and continued (the fresh draw never opens with the Song just heard). Returning to a country **resumes** rather than restarts. Choosing the country already playing is a no-op.
+- **Country queue** — built on first selection from all of a country's Albums' Songs, shuffled. Skip advances it; it is exhausted before any Song repeats, then drawn afresh and continued (the fresh draw never opens with the Song just heard). Choosing a country again — later in the visit, or on a later visit — **resumes** it rather than restarting it. Choosing the country already playing is a no-op.
 - **Playback** — choosing a country or skipping starts playback automatically on every device (the click on the map is itself the user gesture, so the game's desktop-width gate is deliberately not carried over). A finished Song advances the queue; pausing stops that run, because auto-advance is driven by the finished signal and nothing else. The track card is shown **un-gated** from the first note — artwork, title, artist, Album and the Spotify link — because Explore has nothing to withhold.
 - **Keyboard** — the same shortcuts as the game, with next-song wired to Skip: Space plays/pauses, Enter skips, any other key focuses the country input, Escape blurs it. `CountryInput` takes an optional `countries` list (defaulting to all of them, so the game is unaffected); Explore passes only the Playable ones, so the suggestions can never dead-end.
-- **Lifetime** — leaving Explore unmounts the player and therefore stops the music; the queues live in the provider above the screen, so a trip to the menu and back within a visit keeps the player's place. Nothing is persisted across a page reload — no storage, no schema to version.
+- **Lifetime** — leaving Explore unmounts the player and therefore stops the music, and unchooses the country with it (`LEAVE`), so coming back opens on the map in silence rather than resuming the Song mid-flight. The queues live in the provider above the screen and are kept: choosing that country again picks up where it left off, which is what stops it repeating itself. `LEAVE` is dispatched from a **layout**-effect cleanup — a dispatch from a passive cleanup while the subtree is being deleted never reaches the reducer. Nothing is persisted across a page reload — no storage, no schema to version.
 
 ### Run summary
 
@@ -127,18 +152,24 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/Components/WorldMap/WorldMap.tsx` — The guessing wrapper around it
 - `src/Components/ExploreMap/ExploreMap.tsx` — The Explore wrapper around it
 - `src/Components/RunSummaryMap/RunSummaryMap.tsx` — The Run summary wrapper around it
+- `src/Components/BackdropMap/BackdropMap.tsx` — The content pages' backdrop: the map under a black veil, click-through and `aria-hidden` (see `design.md`)
+- `src/Layouts/Base/Base.tsx` — The layout both families are dressed in, and where the lockup and its glide live
+- `src/Components/Logo/Logo.tsx` — The mark: a map pin whose head is a play button. Its geometry (`geometry.ts`) is shared with `scripts/build-logo-assets.ts`, which regenerates `public/`'s icons
 - `src/Components/ExploreScreen/ExploreScreen.tsx` — Explore's container: player + keyboard seams wired to the Explore reducer
 - `src/Components/RunSummaryScreen/RunSummaryScreen.tsx` — The Run summary's container: the leaderboard write wired to the game reducer
 - `src/Components/RunSummary/RunSummary.tsx` — The Run summary's layout, and the row→map highlight
 - `src/Components/PanelSurface/PanelSurface.tsx` — The panel treatment all three control panels sit on
 - `src/Components/ControlPanel/ControlPanel.tsx` — The game's controls panel (see “Game screen layout”)
+- `src/Components/CurrentScore/CurrentScore.tsx` — Competition's standings, as a plaque over the map
 - `src/Components/ExplorePanel/ExplorePanel.tsx` — Explore's controls panel (see “Explore”)
 - `src/Components/RunSummaryPanel/RunSummaryPanel.tsx` — The Run summary's panel (see “Run summary”)
 - `src/Components/TurnResultRow/TurnResultRow.tsx` — One turn of the Run, as a row
 - `src/Components/AlbumArt/AlbumArt.tsx` — A Song's artwork with its placeholder, shared by the reveal card and the summary rows
 - `src/layout.ts` — Shared game-screen geometry: `LANDSCAPE_QUERY`/`LANDSCAPE_MEDIA`, `CHROME_CLEARANCE`, `PORTRAIT_PANEL_MAX_HEIGHT`
 - `src/types.ts` — Shared TypeScript types
-- `src/theme.ts` — MUI theme
+- `design.md` — The locked design system (read before any visual change)
+- `src/tokens.ts` — Every colour, chosen once; `src/tokens.css` is the same set as custom properties
+- `src/theme.ts` — MUI's view of the system; colours come from `tokens.ts`, never written literally
 
 ### Testing
 
@@ -150,7 +181,7 @@ The Run summary is covered from `src/App.test.tsx` (a Competition Run played to 
 - **Guesses in the Run helpers go through the map**, not the text box: typing re-renders the world's ~250 shapes on every keystroke, and ten turns of it took the suite from 16s to 74s.
 - **Hover assertions use `fireEvent.mouseEnter`**, as the map's own hover tests do; a hover update is low priority and `userEvent.hover`'s `act` does not settle it before the assertion.
 
-No new mocking boundaries have been added for Explore — it reuses those four, plus Album data injected as a **default parameter** (`createInitialExploreState(albums = albumsJSON)`, mirroring `createInitialState`). Because the Country queue is shuffled, **no test may assert which Song plays first**; every property tested is invariant under any shuffle, and the Song currently playing is observed through the track card's Spotify link, whose address comes from the real reducer rather than the fake. Note also that the map's ~250 country shapes are drawn a tick after the screen mounts, so a test must `await screen.findByLabelText(...)` before reaching for a country.
+No new mocking boundaries have been added for Explore — it reuses those four, plus Album data injected as a **default parameter** (`createInitialExploreState(albums = albumsJSON)`, mirroring `createInitialState`). Because the Country queue is shuffled, **no test may assert which Song plays first**; every property tested is invariant under any shuffle, and the Song currently playing is observed through the track card's Spotify link, whose address comes from the real reducer rather than the fake. The map's ~250 country shapes are drawn in its first render, so a country can be reached with a plain `getByLabelText` once the screen is up; the existing `await screen.findByLabelText(...)` calls are harmless and still wait correctly for the screen itself.
 
 ### Keyboard Shortcuts (`src/hooks/useKeyboardShortcuts.ts`, wired in `GameScreen` and `ExploreScreen`)
 

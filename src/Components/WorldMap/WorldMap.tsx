@@ -10,15 +10,16 @@ import {
   countryCoordinates,
   countryNameByCode,
 } from "../../map/geography";
+import { COLORS, FLAT_WRONG } from "../../tokens";
 import { Guess } from "../../types";
 
 // The guessing surface's own markings. `wrong` is the hints-off marking: a flat
 // desaturated red, well clear of the saturated proximity-heat scale, carrying no
 // distance at all.
 const GUESS_FILLS = {
-  wrong: "#8b4a4a",
-  correct: "#4caf50",
-  answer: "#ffa726",
+  wrong: FLAT_WRONG,
+  correct: COLORS.mintDeep,
+  answer: COLORS.accent,
 } as const;
 
 // Sizes of the hint furniture in screen units at zoom 1; the base map hands back
@@ -134,9 +135,15 @@ const WorldMap = (props: WorldMapProps) => {
       labelFor={(code) =>
         props.finished ? undefined : countryNameByCode(code)
       }
+      // Arrived at from a page standing on this same map in the dark, so the
+      // way in is the night coming off it.
+      veil="lift"
       // A guess is irreversible, so on touch it costs a tap to arm first.
       armOnTouch
       onCommit={props.onCommit}
+      // Every guess and the reveal carry an outline: on cream land the warm end
+      // of the proximity scale is barely 1.3:1 against the land underneath it.
+      marked={(code) => stateFor(code) !== undefined}
       countryAttributes={(code) => ({ "data-guess-state": stateFor(code) })}
       overlay={(fixed) =>
         hintMarks.map(({ code, coordinates, distanceKm, angle }) => (
@@ -144,21 +151,26 @@ const WorldMap = (props: WorldMapProps) => {
             {/* Fixed on-screen size: a hint that grew with the zoom would
                 blanket the countries the player zoomed in to reach. */}
             <g transform={`scale(${fixed})`} pointerEvents="none">
+              {/* Ink on a cream halo, rather than the other way round: the
+                  furniture has to stay legible over land, sea and every fill
+                  on the proximity scale alike. */}
               <path
                 data-testid={`map-hint-arrow-${code}`}
                 d={ARROW_PATH}
                 transform={`rotate(${angle})`}
-                fill="#ffffff"
-                stroke={MAP_FILLS.border}
-                strokeWidth={0.75}
+                fill={COLORS.ink}
+                stroke={COLORS.paper}
+                strokeWidth={1.5}
+                paintOrder="stroke"
               />
               <text
                 y={HINT_LABEL_OFFSET}
                 textAnchor="middle"
                 fontSize={HINT_LABEL_SIZE}
-                fill="#ffffff"
-                stroke={MAP_FILLS.border}
-                strokeWidth={2.5}
+                fontWeight={600}
+                fill={COLORS.ink}
+                stroke={COLORS.paper}
+                strokeWidth={3}
                 paintOrder="stroke"
               >
                 {`${distanceKm.toFixed()} km`}

@@ -3,6 +3,7 @@ import "./index.css";
 
 import Base from "./Layouts/Base/Base";
 import Menu from "./Components/Menu/Menu";
+import BackdropMap from "./Components/BackdropMap/BackdropMap";
 import RunSummaryScreen from "./Components/RunSummaryScreen/RunSummaryScreen";
 import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
@@ -55,6 +56,11 @@ function AppContent() {
     <Base
       showMenuButton={state.screen !== "menu"}
       fullBleed={isMapSurface}
+      screenKey={state.screen}
+      // Both content pages stand on the map: they are the two screens that are
+      // about the game without being made of it, and the backdrop is what says
+      // so. The map surfaces have no use for it — they *are* the map.
+      backdrop={isMapSurface ? undefined : <BackdropMap />}
       onMenuClicked={() => dispatch({ type: "RESET_TO_MENU" })}
     >
       {content}
@@ -63,8 +69,9 @@ function AppContent() {
 }
 
 // The two providers are siblings, not a hierarchy: neither reads the other
-// (ADR-0003). Explore's queues live here so a trip to the menu and back within
-// a visit keeps the player's place; nothing survives a reload.
+// (ADR-0003). Explore's queues live here so a country chosen again picks up
+// where it left off; the chosen country itself goes with the screen, so a trip
+// to the menu and back is silence. Nothing survives a reload.
 function App() {
   return (
     <GameProvider>

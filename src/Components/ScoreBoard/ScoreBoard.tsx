@@ -11,18 +11,18 @@ import {
   Chip,
 } from "@mui/material";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import { COLORS } from "../../tokens";
 import { ScoreEntry } from "../../types";
 
 interface ScoreboardProps {
   scores: ScoreEntry[];
 }
 
-const getRankColor = (index: number) => {
-  if (index === 0) return "warning.main";
-  if (index === 1) return "text.secondary";
-  if (index === 2) return "#cd7f32";
-  return "text.disabled";
-};
+// A medal is carried by a filled chip rather than by coloured text: none of the
+// three metals clears 4.5:1 as text on cream, and as a fill each one takes an
+// ink label at better than 6:1. Ranks past third get no fill at all, so the
+// medals are the only thing on the column with colour.
+const MEDAL_FILLS = [COLORS.gold, COLORS.silver, COLORS.bronze];
 
 const Scoreboard = (props: ScoreboardProps) => {
   return (
@@ -36,7 +36,9 @@ const Scoreboard = (props: ScoreboardProps) => {
           mb: 2,
         }}
       >
-        <LeaderboardIcon sx={{ color: "primary.main" }} />
+        {/* Inherits the page's foreground: this heading sits on the night
+            backdrop, unlike the table below it, which is its own cream card. */}
+        <LeaderboardIcon sx={{ color: "inherit" }} />
         <Typography variant="h2">Top Scores</Typography>
       </Box>
       <TableContainer
@@ -68,8 +70,8 @@ const Scoreboard = (props: ScoreboardProps) => {
                     size="small"
                     sx={{
                       fontWeight: 700,
-                      color: getRankColor(index),
-                      bgcolor: "transparent",
+                      color: "text.primary",
+                      bgcolor: MEDAL_FILLS[index] ?? "transparent",
                       fontSize: "0.875rem",
                     }}
                   />
@@ -78,7 +80,10 @@ const Scoreboard = (props: ScoreboardProps) => {
                 <TableCell align="right">
                   <Typography
                     component="span"
-                    sx={{ fontWeight: 600, color: "primary.main" }}
+                    sx={{
+                      fontWeight: 600,
+                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    }}
                   >
                     {score.score}
                   </Typography>

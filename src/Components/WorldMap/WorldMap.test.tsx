@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ThemeProvider } from "@mui/material/styles";
 import { render, screen, fireEvent } from "../../test-utils";
 import userEvent from "@testing-library/user-event";
 
+import theme from "../../theme";
+import { countryFeatures } from "../../map/geography";
 import WorldMap from "./WorldMap";
 import getProximityColor from "../../helpers/getProximityColor";
 import { setHoverCapability } from "../../test/hoverCapability";
@@ -286,5 +290,46 @@ describe("WorldMap", () => {
 
       expect(screen.queryByText("Australia")).not.toBeInTheDocument();
     });
+  });
+
+  // The menu stands on this same map under a black veil, so the way in is that
+  // veil coming off — never a fade, which would draw the map at less than full
+  // opacity and show the cream page underneath as a white flash.
+  it("arrives by lifting the night off the map, and never stays under it", async () => {
+    renderMap();
+    await screen.findByLabelText("France");
+
+    const veil = screen.getByTestId("map-veil");
+    expect(veil).toHaveClass("veil-lift");
+    // Its resting state is gone rather than dark: if the animation never runs —
+    // reduced motion, or a browser without it — the map is revealed, not lost.
+    expect(veil).toHaveStyle({ opacity: "0" });
+  });
+
+  // A map that arrives empty and fills in on the next commit is a map that
+  // blinks the whole world out on the way into a screen, which is what
+  // react-simple-maps' own <Geographies> did — it expands the TopoJSON in an
+  // effect. Static rendering is the only way to see a first render on its own,
+  // since Testing Library flushes effects before it hands anything back.
+  it("draws every country in its first render, before any effect has run", () => {
+    // Static rendering warns that the map's layout effects won't run, which is
+    // the whole point of rendering it this way.
+    const warnings = vi.spyOn(console, "error").mockImplementation(() => {});
+    const markup = renderToStaticMarkup(
+      <ThemeProvider theme={theme}>
+        <WorldMap
+          guesses={[]}
+          showGeoHints={false}
+          answer="Brazil"
+          finished={false}
+          onCommit={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+    warnings.mockRestore();
+
+    const drawn = markup.match(/class="rsm-geography/g) ?? [];
+    expect(countryFeatures.length).toBeGreaterThan(200);
+    expect(drawn).toHaveLength(countryFeatures.length);
   });
 });

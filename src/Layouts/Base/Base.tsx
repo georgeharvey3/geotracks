@@ -3,6 +3,14 @@ import { Box, Container, IconButton, Typography } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 
 import { COLORS } from "../../tokens";
+// PROTOTYPE — branding variants, active only when `?variant=` is in the URL.
+import {
+  Mark,
+  PrototypeSwitcher,
+  VariantWord,
+  usePrototypeKeys,
+  usePrototypeVariant,
+} from "./branding-prototype";
 
 interface BaseProps {
   showMenuButton: boolean;
@@ -128,6 +136,7 @@ const Wordmark = ({
   onNight?: boolean;
 }) => {
   const glideRef = useWordmarkGlide();
+  const variant = usePrototypeVariant();
 
   return (
     <Typography
@@ -142,17 +151,27 @@ const Wordmark = ({
           heading fills its container on both screens, so its own box would put
           the two at the same width and the flight would never scale. */}
       <Box component="span" ref={glideRef} sx={{ display: "inline-block" }}>
-        Geo
-        <Box
-          component="span"
-          // Coral swaps ends with the ground it is drawn on. `accent3Deep` is
-          // the coral that holds a foreground on cream; over the night backdrop
-          // it is 2.0:1, and the light coral is the one that reads.
-          sx={{ color: onNight ? COLORS.accent3 : "error.main" }}
-        >
-          T
-        </Box>
-        racks
+        {variant ? (
+          <VariantWord
+            variant={variant}
+            onNight={onNight}
+            compact={Boolean(fontSize)}
+          />
+        ) : (
+          <>
+            Geo
+            <Box
+              component="span"
+              // Coral swaps ends with the ground it is drawn on. `accent3Deep`
+              // is the coral that holds a foreground on cream; over the night
+              // backdrop it is 2.0:1, and the light coral is the one that reads.
+              sx={{ color: onNight ? COLORS.accent3 : "error.main" }}
+            >
+              T
+            </Box>
+            racks
+          </>
+        )}
       </Box>
     </Typography>
   );
@@ -186,33 +205,39 @@ const OverlayChrome = (props: {
   showMenuButton: boolean;
   onMenuClicked: () => void;
   screenKey?: string;
-}) => (
-  <Box
-    sx={{
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 2,
-      px: 1,
-      pt: 0.5,
-      pb: 3,
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-      pointerEvents: "none",
-      // A cream scrim now, matching the paper the rest of the app is on: the
-      // chrome has to stay legible over sea, land and every mark alike.
-      background:
-        "linear-gradient(to bottom, rgba(247, 245, 236, 0.92) 0%, rgba(247, 245, 236, 0) 100%)",
-    }}
-  >
-    <Box sx={{ pointerEvents: "auto", minWidth: 40 }}>
-      {props.showMenuButton && <HomeButton onClick={props.onMenuClicked} />}
+}) => {
+  // PROTOTYPE: the mark rides beside the word at chrome size, which is where a
+  // 22px logo has to survive being drawn over sea, land and every mark alike.
+  const variant = usePrototypeVariant();
+  return (
+    <Box
+      sx={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 2,
+        px: 1,
+        pt: 0.5,
+        pb: 3,
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        pointerEvents: "none",
+        // A cream scrim now, matching the paper the rest of the app is on: the
+        // chrome has to stay legible over sea, land and every mark alike.
+        background:
+          "linear-gradient(to bottom, rgba(247, 245, 236, 0.92) 0%, rgba(247, 245, 236, 0) 100%)",
+      }}
+    >
+      <Box sx={{ pointerEvents: "auto", minWidth: 40 }}>
+        {props.showMenuButton && <HomeButton onClick={props.onMenuClicked} />}
+      </Box>
+      {variant && <Mark variant={variant} size={22} />}
+      <Wordmark key={props.screenKey} fontSize="1.5rem" />
     </Box>
-    <Wordmark key={props.screenKey} fontSize="1.5rem" />
-  </Box>
-);
+  );
+};
 
 /**
  * The layout every screen is dressed in: a centred column on the night backdrop
@@ -226,6 +251,12 @@ const OverlayChrome = (props: {
  * behind exactly the cut it exists to cover.
  */
 const Base = (props: BaseProps) => {
+  // PROTOTYPE — null unless `?variant=` is in the URL, in which case the whole
+  // app wears that branding and the switcher bar appears.
+  const variant = usePrototypeVariant();
+  usePrototypeKeys(variant);
+  const switcher = variant ? <PrototypeSwitcher current={variant} /> : null;
+
   if (props.fullBleed) {
     return (
       <Box
@@ -251,6 +282,7 @@ const Base = (props: BaseProps) => {
           onMenuClicked={props.onMenuClicked}
           screenKey={props.screenKey}
         />
+        {switcher}
       </Box>
     );
   }
@@ -290,12 +322,23 @@ const Base = (props: BaseProps) => {
               <HomeButton onClick={props.onMenuClicked} onNight />
             </Box>
           )}
+          {/* PROTOTYPE: the display lockup — mark over word, centred. This is
+              the one place design.md's "content pages: typography only" rule
+              would have to be amended if a mark wins. */}
+          {variant && (
+            <Box
+              sx={{ display: "flex", justifyContent: "center", mb: 1, pt: 1 }}
+            >
+              <Mark variant={variant} size={56} onNight />
+            </Box>
+          )}
           <Wordmark key={props.screenKey} onNight />
         </Box>
         <Box key={props.screenKey} className="screen-enter">
           {props.children}
         </Box>
       </Container>
+      {switcher}
     </>
   );
 };

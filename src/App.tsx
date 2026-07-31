@@ -69,8 +69,9 @@ function AppContent() {
 }
 
 // The two providers are siblings, not a hierarchy: neither reads the other
-// (ADR-0003). Explore's queues live here so a trip to the menu and back within
-// a visit keeps the player's place; nothing survives a reload.
+// (ADR-0003). Explore's queues live here so a country chosen again picks up
+// where it left off; the chosen country itself goes with the screen, so a trip
+// to the menu and back is silence. Nothing survives a reload.
 function App() {
   return (
     <GameProvider>

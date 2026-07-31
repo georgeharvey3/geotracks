@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 
 import Explore from "../Explore/Explore";
 import { useExplore } from "../../context/ExploreContext";
@@ -11,8 +11,9 @@ import useKeyboardShortcuts from "../../hooks/useKeyboardShortcuts";
  * and wires them to the Explore reducer via context, so <Explore> stays purely
  * presentational.
  *
- * Unmounting this stops the music: the player hook tears its controller down.
- * The queues live above it, in the provider, so they survive the trip.
+ * Unmounting this stops the music: the player hook tears its controller down,
+ * and the LEAVE below lets the chosen country go with it. The queues live above
+ * it, in the provider, so they survive the trip.
  */
 const ExploreScreen = () => {
   const { state, dispatch } = useExplore();
@@ -25,6 +26,13 @@ const ExploreScreen = () => {
   const wasFinishedRef = useRef(false);
 
   const skip = () => dispatch({ type: "SKIP" });
+
+  // Leaving the screen unchooses the country, so coming back offers the map
+  // with nothing playing instead of picking the last Song up mid-flight.
+  // A *layout* effect, deliberately: a dispatch from a passive cleanup while
+  // this subtree is being deleted is dropped on the floor and never reaches the
+  // reducer, so the country would survive the trip after all.
+  useLayoutEffect(() => () => dispatch({ type: "LEAVE" }), [dispatch]);
 
   useKeyboardShortcuts({
     inputRef: countryInputRef,

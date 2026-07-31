@@ -21,6 +21,7 @@ const initial = () => createInitialExploreState(albums);
 const select = (state: ExploreState, country: string) =>
   exploreReducer(state, { type: "SELECT_COUNTRY", country });
 const skip = (state: ExploreState) => exploreReducer(state, { type: "SKIP" });
+const leave = (state: ExploreState) => exploreReducer(state, { type: "LEAVE" });
 
 const linkOf = (state: ExploreState) => currentSong(state)?.link;
 
@@ -135,6 +136,28 @@ describe("exploreReducer", () => {
       // through Vanuatu did not rewind Mali's queue.
       const heard = [linkOf(first), linkOf(second), linkOf(third)];
       expect(new Set(heard).size).toBe(MALI_SONGS);
+    });
+  });
+
+  describe("leaving", () => {
+    it("leaves nothing playing", () => {
+      const left = leave(select(initial(), "Mali"));
+
+      expect(left.country).toBeNull();
+      expect(currentSong(left)).toBeUndefined();
+    });
+
+    it("keeps the country's place for when it is chosen again", () => {
+      const mali = skip(select(initial(), "Mali"));
+      const returned = select(leave(mali), "Mali");
+
+      expect(linkOf(returned)).toBe(linkOf(mali));
+    });
+
+    it("does nothing when nothing was playing", () => {
+      const state = initial();
+
+      expect(leave(state)).toBe(state);
     });
   });
 });

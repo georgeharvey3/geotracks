@@ -143,9 +143,9 @@ stand on one: the game's map at rest, covering the viewport behind the column
 (`BackdropMap`). It is a **veil, not a wash** — the map is drawn at full
 strength and then covered in `night` at 0.76 — so what is left is a coastline in
 the dark rather than a picture of the world. Paper type lands at ~10.5:1 over it
-whatever the map has drawn underneath (`paperMuted` 5.6:1, the coral `T` 3.3:1 as
-display type), which is what lets the veil be the same one on both pages and
-under any pan.
+whatever the map has drawn underneath (`paperMuted`, which the wordmark's `Geo`
+is drawn in, 5.6:1), which is what lets the veil be the same one on both pages
+and under any pan.
 
 The veil belongs to the **map** rather than to the backdrop (`BaseMap`'s `veil`:
 `night` holds it, `lift` takes it off on mount, `settle` draws it on, `none`

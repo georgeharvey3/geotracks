@@ -141,10 +141,11 @@ old green/amber/red run translated into the palette one for one.
 The content pages are the way in to three surfaces made of the map, so they
 stand on one: the game's map at rest, covering the viewport behind the column
 (`BackdropMap`). It is a **veil, not a wash** — the map is drawn at full
-strength and then covered in `night` at 0.82 — so what is left is a coastline in
-the dark rather than a picture of the world. Paper type lands at ~12:1 over it
-whatever the map has drawn underneath, which is what lets the veil be the same
-one on both pages and under any pan.
+strength and then covered in `night` at 0.76 — so what is left is a coastline in
+the dark rather than a picture of the world. Paper type lands at ~10.5:1 over it
+whatever the map has drawn underneath (`paperMuted` 5.6:1, the coral `T` 3.3:1 as
+display type), which is what lets the veil be the same one on both pages and
+under any pan.
 
 The veil belongs to the **map** rather than to the backdrop (`BaseMap`'s `veil`:
 `night` holds it, `lift` takes it off on mount, `settle` draws it on, `none`
@@ -250,7 +251,7 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
        show a lit world and then put it out.
      - A **map surface** does not fade. It is the map the page before it was
        standing on, so it arrives by that map's **veil lifting** (`veil-lift`,
-       520ms, from exactly the 0.82 the page ended on). Fading a map means
+       520ms, from exactly the 0.76 the page ended on). Fading a map means
        drawing it at less than full opacity, and what shows through is the cream
        underneath: the player sees the whole screen wash out to white and then
        resolve. The one thing on these screens that was already there is the

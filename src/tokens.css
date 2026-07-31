@@ -83,5 +83,5 @@
   /* ---- the night ground --------------------------------------------- */
   /* How much black lies over the map. Mirrored from `tokens.ts`, where the
      reasoning is; the keyframe that lifts it needs the value in CSS. */
-  --night-veil-opacity: 0.82;
+  --night-veil-opacity: 0.76;
 }

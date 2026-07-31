@@ -145,10 +145,11 @@ export const FLAT_WRONG = "#bb6c6f"; // oklch(62% 0.10 18)
  * A veil rather than a wash: the map is drawn at full strength and then almost
  * entirely covered, so what is left is a coastline in the dark rather than a
  * picture of the world. High enough that a content page reads as one black
- * ground — paper type lands at ~12:1 over it whatever the map has drawn
- * underneath — and low enough that the land/sea step still shows as a ghost of
- * an edge. It is also where an app surface's map *arrives from*, so the two
- * cannot be allowed to drift apart: the reveal starts at exactly the darkness
- * the screen before it ended on. Mirrored in `tokens.css` for the keyframes.
+ * ground — paper type lands at ~10.5:1 over it whatever the map has drawn
+ * underneath, `paperMuted` at 5.6:1 — and low enough that the land/sea step
+ * still shows as a ghost of an edge. It is also where an app surface's map
+ * *arrives from*, so the two cannot be allowed to drift apart: the reveal
+ * starts at exactly the darkness the screen before it ended on. Mirrored in
+ * `tokens.css` for the keyframes.
  */
-export const NIGHT_VEIL_OPACITY = 0.82;
+export const NIGHT_VEIL_OPACITY = 0.76;

@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` — ESLint over the repo; `npm run format` / `npm run format:check` for Prettier
 - `npm run test:coverage` — Run the suite with a V8 coverage report (`coverage/`); reported only, no enforced gate
 - `node scripts/build-map-geometry.mjs` — Regenerate the map's bundled country geometry (only needed after changing `src/countries.json` or the straggler threshold; see ADR-0002)
+- `node scripts/build-logo-assets.ts` — Regenerate `public/`'s favicon, PWA icons and `logo.svg` from the mark's geometry (only needed after changing the mark; needs Chrome on the machine)
 
 ### CI/CD & deployment
 
@@ -40,9 +41,9 @@ Colours are chosen in exactly one place: **`src/tokens.ts`**. `src/tokens.css` i
 
 The rule that governs everything: **accents own fills, ink owns foregrounds.** On cream, pear is 1.4:1 and mint 2.5:1, so an accent may fill a shape carrying an ink label but may not be the colour a glyph or word is drawn in. Foreground-safe variants exist where an accent identity must be a foreground (`mintInk`, `accent3Deep`); there is deliberately no pear equivalent.
 
-**Two grounds, and which one a screen is on follows from its family.** The app pages (game, Explore, Run summary) are ink on cream. The **content pages** (menu, scoreboard) stand on the **night backdrop** — the map under a black veil (`BackdropMap`) — and draw their chrome in paper: `paper` for type, `paperMuted` for secondary, the light `accent3` for the wordmark's `T`, and a paper focus ring, scoped by `[data-surface="night"]` in `src/index.css`. Opaque surfaces inside them (the scoreboard's table card) are MUI `Paper`, which resets to cream and ink on its own.
+**Two grounds, and which one a screen is on follows from its family.** The app pages (game, Explore, Run summary) are ink on cream. The **content pages** (menu, scoreboard) stand on the **night backdrop** — the map under a black veil (`BackdropMap`) — and draw their chrome in paper: `paper` for type, `paperMuted` for secondary and for the wordmark's `Geo`, and a paper focus ring, scoped by `[data-surface="night"]` in `src/index.css`. Opaque surfaces inside them (the scoreboard's table card) are MUI `Paper`, which resets to cream and ink on its own.
 
-**Screen transitions** are staged and only ever inward — the outgoing screen is gone the moment it is replaced, because cross-fading would mean two maps mounted at once. The screen arrives, the wordmark flies from where it was to where it lands (FLIP, in `Base.tsx`), and the panel comes in last from the edge it is attached to (`panel-enter`, in `PanelSurface`). The chrome sits **outside** what animates, or it would hide the flight behind exactly the cut it exists to cover.
+**Screen transitions** are staged and only ever inward — the outgoing screen is gone the moment it is replaced, because cross-fading would mean two maps mounted at once. The screen arrives, the lockup — mark and wordmark together — flies from where it was to where it lands (FLIP, in `Base.tsx`), and the panel comes in last from the edge it is attached to (`panel-enter`, in `PanelSurface`). The chrome sits **outside** what animates, or it would hide the flight behind exactly the cut it exists to cover.
 
 How the screen arrives depends on its family, and the two are not interchangeable. A **content page** fades up (`screen-enter`), and if it was reached from a map surface the night is drawn back over the map underneath it (`veil="settle"`, 320ms) rather than the page cutting to black. A **map surface** must never fade: a map at less than full opacity shows the cream underneath it, which the player sees as the whole screen washing out to white and resolving. It arrives instead by the **veil lifting off the map** (`veil="lift"`, 520ms), starting at exactly the darkness the content page it came from was standing on. Two exceptions, both because the map is already in the state the animation would have to fake: the Run summary lifts nothing (it is reached from the game screen — the same map, already revealed), and the first page of a session settles nothing (`BackdropMap` tracks whether a backdrop has stood under a page yet; there is nothing to come back from). See `design.md` § Motion.
 
@@ -152,7 +153,8 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/Components/ExploreMap/ExploreMap.tsx` — The Explore wrapper around it
 - `src/Components/RunSummaryMap/RunSummaryMap.tsx` — The Run summary wrapper around it
 - `src/Components/BackdropMap/BackdropMap.tsx` — The content pages' backdrop: the map under a black veil, click-through and `aria-hidden` (see `design.md`)
-- `src/Layouts/Base/Base.tsx` — The layout both families are dressed in, and where the wordmark's glide lives
+- `src/Layouts/Base/Base.tsx` — The layout both families are dressed in, and where the lockup and its glide live
+- `src/Components/Logo/Logo.tsx` — The mark: a map pin whose head is a play button. Its geometry (`geometry.ts`) is shared with `scripts/build-logo-assets.ts`, which regenerates `public/`'s icons
 - `src/Components/ExploreScreen/ExploreScreen.tsx` — Explore's container: player + keyboard seams wired to the Explore reducer
 - `src/Components/RunSummaryScreen/RunSummaryScreen.tsx` — The Run summary's container: the leaderboard write wired to the game reducer
 - `src/Components/RunSummary/RunSummary.tsx` — The Run summary's layout, and the row→map highlight

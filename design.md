@@ -82,8 +82,8 @@ pear equivalent, deliberately — a pear dark enough to read as text stops looki
 like pear, so pear-as-text is simply not a move this system has.
 
 **On night the pairs swap ends.** `accent3Deep` is the coral that holds a
-foreground on cream and only 2.0:1 on the backdrop; the wordmark's `T` is drawn
-in the light `accent3` there instead (4.1:1, and it is display type). The same
+foreground on cream and only 2.0:1 on the backdrop, so where a coral foreground
+is needed there it is the light `accent3` that is drawn. The same
 goes for chrome: ink becomes paper, `inkMuted` becomes `paperMuted`, and the
 focus ring — `--color-focus` is 1.6:1 on night, a ring nobody could find —
 becomes paper, scoped by `[data-surface="night"]` in `src/index.css`. Nothing
@@ -170,6 +170,32 @@ nothing here is picked, so nothing here is a target:
 already; the backdrop is what marks a screen as being about the game without
 being made of it.
 
+## The brand
+
+The name is a compound, and the lockup says so twice.
+
+- **The wordmark** puts its emphasis on the seam of the compound — `Geo` at 400
+  in the muted ink (`paperMuted` on night), `Tracks` at the display weight —
+  rather than on a letter picked out in colour. A coloured letter is emphasis
+  without an argument: nothing about the word says why that letter and not its
+  neighbour, and the app wore a coral `T` for exactly as long as it took someone
+  to ask. Weight says which half of the name you are reading; it also keeps
+  colour out of the type, which leaves coral free to be the one loud moment on a
+  screen rather than a permanent fixture of the chrome.
+- **The mark** is a map pin whose head is a play button: where the music is
+  from, and that you can hear it, in one shape. Pear fills it and ink draws the
+  glyph — the accent rule, not a choice made for it — and it takes an **ink
+  outline** for the same reason the map's marked countries do: pear is 1.4:1 on
+  cream, so over the game screen's scrim the fill cannot be what makes the shape
+  visible. On night that outline lands on near-black and simply stops mattering.
+- **They are one lockup**, mark then word, and the mark is sized in `em` so the
+  two scale together — the wordmark's flight between screens is a scale, and a
+  mark measured in pixels would be the one part of it that didn't move (see
+  Motion). It is drawn once, in `src/Components/Logo/Logo.tsx`, from geometry
+  that `scripts/build-logo-assets.ts` also draws `public/`'s favicon, PWA icons
+  and `logo.svg` from, so the tab strip cannot end up showing a different mark
+  from the screen.
+
 ## Typography
 
 - **Display and body:** Plus Jakarta Sans — 700 for display, 600 for buttons and
@@ -231,12 +257,14 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
        world, so the way in is to uncover it rather than to draw a new one.
        The Run summary is the exception — it is reached from the game screen,
        which is this same map already revealed, so it lifts nothing.
-  2. **The wordmark glides.** It is the one element every screen shares, so it
+  2. **The lockup glides.** It is the one element every screen shares, so it
      is what carries the eye across an otherwise instant swap: the incoming one
      is drawn where the outgoing one was and released (FLIP, 420ms, in
-     `Base.tsx`). It measures the word rather than the heading block — the
+     `Base.tsx`). It measures the lockup rather than the heading block — the
      heading fills its container on both screens, so the block's own box would
-     put the two at the same width and the flight would never scale. Being
+     put the two at the same width and the flight would never scale. The mark
+     is inside what flies, and sized in `em`, so the whole thing arrives as one
+     piece rather than the word gliding while the mark cuts. Being
      transform-only it runs on the compositor, which matters because the screen
      it lands on is mounting ~250 country shapes on the main thread at the time.
   3. **The panel** comes in last (`panel-enter`, 320ms after a 120ms beat) and
@@ -267,9 +295,10 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
 
 ## What screens MUST share
 
-- The wordmark, including its single coral `T` — and its `aria-label`, because
-  splitting the word into elements to colour one letter also splits it for the
-  accessibility tree, which otherwise announces "Geo T racks".
+- The lockup — mark then wordmark — and the wordmark's `aria-label`, because
+  splitting the word into elements to weight one half also splits it for the
+  accessibility tree, which otherwise announces "Geo Tracks" as two words. The
+  mark is `aria-hidden` beside it: the word already carries the name.
 - The accent set and the one-job-each rule.
 - Plus Jakarta Sans + JetBrains Mono, and mono only for figures.
 - The CTA voice: pill radius, the edge, the press.
@@ -285,7 +314,9 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
 
 ## Per-page allowances
 
-- Content pages: typography only, plus the night backdrop.
+- Content pages: typography only, plus the night backdrop. The mark is not an
+  exception to this — it is chrome the app wears on every screen, at the same
+  size relative to the word, not something the page adds to itself.
 - App pages: no enrichment — the map is the artefact.
 - No screen gets a hero illustration, a mascot, or a character moment. Hum
   normally asks for one; GeoTracks already has 240 hand-drawn shapes on screen

@@ -1224,6 +1224,12 @@
         "name": "Suriname"
     },
     {
+        "code": "SS",
+        "lat": "6.876991",
+        "lon": "31.306978",
+        "name": "South Sudan"
+    },
+    {
         "code": "ST",
         "lat": "0.18636",
         "lon": "6.613081",

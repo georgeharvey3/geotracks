@@ -3,25 +3,27 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { Box, useMediaQuery } from "@mui/material";
 import {
   ComposableMap,
-  Geographies,
   Geography,
   Marker,
   ZoomableGroup,
+  useMapContext,
 } from "react-simple-maps";
 
 import useHasHover from "../../hooks/useHasHover";
 import { MAP_FILLS } from "../../map/fills";
+import { COLORS, NIGHT_VEIL_OPACITY } from "../../tokens";
 import {
+  countryFeatures,
   countryNameByCode,
   polygonCodes,
   stragglerMarkers,
-  topology,
 } from "../../map/geography";
 import { CHROME_CLEARANCE, LANDSCAPE_QUERY } from "../../layout";
 
@@ -53,12 +55,55 @@ const TOOLTIP_LIFT = 12;
 // neighbouring straggler dots merge and any overlay swells to cover whole
 // regions.
 const BORDER_WIDTH = 0.3;
+const MARK_WIDTH = 0.9;
 const STRAGGLER_RADIUS = 3.5;
 const STRAGGLER_STROKE = 0.75;
+const STRAGGLER_MARK_STROKE = 1.5;
 
 const stragglerCodes = new Set(stragglerMarkers.map((marker) => marker.code));
 
-type MapGeography = { rsmKey: string; id?: string };
+// Which way the veil moves on mount, if it moves at all. The keyframes are in
+// `index.css`, next to the other entrances.
+const VEIL_ANIMATIONS = {
+  none: undefined,
+  night: undefined,
+  lift: "veil-lift",
+  settle: "veil-settle",
+} as const;
+
+type MapGeography = { rsmKey: string; id?: string; svgPath: string | null };
+
+/**
+ * The countries, drawn in the map's first render.
+ *
+ * This is react-simple-maps' `<Geographies>` with the flash taken out of it. The
+ * library expands the TopoJSON in an effect, so every map it is mounted in shows
+ * an empty world for one commit before the shapes appear — on the way into a
+ * screen that reads as the whole world blinking out and coming back. The shapes
+ * are already expanded (`countryFeatures`); all that is left is projecting them,
+ * and the projection is fixed for as long as a map is mounted, so this happens
+ * once per map and never again.
+ */
+const Countries = ({
+  children,
+}: {
+  children: (geographies: MapGeography[]) => ReactNode;
+}) => {
+  const { path } = useMapContext();
+  const geographies = useMemo(
+    () =>
+      countryFeatures.map((country, index) => ({
+        ...country,
+        // The key the library gives them, kept so nothing downstream can tell
+        // the difference.
+        rsmKey: `geo-${index}`,
+        svgPath: path(country as never),
+      })),
+    [path],
+  );
+
+  return <g>{children(geographies)}</g>;
+};
 
 interface BaseMapProps {
   /**
@@ -82,6 +127,33 @@ interface BaseMapProps {
   armOnTouch: boolean;
   onCommit: (countryName: string) => void;
   /**
+   * Whether the map covers its box whatever the shape of it. The default is the
+   * app surfaces' rule — cover in landscape, and in portrait fit the whole world
+   * into the band the layout leaves below the chrome, because covering a tall
+   * box crops away most of the world's width. A map that is only the ground
+   * under a page, with nothing laid out beside it and no chrome to stay clear
+   * of, passes `true` and covers in both.
+   */
+  cover?: boolean;
+  /**
+   * Whether the straggler point-markers are drawn. They exist so that every
+   * *guessable* country has a target big enough to hit; a surface that picks
+   * nothing has no targets, and the dots are then the only thing on it that
+   * reads as UI — a scatter of cream freckles across open ocean, drawn at a
+   * constant screen size and so the loudest thing on the map. Defaults to on:
+   * a surface has to opt out of being playable, never into it.
+   */
+  showStragglers?: boolean;
+  /**
+   * Whether a country carries an emphasis outline, drawn in place of the
+   * ordinary hairline border. Every fill a surface marks with is lighter than
+   * 3:1 against the land it sits on — the palette's warm end is 1.3:1 — so a
+   * fill on its own cannot be what makes a mark visible. The outline does that;
+   * the fill is left to carry the meaning. Like `fillFor`, this says nothing
+   * about *what* is marked: that stays with the caller (ADR-0003).
+   */
+  marked?: (code: string) => boolean;
+  /**
    * Extra attributes for one country's shape — the handle a surface marks its
    * own state through.
    */
@@ -92,6 +164,21 @@ interface BaseMapProps {
    * size.
    */
   overlay?: (fixed: number) => ReactNode;
+  /**
+   * The black veil over the map, and what it does when the map mounts.
+   *
+   * `night` holds it at full strength: the map at rest in the dark, which is
+   * the ground a content page stands on. `lift` starts it there and takes it
+   * off — how a map surface arrives, revealing the same world the page before
+   * it was standing on rather than fading a new one up over the cream.
+   * `settle` is the way back: it starts at nothing and draws the night on.
+   * `none` is a map that was never under anything.
+   *
+   * It is a parameter and not a fact about the map, like `cover` and
+   * `showStragglers`: this component still knows nothing about which surface is
+   * calling it (ADR-0003).
+   */
+  veil?: "none" | "night" | "lift" | "settle";
 }
 
 /**
@@ -105,9 +192,13 @@ interface BaseMapProps {
  * the tooltip says and anything drawn over the top come from the caller, so
  * this component never has to know which surface is using it (ADR-0003).
  */
-const BaseMap = (props: BaseMapProps) => {
+const BaseMap = ({ veil = "none", ...props }: BaseMapProps) => {
   const hasHover = useHasHover();
   const isLandscape = useMediaQuery(LANDSCAPE_QUERY);
+  // Covering crops the world; fitting shows all of it under the layout's
+  // chrome. Landscape covers because the crop it takes is only the empty polar
+  // bands, and a caller that owns the whole box covers whatever its shape.
+  const covers = props.cover === true || isLandscape;
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [armedCode, setArmedCode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -210,6 +301,12 @@ const BaseMap = (props: BaseMapProps) => {
 
   const isPreviewed = (code: string) => code === previewedCode;
 
+  // A marked country trades its hairline for the emphasis outline, so the mark
+  // reads against land it has too little contrast with on its own.
+  const { marked } = props;
+  const isMarked = (code: string | undefined) =>
+    code !== undefined && (marked?.(code) ?? false);
+
   const interactionStyle = (code: string) => {
     const cursor = props.selectable(code) ? "pointer" : "default";
     return {
@@ -239,7 +336,7 @@ const BaseMap = (props: BaseMapProps) => {
         sx={{
           position: "absolute",
           inset: 0,
-          top: isLandscape ? 0 : `${CHROME_CLEARANCE}px`,
+          top: covers ? 0 : `${CHROME_CLEARANCE}px`,
         }}
       >
         <ComposableMap
@@ -249,7 +346,7 @@ const BaseMap = (props: BaseMapProps) => {
           height={MAP_HEIGHT}
           // Landscape covers the viewport, cropping the empty polar bands;
           // portrait fits the world into the band the layout reserves for it.
-          preserveAspectRatio={isLandscape ? "xMidYMid slice" : "xMidYMid meet"}
+          preserveAspectRatio={covers ? "xMidYMid slice" : "xMidYMid meet"}
           style={{ width: "100%", height: "100%", display: "block" }}
         >
           <ZoomableGroup
@@ -258,8 +355,8 @@ const BaseMap = (props: BaseMapProps) => {
             translateExtent={WORLD_EXTENT}
             onMove={handleMove}
           >
-            <Geographies geography={topology}>
-              {({ geographies }: { geographies: MapGeography[] }) =>
+            <Countries>
+              {(geographies) =>
                 geographies.map((geo) => {
                   // Undefined for shapes the app has no country for (disputed
                   // territories, and countries missing from countries.json):
@@ -278,8 +375,12 @@ const BaseMap = (props: BaseMapProps) => {
                         code,
                         code !== undefined && isPreviewed(code),
                       )}
-                      stroke={MAP_FILLS.border}
-                      strokeWidth={BORDER_WIDTH * fixed}
+                      stroke={
+                        isMarked(code) ? MAP_FILLS.mark : MAP_FILLS.border
+                      }
+                      strokeWidth={
+                        (isMarked(code) ? MARK_WIDTH : BORDER_WIDTH) * fixed
+                      }
                       // A straggler's point-marker is its labelled target; the
                       // polygon underneath stays clickable for players who zoom in.
                       aria-label={
@@ -308,38 +409,68 @@ const BaseMap = (props: BaseMapProps) => {
                   );
                 })
               }
-            </Geographies>
+            </Countries>
 
-            {stragglerMarkers.map((marker) => (
-              <Marker key={marker.code} coordinates={marker.coordinates}>
-                {/* Fixed on-screen size: zooming in separates crowded island
+            {(props.showStragglers ?? true) &&
+              stragglerMarkers.map((marker) => (
+                <Marker key={marker.code} coordinates={marker.coordinates}>
+                  {/* Fixed on-screen size: zooming in separates crowded island
                     dots instead of inflating them into each other. */}
-                <g transform={`scale(${fixed})`}>
-                  <circle
-                    r={STRAGGLER_RADIUS}
-                    tabIndex={-1}
-                    fill={props.fillFor(marker.code, isPreviewed(marker.code))}
-                    stroke={MAP_FILLS.border}
-                    strokeWidth={STRAGGLER_STROKE}
-                    aria-label={marker.name}
-                    {...props.countryAttributes?.(marker.code)}
-                    onClick={() => armOrCommit(marker.code)}
-                    onMouseEnter={() => handleMouseEnter(marker.code)}
-                    onMouseLeave={handleMouseLeave}
-                    style={{
-                      cursor: props.selectable(marker.code)
-                        ? "pointer"
-                        : "default",
-                    }}
-                  />
-                </g>
-              </Marker>
-            ))}
+                  <g transform={`scale(${fixed})`}>
+                    <circle
+                      r={STRAGGLER_RADIUS}
+                      tabIndex={-1}
+                      fill={props.fillFor(
+                        marker.code,
+                        isPreviewed(marker.code),
+                      )}
+                      stroke={
+                        isMarked(marker.code)
+                          ? MAP_FILLS.mark
+                          : MAP_FILLS.border
+                      }
+                      strokeWidth={
+                        isMarked(marker.code)
+                          ? STRAGGLER_MARK_STROKE
+                          : STRAGGLER_STROKE
+                      }
+                      aria-label={marker.name}
+                      {...props.countryAttributes?.(marker.code)}
+                      onClick={() => armOrCommit(marker.code)}
+                      onMouseEnter={() => handleMouseEnter(marker.code)}
+                      onMouseLeave={handleMouseLeave}
+                      style={{
+                        cursor: props.selectable(marker.code)
+                          ? "pointer"
+                          : "default",
+                      }}
+                    />
+                  </g>
+                </Marker>
+              ))}
 
             {props.overlay?.(fixed)}
           </ZoomableGroup>
         </ComposableMap>
       </Box>
+
+      {/* Over the map and under everything a surface floats on it — the panel,
+          the standings — so the world is what is revealed, not the controls. */}
+      {veil !== "none" && (
+        <Box
+          data-testid="map-veil"
+          className={VEIL_ANIMATIONS[veil]}
+          sx={{
+            position: "absolute",
+            inset: 0,
+            bgcolor: COLORS.night,
+            // Where it comes to rest, which is also where it stays if the
+            // animation never runs — reduced motion, or a browser without it.
+            opacity: veil === "lift" ? 0 : NIGHT_VEIL_OPACITY,
+            pointerEvents: "none",
+          }}
+        />
+      )}
 
       {previewedLabel && (
         <Box
@@ -351,11 +482,13 @@ const BaseMap = (props: BaseMapProps) => {
             position: "absolute",
             px: 1,
             py: 0.25,
-            borderRadius: 1,
-            bgcolor: "rgba(26, 26, 46, 0.9)",
-            border: "1px solid",
-            borderColor: "divider",
+            borderRadius: 999,
+            bgcolor: "background.paper",
+            color: "text.primary",
+            border: "1.5px solid",
+            borderColor: "text.primary",
             fontSize: "0.8rem",
+            fontWeight: 600,
             pointerEvents: "none",
             whiteSpace: "nowrap",
             ...labelPosition,

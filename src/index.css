@@ -1,5 +1,116 @@
+@import "./tokens.css";
+
 body {
   margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Figures line up wherever they appear — scores, distances, turn counts. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible on cream at 6.7:1, and never animated: a focus ring that fades in is
+   a focus ring that is missed. */
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The focus blue is 1.6:1 on the night backdrop — a ring nobody can find. The
+   content pages get the paper one instead, which is the same 12:1 there that
+   their type is. */
+[data-surface="night"] :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+/* Arriving on a map surface: the night comes off the map it was already on.
+   The content pages stand on the map under a black veil, and a map surface is
+   the same world with the veil taken away — so the way in is to take it away in
+   front of the player, from exactly the darkness the page before it ended on.
+   Nothing fades *up* here: a map at less than full opacity shows the cream
+   underneath it, which is the white flash this replaced. */
+@keyframes veil-lift {
+  from {
+    opacity: var(--night-veil-opacity);
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.veil-lift {
+  animation: veil-lift var(--dur-reveal) var(--ease-reveal) both;
+}
+
+/* And the way back: the night settling over the map again, rather than the
+   content page cutting to black. The same veil, the same easing, the other
+   direction. */
+@keyframes veil-settle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--night-veil-opacity);
+  }
+}
+
+.veil-settle {
+  animation: veil-settle var(--dur-settle) var(--ease-reveal) both;
+}
+
+/* Arriving on a content page. The screen fades up and settles the last few
+   pixels rather than cutting in, so the wordmark flying to its new place (see
+   `Base.tsx`) has something to arrive over. Content pages only: they fade up
+   over the night backdrop, which is already there and stays. */
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.screen-enter {
+  animation: screen-enter var(--dur-mid) var(--ease-snap) both;
+}
+
+/* The panel comes in after the surface it sits on, and from the edge it is
+   attached to: the tray up from the bottom in portrait, the card down from the
+   top in landscape. Staged rather than simultaneous, so the map reads as the
+   page and the panel as the thing placed on it. */
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes panel-enter-landscape {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

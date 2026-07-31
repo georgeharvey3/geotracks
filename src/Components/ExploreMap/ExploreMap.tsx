@@ -3,11 +3,12 @@ import { useMemo } from "react";
 import BaseMap from "../WorldMap/BaseMap";
 import { MAP_FILLS } from "../../map/fills";
 import { countryCodeByName, countryNameByCode } from "../../map/geography";
+import { COLORS } from "../../tokens";
 
-// The country now playing takes the palette's green — the one colour on this
+// The country now playing takes the palette's mint — the one colour on this
 // map that means "this is the one". Everything else is the shared land/inert
 // pair: music here, or none.
-const NOW_PLAYING_FILL = "#4caf50";
+const NOW_PLAYING_FILL = COLORS.mintDeep;
 
 interface ExploreMapProps {
   /** The countries the app holds music for, by name. */
@@ -55,9 +56,13 @@ const ExploreMap = (props: ExploreMapProps) => {
       // Silent countries still answer to hover: an absence of music is not an
       // absence of geography.
       labelFor={(code) => countryNameByCode(code)}
+      // Reached from the menu, which stands on this map in the dark.
+      veil="lift"
       // Nothing here is irreversible, so a single tap is enough on touch too.
       armOnTouch={false}
       onCommit={props.onSelect}
+      // Only the country playing is marked: mint alone is 2.0:1 against land.
+      marked={(code) => code === selectedCode}
       countryAttributes={(code) => ({
         "data-explore-state":
           code === selectedCode

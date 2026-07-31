@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -13,6 +14,7 @@ import SouthWestIcon from "@mui/icons-material/SouthWest";
 import WestIcon from "@mui/icons-material/West";
 import NorthWestIcon from "@mui/icons-material/NorthWest";
 
+import { COLORS } from "../../tokens";
 import { Guess, Direction } from "../../types";
 
 const directionIconMap: Record<Direction, React.ReactElement> = {
@@ -41,13 +43,17 @@ const GuessRow = ({
       px: 1.5,
       py: 0.5,
       borderRadius: 1,
-      bgcolor: guess.correct
-        ? "rgba(102, 187, 106, 0.12)"
-        : "rgba(244, 67, 54, 0.08)",
+      // Tinted from the palette's own mint and coral rather than from literal
+      // rgba, so a row and the country it marks on the map agree.
+      bgcolor: alpha(
+        guess.correct ? COLORS.mintDeep : COLORS.accent3Deep,
+        guess.correct ? 0.16 : 0.1,
+      ),
       border: "1px solid",
-      borderColor: guess.correct
-        ? "rgba(102, 187, 106, 0.3)"
-        : "rgba(244, 67, 54, 0.2)",
+      borderColor: alpha(
+        guess.correct ? COLORS.mintDeep : COLORS.accent3Deep,
+        0.32,
+      ),
     }}
   >
     <Typography variant="body2">{guess.country}</Typography>
@@ -66,7 +72,9 @@ const GuessRow = ({
               />
               <Box
                 sx={{
-                  color: "primary.main",
+                  // Ink, not pear: the arrow is a glyph on cream, and the
+                  // accents are fills here.
+                  color: "text.primary",
                   display: "flex",
                   alignItems: "center",
                 }}

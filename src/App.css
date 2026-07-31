@@ -2,13 +2,8 @@
   box-sizing: border-box;
 }
 
-.iframe-wrapper {
-  position: relative;
-  margin-top: 1.5rem;
-  overflow: hidden;
-  border-radius: 12px;
-}
-
-#embed-iframe {
-  margin-top: 0;
-}
+/* The Spotify embed is driven headlessly — its host is collapsed to height 0 at
+   every call site, so it gets no styling of its own here. It used to carry a
+   top margin from when the embed was on screen, and because a zero-height flex
+   item still contributes its margin, that margin was shortening the full-bleed
+   map by 24px and letting the paper show under it. */

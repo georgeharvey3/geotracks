@@ -1,0 +1,24 @@
+[
+  {
+    "date": "2026-07-30",
+    "scope": "app",
+    "genre": "playful",
+    "macrostructure": "Workbench (app) + centred column (content)",
+    "theme": "Hum",
+    "theme_axes": "light / rounded-sans / multi",
+    "enrichment": "none",
+    "design_system": "design.md",
+    "brief": "GeoTracks — whole-app redesign onto the Hum system"
+  },
+  {
+    "date": "2026-07-30",
+    "scope": "content pages + screen transitions",
+    "genre": "playful",
+    "macrostructure": "centred column on the night backdrop",
+    "theme": "Hum",
+    "theme_axes": "light app / night content pages / rounded-sans / multi",
+    "enrichment": "none",
+    "design_system": "design.md",
+    "brief": "Menu and scoreboard onto the veiled map; staged screen entrance with the wordmark gliding between its two places"
+  }
+]

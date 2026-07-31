@@ -69,9 +69,15 @@ const RunSummaryMap = (props: RunSummaryMapProps) => {
       // A finished Run has nothing left to choose.
       selectable={() => false}
       labelFor={(code) => countryNameByCode(code)}
+      // No veil, unlike the other two app surfaces: this one is arrived at from
+      // the game screen, which is this same map already revealed. Lifting a
+      // veil here would mean darkening the world in order to uncover it.
       // Nothing commits here, so there is nothing for a first tap to guard.
       armOnTouch={false}
       onCommit={() => {}}
+      // The Run's answers are the only thing carrying colour here, so they are
+      // also the only thing that has to survive the land underneath them.
+      marked={(code) => outcomeByCode.has(code)}
       countryAttributes={(code) => ({
         "data-run-outcome": outcomeByCode.get(code),
       })}

@@ -43,13 +43,33 @@ describe("map geography", () => {
   });
 
   it("only treats codes the app can guess as polygons", () => {
-    // Natural Earth carries shapes the app has no country for (e.g. South
-    // Sudan, Åland). They still render, but they are not committable.
+    // Natural Earth carries shapes the app has no country for (e.g. Åland,
+    // Curaçao). They still render, but they are not committable.
     const geometryIds = topology.objects.countries.geometries
       .map((geometry) => geometry.id)
       .filter((id): id is string => id !== undefined);
 
-    expect(geometryIds).toContain("SS");
-    expect(polygonCodes.has("SS")).toBe(false);
+    expect(geometryIds).toContain("AX");
+    expect(polygonCodes.has("AX")).toBe(false);
+  });
+
+  it("draws Somaliland as part of Somalia, and South Sudan as its own country", () => {
+    // Somaliland is unrecognised and has no ISO code; the app follows most
+    // world maps in folding it into Somalia's shape rather than leaving it as
+    // an unguessable hole in the Horn of Africa. South Sudan has both, so it
+    // is a country here like any other.
+    const somalia = topology.objects.countries.geometries.filter(
+      (geometry) => geometry.id === "SO",
+    );
+
+    expect(somalia).toHaveLength(1);
+    expect(
+      topology.objects.countries.geometries.some(
+        (geometry) => geometry.properties?.name === "Somaliland",
+      ),
+    ).toBe(false);
+
+    expect(polygonCodes.has("SS")).toBe(true);
+    expect(countryNameByCode("SS")).toBe("South Sudan");
   });
 });

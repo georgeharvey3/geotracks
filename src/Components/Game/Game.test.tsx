@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "../../test-utils";
+import { readsAs, render, screen } from "../../test-utils";
 import Game from "./Game";
 import { Guess, Song } from "../../types";
 
@@ -120,27 +120,24 @@ describe("Game", () => {
         })}
       />,
     );
-    expect(screen.getByText("Turns: 8")).toBeInTheDocument();
-    expect(screen.getByText("Score: 230")).toBeInTheDocument();
+    expect(screen.getByText(readsAs("3/10"))).toBeInTheDocument();
+    expect(screen.getByText("230")).toBeInTheDocument();
   });
 
   it("does not show CurrentScore in infinite mode", () => {
     render(<Game {...createDefaultProps({ isCompetition: false })} />);
-    expect(screen.queryByText(/Turns:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Turn")).not.toBeInTheDocument();
+    expect(screen.queryByText("Score")).not.toBeInTheDocument();
   });
 
-  it("shows GeoHints half points warning in competition mode", () => {
+  it("says what GeoHints cost in competition mode", () => {
     render(<Game {...createDefaultProps({ isCompetition: true })} />);
-    expect(
-      screen.getByText("Enabling GeoHints will score half points"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("half points")).toBeInTheDocument();
   });
 
-  it("hides GeoHints warning in infinite mode", () => {
+  it("says nothing about the cost in infinite mode, where there is none", () => {
     render(<Game {...createDefaultProps({ isCompetition: false })} />);
-    expect(
-      screen.queryByText("Enabling GeoHints will score half points"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("half points")).not.toBeInTheDocument();
   });
 
   it("renders the GeoHints switch", () => {

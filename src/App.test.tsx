@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "./test-utils";
+import { act, fireEvent, readsAs, render, screen, waitFor } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
@@ -162,7 +162,9 @@ describe("App integration", () => {
   describe("menu and navigation", () => {
     it("shows the title and mode buttons on the menu", () => {
       render(<App />);
-      expect(screen.getByText("GeoTracks")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "GeoTracks" }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /Competition Mode/i }),
       ).toBeInTheDocument();
@@ -203,6 +205,22 @@ describe("App integration", () => {
       expect(
         screen.getByRole("button", { name: /Infinite Mode/i }),
       ).toBeInTheDocument();
+    });
+
+    // The backdrop is what says a screen is *about* the game without being made
+    // of it. Both content pages get it; the map surfaces are the map already.
+    it("stands both content pages on the map, and neither map surface", async () => {
+      render(<App />);
+      expect(screen.getByTestId("page-backdrop")).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Scoreboard/i }),
+      );
+      expect(screen.getByTestId("page-backdrop")).toBeInTheDocument();
+
+      await userEvent.click(homeButton());
+      await startInfinite();
+      expect(screen.queryByTestId("page-backdrop")).not.toBeInTheDocument();
     });
 
     it("returns to the menu from a game via the home button", async () => {
@@ -411,15 +429,16 @@ describe("App integration", () => {
   });
 
   describe("competition mode", () => {
-    it("shows score and turns and the half-points warning", async () => {
+    it("shows the standings and what GeoHints cost", async () => {
       render(<App />);
       await startCompetition();
 
-      expect(screen.getByText("Turns: 10")).toBeInTheDocument();
-      expect(screen.getByText("Score: 0")).toBeInTheDocument();
-      expect(
-        screen.getByText("Enabling GeoHints will score half points"),
-      ).toBeInTheDocument();
+      // The standings live on their own plaque over the map: score, and the
+      // turn being played out of ten.
+      expect(screen.getByText("Score")).toBeInTheDocument();
+      expect(screen.getByText("0")).toBeInTheDocument();
+      expect(screen.getByText(readsAs("1/10"))).toBeInTheDocument();
+      expect(screen.getByText("half points")).toBeInTheDocument();
     });
 
     it("scores across turns and reaches the Run summary", async () => {
@@ -430,9 +449,7 @@ describe("App integration", () => {
       // First-guess-correct on every turn = 150 * 10 = 1500.
       for (let turn = 0; turn < 10; turn += 1) {
         await submitGuess(answerAt(turn));
-        expect(
-          screen.getByText(`Score: ${(turn + 1) * 150}`),
-        ).toBeInTheDocument();
+        expect(screen.getByText(`${(turn + 1) * 150}`)).toBeInTheDocument();
         await userEvent.click(
           screen.getByRole("button", { name: /Next Song/i }),
         );
@@ -448,7 +465,7 @@ describe("App integration", () => {
 
       await guessOnMap(answerAt(0));
 
-      expect(screen.getByText("Score: 150")).toBeInTheDocument();
+      expect(screen.getByText("150")).toBeInTheDocument();
     });
 
     it("halves the score for the round when GeoHints is enabled", async () => {
@@ -460,7 +477,7 @@ describe("App integration", () => {
       await submitGuess(answerAt(0));
 
       // 150 base, halved to 75 because hints were enabled this round.
-      expect(screen.getByText("Score: 75")).toBeInTheDocument();
+      expect(screen.getByText("75")).toBeInTheDocument();
     });
   });
 

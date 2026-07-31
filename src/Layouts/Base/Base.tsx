@@ -3,6 +3,7 @@ import { Box, Container, IconButton, Typography } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 
 import { COLORS } from "../../tokens";
+import Logo from "../../Components/Logo/Logo";
 
 interface BaseProps {
   showMenuButton: boolean;
@@ -117,9 +118,17 @@ const useWordmarkGlide = () => {
   return ref;
 };
 
-// The wordmark carries its emphasis in one coral letter rather than a gradient
-// across the whole word: gradient text can't be selected, ignores the user's
-// contrast settings, and is the most-copied generated-UI flourish there is.
+/**
+ * The mark and the word, as one lockup.
+ *
+ * The word's emphasis sits on the seam of the compound it is made of — `Geo`
+ * light and muted, `Tracks` at the display weight — rather than on a letter
+ * picked out in colour. A coloured letter is emphasis without an argument:
+ * nothing about the word says why that letter and not its neighbour. Weight
+ * says which half of the name you are reading, and it leaves colour out of the
+ * type altogether, so coral is free to stay the one loud moment on a screen and
+ * the mark is what carries the brand.
+ */
 const Wordmark = ({
   fontSize,
   onNight,
@@ -132,27 +141,39 @@ const Wordmark = ({
   return (
     <Typography
       variant="h1"
-      // Splitting the word into elements to colour one letter also splits it for
-      // the accessibility tree, which announces "Geo T racks". The label puts the
+      // Splitting the word into elements to weight one half also splits it for
+      // the accessibility tree, which announces "Geo Tracks". The label puts the
       // word back together: how it is read shouldn't follow how it is painted.
       aria-label="GeoTracks"
       sx={{ fontSize, py: fontSize ? 0 : 1 }}
     >
-      {/* The glide measures the *word*, not the block it is laid out in: the
+      {/* The glide measures the *lockup*, not the block it is laid out in: the
           heading fills its container on both screens, so its own box would put
-          the two at the same width and the flight would never scale. */}
-      <Box component="span" ref={glideRef} sx={{ display: "inline-block" }}>
-        Geo
-        <Box
-          component="span"
-          // Coral swaps ends with the ground it is drawn on. `accent3Deep` is
-          // the coral that holds a foreground on cream; over the night backdrop
-          // it is 2.0:1, and the light coral is the one that reads.
-          sx={{ color: onNight ? COLORS.accent3 : "error.main" }}
-        >
-          T
+          the two at the same width and the flight would never scale. The mark
+          is inside it, and sized in `em`, so the whole thing flies as one
+          rather than the word gliding while the mark cuts. */}
+      <Box
+        component="span"
+        ref={glideRef}
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.24em",
+        }}
+      >
+        <Logo />
+        <Box component="span">
+          <Box
+            component="span"
+            sx={{
+              fontWeight: 400,
+              color: onNight ? COLORS.paperMuted : COLORS.inkMuted,
+            }}
+          >
+            Geo
+          </Box>
+          Tracks
         </Box>
-        racks
       </Box>
     </Typography>
   );

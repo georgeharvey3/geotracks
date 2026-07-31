@@ -18,8 +18,8 @@ const rect = (left: number, top: number, width: number, height: number) =>
   }) as DOMRect;
 
 describe("Base", () => {
-  // The wordmark sets one letter in the accent colour, so it is several text
-  // nodes; what matters is that it still reads as the one word.
+  // The wordmark sets each half of the compound in its own weight, so it is
+  // several text nodes; what matters is that it still reads as the one word.
   it("renders the GeoTracks title", () => {
     render(
       <Base showMenuButton={false} onMenuClicked={vi.fn()}>
@@ -29,6 +29,21 @@ describe("Base", () => {
     expect(
       screen.getByRole("heading", { name: "GeoTracks" }),
     ).toBeInTheDocument();
+  });
+
+  // The mark stands beside a word that already carries the name; announcing it
+  // as well would read the app's name twice on every screen.
+  it("draws the mark, and leaves the name to the word", () => {
+    const { container } = render(
+      <Base showMenuButton={false} onMenuClicked={vi.fn()}>
+        <div>Child</div>
+      </Base>,
+    );
+    expect(container.querySelector('svg[aria-hidden="true"]')).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "GeoTracks" }),
+    ).toBeInTheDocument();
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
   it("renders children", () => {

@@ -15,9 +15,10 @@
 // Matching is deliberately conservative. Spotify's search is fuzzy and the
 // archive is full of near-identical titles ("Music of Indonesia, Vol. 1"
 // through "Vol. 20"), so a candidate is only accepted automatically when the
-// title matches closely AND corroborating evidence agrees. Everything else is
-// written out for a human to look at rather than guessed at — a wrong Spotify
-// album here is a country the player is asked to guess from the wrong music.
+// title matches closely, no rival matches it as well, AND either the label or
+// the release year corroborates. Everything else is written out for a human to
+// look at rather than guessed at — a wrong Spotify album here is a country the
+// player is asked to guess from the wrong music.
 //
 // Usage:
 //   node scripts/backfill-albums.mjs                 # dry run — reports, writes nothing
@@ -65,20 +66,31 @@ const ARCHIVE_LABELS = [
   "collector",
 ];
 
-// Accept without review only at this title similarity or better, and only with
-// the label agreeing. 0.9 tolerates punctuation and diacritic drift between the
-// sheet and Spotify ("Taqâsîm" vs "Taqasim") but not a different volume number.
+// Accept without review only at this title similarity or better. 0.9 tolerates
+// punctuation and diacritic drift between the sheet and Spotify ("Taqâsîm" vs
+// "Taqasim") but not a different volume number. See `isConfident` for the rest
+// of the gate.
 const AUTO_ACCEPT_SIMILARITY = 0.9;
 
 // Below this a candidate is not worth showing at all — the search missed.
 const MIN_PLAUSIBLE_SIMILARITY = 0.55;
 
+// A runner-up within this of the leader means the title cannot separate them.
+const RIVAL_MARGIN = 0.02;
+
 const SEARCH_LIMIT = 10;
 const PAGE_SIZE = 50;
 
-// Spotify's rate limit is a rolling window it does not publish. A short pause
-// between albums keeps a 146-album run comfortably under it; 429s are still
-// handled below, because the limit also counts whatever else the account did.
+// How many of the leading candidates to re-fetch in full so their labels can be
+// read. Spotify caps `GET /albums?ids=` at 20; five is the number the report
+// shows, so nothing is judged on evidence the report doesn't print.
+const ALBUMS_PER_FETCH = 5;
+
+// Spotify's rate limit is a rolling 30-second window whose size it does not
+// publish, and a new app is in development mode, where it is lower. A short
+// pause between albums keeps a 145-album run under it; 429s are still handled
+// below, because the limit also counts whatever else the account did. Raise
+// this if a run reports repeated waits.
 const PAUSE_MS = 120;
 
 const args = process.argv.slice(2);
@@ -215,20 +227,47 @@ async function searchAlbums(title) {
   return body.albums?.items ?? [];
 }
 
-/** Every track URL on an album, following Spotify's pagination to the end. */
-async function trackUrls(albumId) {
+/**
+ * Search returns *simplified* album objects, which carry no `label` — asking a
+ * search hit whether it is on a Folkways imprint always says no. Only the full
+ * object has it, so the shortlist is re-fetched here before anything is judged.
+ * One extra request per album buys the corroboration the whole gate rests on,
+ * and the full object embeds the first page of tracks, which usually saves the
+ * request it cost.
+ */
+async function hydrate(candidates) {
+  if (candidates.length === 0) return [];
+  const ids = candidates.slice(0, ALBUMS_PER_FETCH).map((c) => c.id);
+  const body = await api(`albums?ids=${ids.join(",")}`);
+  // Spotify returns null in place of an album it could not resolve, positionally.
+  return (body.albums ?? []).filter(Boolean);
+}
+
+/**
+ * Every track URL on an album. The full album object already holds the first
+ * page, so this only goes back to the API for the compilations long enough to
+ * need a second one.
+ */
+async function trackUrls(album) {
   const urls = [];
-  let offset = 0;
-  for (;;) {
-    const page = await api(
-      `albums/${albumId}/tracks?limit=${PAGE_SIZE}&offset=${offset}`,
-    );
-    for (const track of page.items ?? []) {
+  const take = (page) => {
+    for (const track of page?.items ?? []) {
       if (track?.external_urls?.spotify) urls.push(track.external_urls.spotify);
     }
-    if (!page.next) return urls;
+  };
+
+  take(album.tracks);
+  let next = album.tracks?.next;
+  let offset = album.tracks?.items?.length ?? 0;
+  while (next) {
+    const page = await api(
+      `albums/${album.id}/tracks?limit=${PAGE_SIZE}&offset=${offset}`,
+    );
+    take(page);
+    next = page.next;
     offset += PAGE_SIZE;
   }
+  return urls;
 }
 
 /**
@@ -254,6 +293,7 @@ function rank(title, candidates) {
         score,
         labelMatches: isArchiveLabel(album.label ?? ""),
         yearMatches: year != null && released === year,
+        album,
       };
     })
     .sort((a, b) => {
@@ -261,6 +301,25 @@ function rank(title, candidates) {
       if (a.labelMatches !== b.labelMatches) return a.labelMatches ? -1 : 1;
       return Number(b.yearMatches) - Number(a.yearMatches);
     });
+}
+
+/**
+ * Whether the leading candidate can be taken without a human looking at it.
+ *
+ * The title must be close and unrivalled — a runner-up scoring as well means
+ * the title alone cannot separate them, which is exactly the Vol. 13 / Vol. 14
+ * case. Beyond that it needs *one* piece of corroboration, from either the
+ * label or the release year. Requiring the label specifically was the original
+ * rule and it accepted nothing at all, because search results carry no label;
+ * that is now fixed, but Spotify also marks `label` deprecated, so a rule that
+ * depends on it alone is a rule with an expiry date. A matching year is
+ * independent evidence and survives the field's removal.
+ */
+function isConfident(ranked) {
+  const [best, runnerUp] = ranked;
+  if (!best || best.score < AUTO_ACCEPT_SIMILARITY) return false;
+  if (runnerUp && runnerUp.score >= best.score - RIVAL_MARGIN) return false;
+  return best.labelMatches || best.yearMatches;
 }
 
 // --- Reconciliation ----------------------------------------------------------
@@ -322,7 +381,15 @@ async function main() {
     const progress = `[${index + 1}/${todo.length}]`;
     let ranked;
     try {
-      ranked = rank(album.album_name, await searchAlbums(album.album_name));
+      // Rank once on the search hits to find the shortlist, re-fetch those in
+      // full so they carry a label, then rank again on the real evidence.
+      const shortlist = rank(
+        album.album_name,
+        await searchAlbums(album.album_name),
+      )
+        .filter((c) => c.score >= MIN_PLAUSIBLE_SIMILARITY)
+        .slice(0, ALBUMS_PER_FETCH);
+      ranked = rank(album.album_name, await hydrate(shortlist));
     } catch (error) {
       console.log(
         `${progress} ${album.album_name} — search failed: ${error.message}`,
@@ -345,14 +412,7 @@ async function main() {
       continue;
     }
 
-    const confident =
-      best.score >= AUTO_ACCEPT_SIMILARITY &&
-      best.labelMatches &&
-      // A second candidate scoring as well means the title alone cannot tell
-      // them apart — exactly the volume-number case. Send it to review.
-      !(ranked[1] && ranked[1].score >= best.score - 0.02);
-
-    if (!confident) {
+    if (!isConfident(ranked)) {
       console.log(
         `${progress} ${album.album_name} — review (${best.score.toFixed(2)}, ${best.label || "no label"})`,
       );
@@ -363,7 +423,7 @@ async function main() {
 
     let tracks;
     try {
-      tracks = await trackUrls(best.id);
+      tracks = await trackUrls(best.album);
     } catch (error) {
       console.log(
         `${progress} ${album.album_name} — tracks failed: ${error.message}`,
@@ -389,7 +449,9 @@ async function main() {
       country: album.country,
       album_name: album.album_name,
       tracks,
-      _match: best,
+      // The evidence, without the raw Spotify object `best` carries for the
+      // track fetch — that is a few KB per album of no use to a reader.
+      _match: { ...best, album: undefined },
     });
     await sleep(PAUSE_MS);
   }
@@ -509,16 +571,19 @@ function writeReport({ accepted, review, notFound, gap, orphans }) {
   writeFileSync(REPORT, lines.join("\n"));
 }
 
-// Exported for `scripts/backfill-albums.test.mjs`, which pins the two pieces
-// that are wrong silently rather than loudly: the serialiser (a bad round-trip
-// reformats the whole library) and the matcher (a bad score picks Vol. 14 for
-// Vol. 13). Everything else is I/O and is exercised by running the thing.
+// Exported for `scripts/backfill-albums.test.mjs`, which pins the pieces that
+// are wrong silently rather than loudly: the serialiser (a bad round-trip
+// reformats the whole library), the matcher (a bad score picks Vol. 14 for
+// Vol. 13) and the confidence gate (too strict and it accepts nothing, which
+// is precisely how it shipped the first time). The rest is I/O and is
+// exercised by running the thing.
 export {
   normalise,
   yearOf,
   similarity,
   isArchiveLabel,
   rank,
+  isConfident,
   serialiseLibrary,
 };
 

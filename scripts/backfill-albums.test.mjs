@@ -17,6 +17,7 @@ import {
   similarity,
   isArchiveLabel,
   rank,
+  isConfident,
   serialiseLibrary,
 } from "./backfill-albums.mjs";
 
@@ -149,5 +150,52 @@ describe("rank", () => {
     expect(best.score).toBeGreaterThan(0.9);
     expect(best.labelMatches).toBe(false);
     expect(best.yearMatches).toBe(false);
+  });
+});
+
+describe("isConfident", () => {
+  const candidate = (over = {}) => ({
+    score: 1,
+    labelMatches: true,
+    yearMatches: true,
+    ...over,
+  });
+
+  it("accepts a perfect, unrivalled, corroborated match", () => {
+    expect(isConfident([candidate()])).toBe(true);
+  });
+
+  // The bug this whole gate had on its first run: search returns simplified
+  // album objects with no `label`, so every candidate looked unlabelled and
+  // nothing was ever accepted. The year has to be able to carry it alone —
+  // Spotify also marks `label` deprecated.
+  it("accepts on the year alone when the label is absent", () => {
+    expect(isConfident([candidate({ labelMatches: false })])).toBe(true);
+  });
+
+  it("accepts on the label alone when the title carries no year", () => {
+    expect(isConfident([candidate({ yearMatches: false })])).toBe(true);
+  });
+
+  it("refuses a match with no corroboration at all", () => {
+    expect(
+      isConfident([candidate({ labelMatches: false, yearMatches: false })]),
+    ).toBe(false);
+  });
+
+  it("refuses a match a rival scores as well as", () => {
+    expect(isConfident([candidate(), candidate({ score: 0.99 })])).toBe(false);
+  });
+
+  it("accepts when the rival is clearly behind", () => {
+    expect(isConfident([candidate(), candidate({ score: 0.8 })])).toBe(true);
+  });
+
+  it("refuses a loose title however well corroborated", () => {
+    expect(isConfident([candidate({ score: 0.85 })])).toBe(false);
+  });
+
+  it("refuses when there is nothing to judge", () => {
+    expect(isConfident([])).toBe(false);
   });
 });

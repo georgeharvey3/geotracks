@@ -360,11 +360,11 @@ describe("gameReducer", () => {
   });
 
   /**
-   * The day's seeded Songs are Competition's (issue #49). Nothing may assert
-   * *which* Songs a day yields — the seed moves with the date — so what is
-   * pinned here is who draws from the list and who leaves it alone.
+   * The Daily Songs are Competition's (issue #49). Nothing may assert *which*
+   * Songs a day yields — the seed moves with the date — so what is pinned here
+   * is who draws from the list and who leaves it alone.
    */
-  describe("the day's seeded Songs", () => {
+  describe("the Daily Songs", () => {
     /** Answer the round correctly and retire the turn, whatever the Song is. */
     function playRound(state: GameState): GameState {
       const answered = gameReducer(state, {

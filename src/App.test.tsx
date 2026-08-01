@@ -32,10 +32,10 @@ vi.mock("react-simple-maps", async (importOriginal) => ({
   ZoomableGroup: (await import("./test/zoomableGroupFake")).default,
 }));
 
-// Competition plays the day's seeded ten; compute the same deterministic set
-// here so tests know the correct answer per turn. Infinite does *not* — it
-// draws at random (issue #49) — so its answer is read from the Song the player
-// was handed, never from this list.
+// Competition plays the Daily Songs; compute the same deterministic set here so
+// tests know the correct answer per turn. Infinite does *not* — it draws at
+// random (issue #49) — so its answer is read from the Song the player was
+// handed, never from this list.
 const dailySongs = getDailySongs(albumsJSON as Album[]);
 const answerAt = (round: number) => dailySongs[round]!.country;
 
@@ -48,8 +48,14 @@ const countryByLink = new Map(
 );
 
 /** The answer to the round now being played, whichever Song it drew. */
-const currentAnswer = () =>
-  countryByLink.get(spotifyPlayerControl.loadedLink()!)!;
+function currentAnswer(): string {
+  const link = spotifyPlayerControl.loadedLink();
+  const country = link ? countryByLink.get(link) : undefined;
+  if (!country) {
+    throw new Error(`No Song is loaded to read an answer from (link: ${link})`);
+  }
+  return country;
+}
 
 const allCountryNames = countriesJSON.map((c) => c.name);
 function wrongCountriesFor(answer: string, count: number): string[] {

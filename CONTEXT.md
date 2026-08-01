@@ -47,7 +47,7 @@ The single Competition Run a browser profile may play on a given calendar day. I
 _Avoid_: Daily challenge, daily attempt, one attempt per day.
 
 **Daily Songs**:
-The day's ten seeded Songs, the same for everyone who plays that calendar day, and the reason two Daily Run scores can be compared at all. They are the Daily Run's and no one else's: Infinite and the Song the menu opens on are drawn at random beside them, so nothing outside Competition can hand a player the day's answers early or spend one of its Songs.
+The day's ten seeded Songs, the same for everyone who plays that calendar day, and the reason two Daily Run scores can be compared at all. They are the Daily Run's and no one else's: Infinite and the Song the menu opens on are drawn at random from the whole library beside them, so nothing outside Competition is served one of the day's Songs or spends one. A random draw landing on the same Album by chance is a coincidence of one shared library, not a Daily Song being played.
 _Avoid_: The daily set, today's playlist, the seed (the seed is what produces them).
 
 **Turn result**:

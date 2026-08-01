@@ -445,7 +445,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
-      const nextRound: GameState = {
+      // Everything the next round inherits except the Song itself, which each
+      // branch below draws from its own list.
+      const withRoundCleared: GameState = {
         ...state,
         ...roundReset,
         questionIndex: state.questionIndex + 1,
@@ -462,7 +464,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         const reachedFinalTurn = state.turnIndex === NUM_COMPETITION_TURNS - 1;
 
         return {
-          ...nextRound,
+          ...withRoundCleared,
           song: picked.song,
           albums: picked.albums,
           dailySongIndex: picked.dailySongIndex,
@@ -472,12 +474,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // The retired turn joins the Run's record. Only Competition keeps one:
           // Infinite never ends, so nothing would ever read it.
           turns: [...state.turns, turnResultFrom(state)],
-          screen: reachedFinalTurn ? "runSummary" : nextRound.screen,
+          screen: reachedFinalTurn ? "runSummary" : withRoundCleared.screen,
         };
       }
 
       const picked = pickRandomSong(state.albums);
-      return { ...nextRound, song: picked.song, albums: picked.albums };
+      return { ...withRoundCleared, song: picked.song, albums: picked.albums };
     }
 
     case "RESET_TO_MENU": {

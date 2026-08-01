@@ -1,5 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { act, fireEvent, readsAs, render, screen, waitFor } from "./test-utils";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  readsAs,
+  render,
+  screen,
+  waitFor,
+} from "./test-utils";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
@@ -86,6 +94,16 @@ async function startCompetition() {
   );
 }
 
+/**
+ * Close the tab and come back to it. Real `localStorage` survives this, which
+ * is the whole point: the Daily Run is the one thing in the app that outlives
+ * the page.
+ */
+function reload() {
+  cleanup();
+  render(<App />);
+}
+
 async function submitGuess(country: string) {
   const input = screen.getByPlaceholderText("Country");
   await userEvent.clear(input);
@@ -156,6 +174,9 @@ const summaryRow = (turnNumber: number, country: string) =>
 beforeEach(() => {
   spotifyPlayerControl.reset();
   leaderboardControl.reset();
+  // Load-bearing: the Daily Run is spent the moment Competition is started, so
+  // without this the second test to reach it finds the day already gone.
+  localStorage.clear();
 });
 
 describe("App integration", () => {
@@ -628,10 +649,198 @@ describe("App integration", () => {
       expect(screen.getByText("Top Scores")).toBeInTheDocument();
 
       await userEvent.click(homeButton());
+      // The day has been played, so the menu offers it back rather than a
+      // second Run.
       expect(
-        screen.getByRole("button", { name: /Competition Mode/i }),
+        screen.getByRole("button", { name: "Today's Run" }),
       ).toBeInTheDocument();
       expect(screen.queryByText("1500 points")).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The Daily Run (issue #1): one Competition Run per browser profile per day,
+   * spent on start and resumed where it stood. Real `localStorage` throughout —
+   * jsdom's is synchronous and well-behaved, so there is nothing to fake; the
+   * clock is what gets faked, and only where a day has to turn over.
+   */
+  describe("the Daily Run", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("spends the day the moment the Run is started, not when it is finished", async () => {
+      render(<App />);
+      await startCompetition();
+      await userEvent.click(homeButton());
+
+      expect(
+        screen.getByRole("button", { name: "Resume today's Run" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Competition Mode" }),
+      ).toBeNull();
+      // The other two ways in are untouched: neither has a Run to spend.
+      expect(
+        screen.getByRole("button", { name: /Infinite Mode/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Explore/i }),
+      ).toBeInTheDocument();
+    });
+
+    // What makes spending-on-start fair: a mis-tap or a dead battery costs
+    // nothing. And the round in flight comes back with it, so two wrong guesses
+    // plus a reload cannot buy a fresh 150-point first attempt.
+    it("resumes an unfinished Run mid-round, guesses and all", async () => {
+      render(<App />);
+      await startCompetition();
+      act(() => spotifyPlayerControl.emitReady());
+      await playTurn(0);
+
+      const [wrongA, wrongB] = countriesOutsideTheRun(2) as [string, string];
+      await guessOnMap(wrongA);
+      await guessOnMap(wrongB);
+
+      reload();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Resume today's Run" }),
+      );
+
+      expect(screen.getByText(readsAs("2/10"))).toBeInTheDocument();
+      expect(screen.getByText("150")).toBeInTheDocument();
+      expect(mapTarget(wrongA)).toHaveAttribute("data-guess-state", "wrong");
+      expect(mapTarget(wrongB)).toHaveAttribute("data-guess-state", "wrong");
+
+      // The answer is now priced as the third attempt: 150 + 60, not 150 + 150.
+      await guessOnMap(answerAt(1));
+      expect(screen.getByText("210")).toBeInTheDocument();
+    });
+
+    it("carries an unfinished Run through Infinite and Explore untouched", async () => {
+      render(<App />);
+      await startCompetition();
+      await userEvent.click(homeButton());
+
+      await startInfinite();
+      await userEvent.click(homeButton());
+      await userEvent.click(screen.getByRole("button", { name: /Explore/i }));
+      await userEvent.click(homeButton());
+
+      reload();
+      expect(
+        screen.getByRole("button", { name: "Resume today's Run" }),
+      ).toBeInTheDocument();
+    });
+
+    it("reopens a finished Run as its summary, across a reload", async () => {
+      await playRun({ 1: { wrongGuesses: 2 } });
+
+      reload();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Today's Run" }),
+      );
+
+      expect(screen.getByText("1410 points")).toBeInTheDocument();
+      expect(screen.getByText("10 of 10 named")).toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: /Spotify/i })).toHaveLength(
+        10,
+      );
+      // The map is the Run's picture again, drawn from the stored turns.
+      expect(mapTarget(answerAt(turnsWithSoleAnswers(1)[0]!))).toHaveAttribute(
+        "data-run-outcome",
+      );
+    });
+
+    // Song metadata looks derived and is stored anyway: it comes from oEmbed at
+    // play time, and no player mounts on the summary to fetch it again.
+    it("still names the Song it heard in a summary reopened offline", async () => {
+      render(<App />);
+      await startCompetition();
+      act(() => spotifyPlayerControl.emitReady());
+      act(() =>
+        spotifyPlayerControl.setMetadata({
+          trackTitle: "Turn One Track",
+          artistName: "Turn One Artist",
+        }),
+      );
+      for (let turn = 0; turn < 10; turn += 1) {
+        await playTurn(turn);
+      }
+
+      reload();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Today's Run" }),
+      );
+
+      const row = summaryRow(1, dailySongs[0]!.country);
+      expect(row).toHaveTextContent("Turn One Track");
+      expect(row).toHaveTextContent("Turn One Artist");
+    });
+
+    it("lets a player who closed the tab first still submit, and only once", async () => {
+      await playRun();
+
+      reload();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Today's Run" }),
+      );
+      await userEvent.type(screen.getByPlaceholderText("Name..."), "Ada");
+      await userEvent.click(screen.getByRole("button", { name: /Save/i }));
+      await waitFor(() =>
+        expect(screen.getByText("Saved as Ada")).toBeInTheDocument(),
+      );
+
+      // Reopening the summary must not offer the append-only leaderboard the
+      // same score a second time.
+      reload();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Today's Run" }),
+      );
+      expect(screen.queryByPlaceholderText("Name...")).toBeNull();
+      expect(screen.getByText("Saved to the leaderboard")).toBeInTheDocument();
+      expect(leaderboardControl.submitScore).toHaveBeenCalledTimes(1);
+    });
+
+    it("hands the day back at the next local midnight", async () => {
+      render(<App />);
+      await startCompetition();
+      await userEvent.click(homeButton());
+      expect(
+        screen.getByRole("button", { name: "Resume today's Run" }),
+      ).toBeInTheDocument();
+
+      // Only Date is faked: the rest of the suite's timers stay real. The day
+      // the record was stamped with is the day the song seed reads, so this
+      // moves both.
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(tomorrow);
+
+      reload();
+      expect(
+        screen.getByRole("button", { name: "Competition Mode" }),
+      ).toBeInTheDocument();
+
+      // And it is a Run from the top, not yesterday's carried over.
+      await startCompetition();
+      expect(screen.getByText(readsAs("1/10"))).toBeInTheDocument();
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+
+    // Failing open: a serialization bug of ours must not be indistinguishable
+    // from a punishment.
+    it("gives the player their Run when the stored day will not parse", async () => {
+      render(<App />);
+      await startCompetition();
+      await userEvent.click(homeButton());
+
+      localStorage.setItem("geotracks:dailyRun", "{ half a record");
+      reload();
+
+      expect(
+        screen.getByRole("button", { name: "Competition Mode" }),
+      ).toBeInTheDocument();
     });
   });
 });

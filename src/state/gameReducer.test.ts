@@ -1,11 +1,13 @@
 import {
   gameReducer,
   createInitialState,
+  dailyRunRecordFrom,
   GameState,
   GAME_MODES,
   NUM_COMPETITION_TURNS,
   MAX_COMPETITION_SCORE,
 } from "./gameReducer";
+import { parseDailyRun, serializeDailyRun } from "../helpers/dailyRun";
 import { Song } from "../types";
 
 const FRANCE_SONG: Song = {
@@ -354,6 +356,313 @@ describe("gameReducer", () => {
       expect(next.turns).toHaveLength(0);
       expect(next.scoreSubmitted).toBe(false);
       expect(next.nameInputValue).toBe("");
+    });
+  });
+
+  // The Daily Run (issue #1, ADR-0004): the one Competition Run a browser
+  // profile may play on a calendar day, spent on start and resumed where it
+  // stood. The reducer stays pure — the day's record arrives on the action.
+  describe("the Daily Run", () => {
+    const DAY = "2026-08-01";
+
+    it("START_RUN opens Competition on the first turn, with nothing carried in", () => {
+      const stale = stateWith({
+        screen: "menu",
+        gameMode: "",
+        score: 500,
+        turnIndex: 4,
+        turns: [
+          {
+            song: FRANCE_SONG,
+            outcome: "missed",
+            attempts: 5,
+            points: 0,
+            geoHintsUsed: false,
+          },
+        ],
+        scoreSubmitted: true,
+        nameInputValue: "Ada",
+        guesses: [{ country: "Spain", correct: false }],
+      });
+      const next = gameReducer(stale, { type: "START_RUN" });
+
+      expect(next.screen).toBe("playing");
+      expect(next.gameMode).toBe(GAME_MODES.competition);
+      expect(next.score).toBe(0);
+      expect(next.turnIndex).toBe(0);
+      expect(next.turns).toHaveLength(0);
+      expect(next.scoreSubmitted).toBe(false);
+      expect(next.nameInputValue).toBe("");
+      expect(next.guesses).toHaveLength(0);
+    });
+
+    // The Run *is* the day's seeded ten, whatever else the session drew before
+    // it: a Run that opened halfway down the list would not be the same Run
+    // everyone else played.
+    it("START_RUN opens on the day's first Song even after Infinite has drawn from the list", () => {
+      const initial = createInitialState();
+      const played = { ...initial, dailySongIndex: 5 };
+      const next = gameReducer(played, { type: "START_RUN" });
+
+      expect(next.song.link).toBe(initial.dailySongs[0]!.link);
+      expect(next.dailySongIndex).toBe(1);
+    });
+
+    it("RESUME_RUN drops the player back into the turn they left", () => {
+      const initial = createInitialState();
+      const inFlight = initial.dailySongs[3]!;
+      const next = gameReducer(initial, {
+        type: "RESUME_RUN",
+        record: {
+          v: 1,
+          date: DAY,
+          status: "in-progress",
+          turnIndex: 3,
+          score: 310,
+          dailySongIndex: 4,
+          scoreSubmitted: false,
+          turns: [],
+          round: {
+            guesses: [
+              {
+                country: "Spain",
+                correct: false,
+                distance: 900,
+                direction: "N",
+              },
+            ],
+            geoHintsEnabled: true,
+            finished: false,
+            correct: false,
+            roundPoints: 0,
+          },
+        },
+      });
+
+      expect(next.screen).toBe("playing");
+      expect(next.gameMode).toBe(GAME_MODES.competition);
+      expect(next.song.link).toBe(inFlight.link);
+      expect(next.dailySongIndex).toBe(4);
+      expect(next.turnIndex).toBe(3);
+      expect(next.score).toBe(310);
+    });
+
+    // Restoring to a clean turn boundary would let two wrong guesses plus a
+    // reload buy back a fresh 150-point first attempt.
+    it("RESUME_RUN restores the round in flight, not just the turns behind it", () => {
+      const initial = createInitialState();
+      const next = gameReducer(initial, {
+        type: "RESUME_RUN",
+        record: {
+          v: 1,
+          date: DAY,
+          status: "in-progress",
+          turnIndex: 0,
+          score: 0,
+          dailySongIndex: 1,
+          scoreSubmitted: false,
+          turns: [],
+          round: {
+            guesses: [
+              { country: "Spain", correct: false },
+              { country: "Italy", correct: false },
+            ],
+            geoHintsEnabled: true,
+            finished: false,
+            correct: false,
+            roundPoints: 0,
+          },
+        },
+      });
+
+      expect(next.guesses).toHaveLength(2);
+      expect(next.submitted).toBe(true);
+      expect(next.geoHintsEnabled).toBe(true);
+      expect(next.showGeoHints).toBe(true);
+
+      // And the next attempt is priced as the third, not the first.
+      const named = gameReducer(next, {
+        type: "SUBMIT_GUESS",
+        countryAnswer: next.song.country,
+      });
+      expect(named.score).toBe(30);
+    });
+
+    it("RESUME_RUN restores a round that had already ended, answer revealed", () => {
+      const initial = createInitialState();
+      const next = gameReducer(initial, {
+        type: "RESUME_RUN",
+        record: {
+          v: 1,
+          date: DAY,
+          status: "in-progress",
+          turnIndex: 2,
+          score: 200,
+          dailySongIndex: 3,
+          scoreSubmitted: false,
+          turns: [],
+          round: {
+            guesses: Array.from({ length: 5 }, () => ({
+              country: "Spain",
+              correct: false,
+            })),
+            geoHintsEnabled: false,
+            finished: true,
+            correct: false,
+            roundPoints: 0,
+          },
+        },
+      });
+
+      expect(next.finished).toBe(true);
+      expect(next.correct).toBe(false);
+      expect(next.errorMessage).toBe(`Answer was: ${next.song.country}`);
+    });
+
+    // Failing open: a record we cannot land a Song from is a bug of ours, and
+    // the player should still get their Run rather than a dead button.
+    it("RESUME_RUN starts the day fresh when the record points outside today's Songs", () => {
+      const initial = createInitialState();
+      const next = gameReducer(initial, {
+        type: "RESUME_RUN",
+        record: {
+          v: 1,
+          date: DAY,
+          status: "in-progress",
+          turnIndex: 40,
+          score: 0,
+          dailySongIndex: 41,
+          scoreSubmitted: false,
+          turns: [],
+          round: {
+            guesses: [],
+            geoHintsEnabled: false,
+            finished: false,
+            correct: false,
+            roundPoints: 0,
+          },
+        },
+      });
+
+      expect(next.screen).toBe("playing");
+      expect(next.turnIndex).toBe(0);
+      expect(next.song.link).toBe(initial.dailySongs[0]!.link);
+    });
+
+    it("SHOW_RUN_SUMMARY reopens the finished Run, and remembers the score was saved", () => {
+      const turn = {
+        song: FRANCE_SONG,
+        outcome: "named-first" as const,
+        attempts: 1,
+        points: 150,
+        geoHintsUsed: false,
+      };
+      const next = gameReducer(createInitialState(), {
+        type: "SHOW_RUN_SUMMARY",
+        record: {
+          v: 1,
+          date: DAY,
+          status: "finished",
+          turnIndex: NUM_COMPETITION_TURNS,
+          score: 1500,
+          dailySongIndex: NUM_COMPETITION_TURNS,
+          scoreSubmitted: true,
+          turns: Array.from({ length: NUM_COMPETITION_TURNS }, () => turn),
+          round: {
+            guesses: [],
+            geoHintsEnabled: false,
+            finished: true,
+            correct: true,
+            roundPoints: 150,
+          },
+        },
+      });
+
+      expect(next.screen).toBe("runSummary");
+      expect(next.gameMode).toBe(GAME_MODES.competition);
+      expect(next.score).toBe(1500);
+      expect(next.turns).toHaveLength(NUM_COMPETITION_TURNS);
+      expect(next.scoreSubmitted).toBe(true);
+    });
+
+    it("SHOW_RUN_SUMMARY leaves the name box open on a Run whose score never went in", () => {
+      const next = gameReducer(createInitialState(), {
+        type: "SHOW_RUN_SUMMARY",
+        record: {
+          v: 1,
+          date: DAY,
+          status: "finished",
+          turnIndex: NUM_COMPETITION_TURNS,
+          score: 640,
+          dailySongIndex: NUM_COMPETITION_TURNS,
+          scoreSubmitted: false,
+          turns: [],
+          round: {
+            guesses: [],
+            geoHintsEnabled: false,
+            finished: true,
+            correct: true,
+            roundPoints: 0,
+          },
+        },
+      });
+
+      expect(next.scoreSubmitted).toBe(false);
+      expect(next.nameInputValue).toBe("");
+    });
+  });
+
+  describe("dailyRunRecordFrom", () => {
+    const DAY = "2026-08-01";
+
+    it("keeps no day for a player who is not on a Competition Run", () => {
+      expect(dailyRunRecordFrom(createInitialState(), DAY)).toBeNull();
+      expect(
+        dailyRunRecordFrom(stateWith({ gameMode: GAME_MODES.infinite }), DAY),
+      ).toBeNull();
+    });
+
+    it("records a Run in progress, round in flight and all", () => {
+      const state = stateWith({
+        turnIndex: 2,
+        score: 230,
+        dailySongIndex: 3,
+        guesses: [{ country: "Spain", correct: false }],
+        geoHintsEnabled: true,
+      });
+      const record = dailyRunRecordFrom(state, DAY)!;
+
+      expect(record).toMatchObject({
+        v: 1,
+        date: DAY,
+        status: "in-progress",
+        turnIndex: 2,
+        score: 230,
+        dailySongIndex: 3,
+        scoreSubmitted: false,
+      });
+      expect(record.round.guesses).toHaveLength(1);
+      expect(record.round.geoHintsEnabled).toBe(true);
+    });
+
+    // The status is the Run's own turn count, not the screen: the record has to
+    // read "finished" long after the player has walked back to the menu.
+    it("records a Run that has run out of turns as finished", () => {
+      const state = stateWith({
+        screen: "menu",
+        turnIndex: NUM_COMPETITION_TURNS,
+        score: MAX_COMPETITION_SCORE,
+      });
+      expect(dailyRunRecordFrom(state, DAY)!.status).toBe("finished");
+    });
+
+    it("round-trips through storage back into a resumable Run", () => {
+      const state = stateWith({ turnIndex: 1, score: 150, dailySongIndex: 2 });
+      const record = parseDailyRun(
+        serializeDailyRun(dailyRunRecordFrom(state, DAY)!),
+      );
+      expect(record).not.toBeNull();
+      expect(record!.turnIndex).toBe(1);
     });
   });
 });

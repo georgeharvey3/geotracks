@@ -49,11 +49,12 @@ How the screen arrives depends on its family, and the two are not interchangeabl
 
 ### State Management
 
-Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard hook) and components consume it via the `useGame()` / `useLeaderboard()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `runSummary` | `explore`). Side effects are isolated in hooks under `src/hooks/`:
+Game state lives in a pure reducer (`src/state/gameReducer.ts`) exposed through React context (`src/context/GameContext.tsx`) — there is no state management library. `GameProvider` owns the single `useReducer` instance (plus the leaderboard and Daily Run hooks) and components consume it via the `useGame()` / `useLeaderboard()` / `useDailyRun()` context hooks. `src/App.tsx` is now just a thin screen router that switches on `state.screen` (`menu` | `playing` | `scoreboard` | `runSummary` | `explore`). Side effects are isolated in hooks under `src/hooks/`:
 
 - `useSpotifyPlayer` — the entire imperative Spotify IFrame integration (controller lifecycle, oEmbed metadata, retries)
 - `useKeyboardShortcuts` — document-level key handlers for the map screens
 - `useLeaderboard` — all Firebase leaderboard reads/writes
+- `useDailyRun` — the day's Competition Run: the one `localStorage` touch in the app
 
 `src/Components/GameScreen/GameScreen.tsx` is the container that wires the player and keyboard hooks to the reducer; everything below it (under `src/Components/`) stays purely presentational and receives everything through props.
 
@@ -131,8 +132,22 @@ It is the third full-bleed map surface, wearing the game screen's layout exactly
 - **The map** marks only the Run's **answer** countries, in three fills by Turn outcome (`OUTCOME_FILLS` in `src/map/fills.ts`: green / amber / red). Wrong guesses are not marked — the Run doesn't keep them, and the surface is a picture of where the music came from rather than a trace of mistakes. `selectable={false}` throughout, so nothing commits; hover still names every country and pan/zoom come free from the base.
 - **A country can answer twice in one Run** — the daily seed splices out the Album, not the country, and 88 countries hold more than one Album. A marked shape is therefore not a 1:1 index of a turn: the **rows are the record**, the map is the picture, and a shape carries its country's _best_ outcome.
 - **Row → map** — hovering a row lights that row's country. Pointer-only (`useHasHover`); on touch the country printed in every row carries the job instead.
-- **Exits** — the floating home button, plus the leaderboard button that appears in place of the name box once the score is saved. **No "Play again"**: `RESET_TO_MENU` keeps the shrunken album pool and the advanced `dailySongIndex`, so a second Run in the same session draws random songs rather than the day's seeded ten, and a replay shortcut would advertise a Run that isn't comparable.
-- **Lifetime** — in memory only, like Explore's queues. Leaving the screen discards the Run and a reload loses it; persisting it belongs with #1, which has to introduce device storage anyway.
+- **Exits** — the floating home button, plus the leaderboard button that appears in place of the name box once the score is saved. **No "Play again"**: there is one Run a day (see **The Daily Run**), so a replay shortcut would advertise a Run that does not exist.
+- **Lifetime** — the Run leaves state when the player leaves the screen, but the **day's record outlives it**: a finished Daily Run is reopened from storage until midnight, which is why the saved confirmation reads "Saved to the leaderboard" when it has no name to show (the name lived on the screen the player left, and is not part of the record).
+
+### The Daily Run
+
+**One Competition Run per browser profile per calendar day** (issue #1, [ADR-0004](docs/adr/0004-daily-run-persisted-per-browser-profile-and-spent-on-start.md)) — so the day's seeded ten Songs mean the same thing for everyone who plays them. Competition only: Infinite has no Run and Explore is a jukebox, and neither is touched. This is the app's **first and only device storage**.
+
+- **Starting a Run spends the day, not finishing it.** Spending it on finish is unenforceable: state rebuilds from `createInitialState` on every load and the seed is the calendar date, so a reload would hand back the same ten Songs from turn 1 forever.
+- **An unfinished Run resumes where it stood**, which is what makes spending-on-start fair. The **round in flight** comes back with it (guesses, geo-hints, finished/correct) — restoring to a clean turn boundary would let two wrong guesses plus a reload buy a fresh 150-point first attempt.
+- **The menu's Competition button is one control in three states**: "Competition Mode" (`START_RUN`), "Resume today's Run" (`RESUME_RUN`), "Today's Run" (`SHOW_RUN_SUMMARY`, reopening the summary — half its job is _what was that track?_, and the Run is already stored to make resuming work). Three named actions rather than a branch inside `SET_MODE`, and a resumed Run arrives as **an action carrying a record** rather than through `createInitialState`, so no Explore-only or Infinite-only player has a storage read on their path.
+- **The day is device-local**, matching `getDateSeed()`. Any date mismatch unlocks, including a stored date in the _future_ — a clock that was briefly wrong must not brick the mode.
+- **It is a ritual, not enforcement.** Clearing site data resets it, as does a private window; "per device" is really per browser profile. Nothing server-side backs it, and nothing may be built that needs it to be true — a daily leaderboard in particular. There is deliberately **no reset query param or debug button**.
+- **What is stored** is a narrow, versioned day record (`src/helpers/dailyRun.ts`) and deliberately not `JSON.stringify(state)`: stored data is a contract with the past, `GameState` is refactored freely. Every field is mapped by hand in both directions (`dailyRunRecordFrom` out, `RESUME_RUN`/`SHOW_RUN_SUMMARY` in). `scoreSubmitted` is **load-bearing** — without it, reopening a finished summary offers the name box again and puts one score onto the append-only leaderboard repeatedly. The album pool is not stored (`dailySongIndex` re-derives the sequence); the **Song metadata inside `turns[]` is**, derived-looking though it is, because no player mounts on the summary to fetch it again. A record that will not parse, or carries an unrecognised version, is **discarded and the player gets a fresh Run** — failing open, because a serialization bug of ours must not be indistinguishable from a punishment.
+- **`useDailyRun` is the only thing in the app that touches `localStorage`.** It derives the record **during render** rather than in an effect — it is a pure function of the Run in state, and the menu is rendered from it the moment the player walks off the game screen. The day is fixed at mount, so a tab left open across midnight cannot re-stamp a Run in flight with a day whose Songs it never played.
+- **Testing** uses jsdom's real `localStorage` — it is synchronous and well-behaved, so there is nothing to fake. `beforeEach(() => localStorage.clear())` is **load-bearing in `src/App.test.tsx`**: without it the second test to reach Competition finds the day spent. The **clock** is what gets faked (`vi.useFakeTimers({ toFake: ["Date"] })`, so the rest of the suite's timers stay real), and because `vi.setSystemTime` moves the daily seed too, no test may assert which Songs a day yields.
+- **`START_RUN` anchors the Run at the day's first Song** (`dailySongIndex` 0) whatever the session drew before it. Infinite still draws from the same seeded list, which is [#49](https://github.com/georgeharvey3/geotracks/issues/49) and remains open: the leak (an Infinite player hears today's Competition Songs first) is untouched here.
 
 ### Music library
 
@@ -148,9 +163,10 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 
 - `src/state/gameReducer.ts` — Pure game reducer, plus scoring/mode constants (`SCORE_VALUES`, `NUM_COMPETITION_TURNS`, `MAX_COMPETITION_SCORE`, `GAME_MODES`), the Run's `turns`, and the `Screen` router type
 - `src/state/exploreReducer.ts` — Pure Explore reducer: Playable countries, the selected country and each Country queue, plus the `currentSong()` selector
-- `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` context hooks
+- `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` / `useDailyRun()` context hooks
 - `src/context/ExploreContext.tsx` — `ExploreProvider` + `useExplore()`, mounted as GameProvider's sibling
-- `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`, `useHasHover`
+- `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`, `useDailyRun`, `useHasHover`
+- `src/helpers/dailyRun.ts` — The Daily Run's stored day record: version, serialize, parse (fail open) and the date comparison, all pure and taking the date as an argument
 - `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }` (four-space indent, non-ASCII as `\uXXXX`; in `.prettierignore` so both survive a format run)
 - `src/countries.json` — Array of `{ code, name, lat, lon }` used for autocomplete, distance/bearing calculations, and the map join
 - `src/map/` — Map geometry: generated `countries-50m.topo.json` + `stragglers.json`, the `geography.ts` join, and the shared `fills.ts` palette
@@ -186,6 +202,8 @@ The Run summary is covered from `src/App.test.tsx` (a Competition Run played to 
 - **Today's ten are not ten countries.** The daily seed can hand the same country to two turns, so nothing may assume a country identifies a turn — `turnsWithSoleAnswers()` in the suite picks turns that do.
 - **Guesses in the Run helpers go through the map**, not the text box: typing re-renders the world's ~250 shapes on every keystroke, and ten turns of it took the suite from 16s to 74s.
 - **Hover assertions use `fireEvent.mouseEnter`**, as the map's own hover tests do; a hover update is low priority and `userEvent.hover`'s `act` does not settle it before the assertion.
+
+The Daily Run added no mocking boundary either: jsdom's `localStorage` is real throughout, cleared in `beforeEach` (load-bearing in `App.test.tsx`, which spends the day the moment it starts Competition), and the **clock** is what gets faked where a day has to turn over. See **The Daily Run** above.
 
 No new mocking boundaries have been added for Explore — it reuses those four, plus Album data injected as a **default parameter** (`createInitialExploreState(albums = albumsJSON)`, mirroring `createInitialState`). Because the Country queue is shuffled, **no test may assert which Song plays first**; every property tested is invariant under any shuffle, and the Song currently playing is observed through the track card's Spotify link, whose address comes from the real reducer rather than the fake. The map's ~250 country shapes are drawn in its first render, so a country can be reached with a plain `getByLabelText` once the screen is up; the existing `await screen.findByLabelText(...)` calls are harmless and still wait correctly for the screen itself.
 

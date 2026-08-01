@@ -9,7 +9,12 @@ import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
 import ExploreScreen from "./Components/ExploreScreen/ExploreScreen";
 
-import { GameProvider, useGame, useLeaderboard } from "./context/GameContext";
+import {
+  GameProvider,
+  useDailyRun,
+  useGame,
+  useLeaderboard,
+} from "./context/GameContext";
 import { ExploreProvider } from "./context/ExploreContext";
 import { GAME_MODES } from "./state/gameReducer";
 
@@ -18,6 +23,19 @@ import { GAME_MODES } from "./state/gameReducer";
 function AppContent() {
   const { state, dispatch } = useGame();
   const leaderboard = useLeaderboard();
+  const dailyRun = useDailyRun();
+
+  // One button, three states of the day's record: start today's Run, drop back
+  // into the one left unfinished, or reopen the one already played.
+  const onDailyRun = () => {
+    if (dailyRun.record === null) {
+      dispatch({ type: "START_RUN" });
+    } else if (dailyRun.record.status === "in-progress") {
+      dispatch({ type: "RESUME_RUN", record: dailyRun.record });
+    } else {
+      dispatch({ type: "SHOW_RUN_SUMMARY", record: dailyRun.record });
+    }
+  };
 
   let content;
   switch (state.screen) {
@@ -39,6 +57,8 @@ function AppContent() {
         <Menu
           gameModes={GAME_MODES}
           setGameMode={(mode) => dispatch({ type: "SET_MODE", mode })}
+          dailyRunStatus={dailyRun.status}
+          onDailyRun={onDailyRun}
           setShowScoreboard={() => dispatch({ type: "SHOW_SCOREBOARD" })}
           setShowExplore={() => dispatch({ type: "SHOW_EXPLORE" })}
         />

@@ -359,6 +359,78 @@ describe("gameReducer", () => {
     });
   });
 
+  /**
+   * The Daily Songs are Competition's (issue #49). Nothing may assert *which*
+   * Songs a day yields — the seed moves with the date — so what is pinned here
+   * is who draws from the list and who leaves it alone.
+   */
+  describe("the Daily Songs", () => {
+    /** Answer the round correctly and retire the turn, whatever the Song is. */
+    function playRound(state: GameState): GameState {
+      const answered = gameReducer(state, {
+        type: "SUBMIT_GUESS",
+        countryAnswer: state.song.country,
+      });
+      return gameReducer(answered, { type: "NEXT_SONG" });
+    }
+
+    it("costs the day nothing to open the menu", () => {
+      const initial = createInitialState();
+      expect(initial.dailySongIndex).toBe(0);
+      expect(initial.dailySongs).toHaveLength(NUM_COMPETITION_TURNS);
+    });
+
+    it("walks Competition through the day's ten, in order", () => {
+      let state = gameReducer(createInitialState(), { type: "START_RUN" });
+      const daily = state.dailySongs;
+
+      for (let turn = 0; turn < NUM_COMPETITION_TURNS; turn += 1) {
+        expect(state.song.link).toBe(daily[turn]!.link);
+        state = playRound(state);
+      }
+      expect(state.screen).toBe("runSummary");
+    });
+
+    // The leak: an Infinite player used to be served today's Competition Songs,
+    // and to walk the index on past them. `START_RUN`'s anchor kept the Run's
+    // *contents* right through that (the list is never mutated), so what was
+    // actually being handed out was the answers.
+    it("is left where it stands however long Infinite plays", () => {
+      let state = gameReducer(createInitialState(), {
+        type: "SET_MODE",
+        mode: GAME_MODES.infinite,
+      });
+
+      for (let round = 0; round < NUM_COMPETITION_TURNS + 2; round += 1) {
+        state = playRound(state);
+      }
+      expect(state.dailySongIndex).toBe(0);
+    });
+
+    it("still has the whole day left for Competition after Infinite", () => {
+      let state = gameReducer(createInitialState(), {
+        type: "SET_MODE",
+        mode: GAME_MODES.infinite,
+      });
+      for (let round = 0; round < NUM_COMPETITION_TURNS + 2; round += 1) {
+        state = playRound(state);
+      }
+
+      state = gameReducer(state, { type: "START_RUN" });
+      const daily = state.dailySongs;
+      for (let turn = 0; turn < NUM_COMPETITION_TURNS; turn += 1) {
+        expect(state.song.link).toBe(daily[turn]!.link);
+        state = playRound(state);
+      }
+    });
+
+    it("costs the day nothing to walk back to the menu", () => {
+      const state = stateWith({ finished: true, dailySongIndex: 3 });
+      const next = gameReducer(state, { type: "RESET_TO_MENU" });
+      expect(next.dailySongIndex).toBe(3);
+    });
+  });
+
   // The Daily Run (issue #1, ADR-0004): the one Competition Run a browser
   // profile may play on a calendar day, spent on start and resumed where it
   // stood. The reducer stays pure — the day's record arrives on the action.
@@ -396,10 +468,11 @@ describe("gameReducer", () => {
       expect(next.guesses).toHaveLength(0);
     });
 
-    // The Run *is* the day's seeded ten, whatever else the session drew before
-    // it: a Run that opened halfway down the list would not be the same Run
-    // everyone else played.
-    it("START_RUN opens on the day's first Song even after Infinite has drawn from the list", () => {
+    // The Run *is* the day's seeded ten, wherever the session left the index:
+    // a Run that opened halfway down the list would not be the same Run
+    // everyone else played. Nothing outside Competition moves the index any
+    // more (issue #49), so this is now the belt to that braces.
+    it("START_RUN opens on the day's first Song whatever the index says", () => {
       const initial = createInitialState();
       const played = { ...initial, dailySongIndex: 5 };
       const next = gameReducer(played, { type: "START_RUN" });

@@ -15,10 +15,12 @@
 // Matching is deliberately conservative. Spotify's search is fuzzy and the
 // archive is full of near-identical titles ("Music of Indonesia, Vol. 1"
 // through "Vol. 20"), so a candidate is only accepted automatically when the
-// title matches closely, no rival matches it as well, AND either the label or
-// the release year corroborates. Everything else is written out for a human to
-// look at rather than guessed at — a wrong Spotify album here is a country the
-// player is asked to guess from the wrong music.
+// title matches closely, no rival matches it as well, AND the release year
+// corroborates (see ARCHIVE_LABELS for why the label cannot). Everything else
+// is written out for a human to look at rather than guessed at — a wrong
+// Spotify album here is a country the player is asked to guess from the wrong
+// music. 125 of the 145 missing albums carry a year and can clear the gate;
+// the other 20 will always land in the report.
 //
 // Usage:
 //   node scripts/backfill-albums.mjs                 # dry run — reports, writes nothing
@@ -53,7 +55,16 @@ const MATCHES = join(dataDir, "backfill-matches.json");
 // Every imprint the Smithsonian absorbed into Folkways. A candidate album whose
 // Spotify label is one of these is almost certainly the right record; one whose
 // label is none of them is almost certainly a same-titled reissue by someone
-// else, which is the failure mode that matters most here.
+// else.
+//
+// In practice this currently decides nothing, and the code is kept only so it
+// starts working again if the field comes back. `label` lives on the full album
+// object, not on a search result — but fetching the full object turns out to be
+// no help twice over: `GET /albums?ids=` answers a client-credentials token
+// with a flat 403, and `GET /albums/{id}`, which does work, omits `label`
+// anyway now that Spotify marks it deprecated. So the release year is the only
+// corroboration actually available, which is why `isConfident` accepts it
+// alone. See the probe results in issue #41.
 const ARCHIVE_LABELS = [
   "folkways",
   "smithsonian",
@@ -81,10 +92,8 @@ const RIVAL_MARGIN = 0.02;
 const SEARCH_LIMIT = 10;
 const PAGE_SIZE = 50;
 
-// How many of the leading candidates to re-fetch in full so their labels can be
-// read. Spotify caps `GET /albums?ids=` at 20; five is the number the report
-// shows, so nothing is judged on evidence the report doesn't print.
-const ALBUMS_PER_FETCH = 5;
+// How many candidates the report prints per album for a human to choose from.
+const CANDIDATES_SHOWN = 5;
 
 // Spotify's rate limit is a rolling 30-second window whose size it does not
 // publish, and a new app is in development mode, where it is lower. A short
@@ -216,7 +225,22 @@ async function api(path, attempt = 0) {
     return api(path, attempt + 1);
   }
   if (!res.ok) {
-    throw new Error(`GET ${path} failed: ${res.status} ${res.statusText}`);
+    // Spotify explains itself in the body, not the status line — a bare
+    // "403 Forbidden" sends you reading changelogs for an answer that was in
+    // the response all along.
+    const detail = await res.text().then(
+      (body) => {
+        try {
+          return JSON.parse(body).error?.message ?? body.slice(0, 200);
+        } catch {
+          return body.slice(0, 200);
+        }
+      },
+      () => "",
+    );
+    throw new Error(
+      `GET ${path} failed: ${res.status} ${res.statusText}${detail ? ` — ${detail}` : ""}`,
+    );
   }
   return res.json();
 }
@@ -227,47 +251,20 @@ async function searchAlbums(title) {
   return body.albums?.items ?? [];
 }
 
-/**
- * Search returns *simplified* album objects, which carry no `label` — asking a
- * search hit whether it is on a Folkways imprint always says no. Only the full
- * object has it, so the shortlist is re-fetched here before anything is judged.
- * One extra request per album buys the corroboration the whole gate rests on,
- * and the full object embeds the first page of tracks, which usually saves the
- * request it cost.
- */
-async function hydrate(candidates) {
-  if (candidates.length === 0) return [];
-  const ids = candidates.slice(0, ALBUMS_PER_FETCH).map((c) => c.id);
-  const body = await api(`albums?ids=${ids.join(",")}`);
-  // Spotify returns null in place of an album it could not resolve, positionally.
-  return (body.albums ?? []).filter(Boolean);
-}
-
-/**
- * Every track URL on an album. The full album object already holds the first
- * page, so this only goes back to the API for the compilations long enough to
- * need a second one.
- */
-async function trackUrls(album) {
+/** Every track URL on an album, following Spotify's pagination to the end. */
+async function trackUrls(albumId) {
   const urls = [];
-  const take = (page) => {
-    for (const track of page?.items ?? []) {
+  let offset = 0;
+  for (;;) {
+    const page = await api(
+      `albums/${albumId}/tracks?limit=${PAGE_SIZE}&offset=${offset}`,
+    );
+    for (const track of page.items ?? []) {
       if (track?.external_urls?.spotify) urls.push(track.external_urls.spotify);
     }
-  };
-
-  take(album.tracks);
-  let next = album.tracks?.next;
-  let offset = album.tracks?.items?.length ?? 0;
-  while (next) {
-    const page = await api(
-      `albums/${album.id}/tracks?limit=${PAGE_SIZE}&offset=${offset}`,
-    );
-    take(page);
-    next = page.next;
+    if (!page.next) return urls;
     offset += PAGE_SIZE;
   }
-  return urls;
 }
 
 /**
@@ -293,7 +290,6 @@ function rank(title, candidates) {
         score,
         labelMatches: isArchiveLabel(album.label ?? ""),
         yearMatches: year != null && released === year,
-        album,
       };
     })
     .sort((a, b) => {
@@ -381,15 +377,7 @@ async function main() {
     const progress = `[${index + 1}/${todo.length}]`;
     let ranked;
     try {
-      // Rank once on the search hits to find the shortlist, re-fetch those in
-      // full so they carry a label, then rank again on the real evidence.
-      const shortlist = rank(
-        album.album_name,
-        await searchAlbums(album.album_name),
-      )
-        .filter((c) => c.score >= MIN_PLAUSIBLE_SIMILARITY)
-        .slice(0, ALBUMS_PER_FETCH);
-      ranked = rank(album.album_name, await hydrate(shortlist));
+      ranked = rank(album.album_name, await searchAlbums(album.album_name));
     } catch (error) {
       console.log(
         `${progress} ${album.album_name} — search failed: ${error.message}`,
@@ -416,19 +404,25 @@ async function main() {
       console.log(
         `${progress} ${album.album_name} — review (${best.score.toFixed(2)}, ${best.label || "no label"})`,
       );
-      review.push({ ...album, candidates: plausible.slice(0, 5) });
+      review.push({
+        ...album,
+        candidates: plausible.slice(0, CANDIDATES_SHOWN),
+      });
       await sleep(PAUSE_MS);
       continue;
     }
 
     let tracks;
     try {
-      tracks = await trackUrls(best.album);
+      tracks = await trackUrls(best.id);
     } catch (error) {
       console.log(
         `${progress} ${album.album_name} — tracks failed: ${error.message}`,
       );
-      review.push({ ...album, candidates: plausible.slice(0, 5) });
+      review.push({
+        ...album,
+        candidates: plausible.slice(0, CANDIDATES_SHOWN),
+      });
       await sleep(PAUSE_MS);
       continue;
     }
@@ -437,7 +431,10 @@ async function main() {
       console.log(
         `${progress} ${album.album_name} — matched but has no tracks`,
       );
-      review.push({ ...album, candidates: plausible.slice(0, 5) });
+      review.push({
+        ...album,
+        candidates: plausible.slice(0, CANDIDATES_SHOWN),
+      });
       await sleep(PAUSE_MS);
       continue;
     }
@@ -449,9 +446,7 @@ async function main() {
       country: album.country,
       album_name: album.album_name,
       tracks,
-      // The evidence, without the raw Spotify object `best` carries for the
-      // track fetch — that is a few KB per album of no use to a reader.
-      _match: { ...best, album: undefined },
+      _match: best,
     });
     await sleep(PAUSE_MS);
   }

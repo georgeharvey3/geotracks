@@ -11,6 +11,7 @@ import {
   Chip,
 } from "@mui/material";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import { MONO } from "../../theme";
 import { COLORS } from "../../tokens";
 import { ScoreEntry } from "../../types";
 
@@ -82,7 +83,7 @@ const Scoreboard = (props: ScoreboardProps) => {
                     component="span"
                     sx={{
                       fontWeight: 600,
-                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                      fontFamily: MONO,
                     }}
                   >
                     {score.score}

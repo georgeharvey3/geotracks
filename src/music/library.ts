@@ -18,10 +18,7 @@ import { LibraryAlbum } from "../types";
  * themselves means four places to keep in step, and the failure mode when one is
  * missed is Explore offering a country the game's pool has never heard of.
  */
-export const library: LibraryAlbum[] = [
-  ...albumsJSON,
-  ...communityAlbumsJSON,
-] as LibraryAlbum[];
+export const library: LibraryAlbum[] = [...albumsJSON, ...communityAlbumsJSON];
 
 /**
  * The Library as Competition may see it on a given day, `today` being the

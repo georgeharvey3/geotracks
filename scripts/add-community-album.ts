@@ -29,20 +29,18 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { extractAlbumId } from "../src/helpers/spotifyAlbum.ts";
+// Types only, so node erases the import outright and never resolves it — which
+// is what lets this reach into `src/types.ts`, whose own imports it could not
+// follow. The album shape is declared in exactly one place regardless.
+import type { Album, CommunityAlbum } from "../src/types.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const communityPath = join(root, "src", "community-albums.json");
 
-interface Album {
-  country: string;
-  album_name: string;
-  tracks: string[];
-}
-
-interface CommunityAlbum extends Album {
-  liveFrom: string;
-}
-
+// The two album files are read from disk rather than through
+// `src/music/library.ts`, which owns the union everywhere else: that module
+// imports the JSON as ESM, which under bare node would need an import
+// attribute, and it pulls in the app's module graph behind it.
 const readJSON = (path: string): unknown =>
   JSON.parse(readFileSync(join(root, path), "utf8"));
 

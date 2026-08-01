@@ -23,11 +23,8 @@ interface CountryAutocompleteProps {
    */
   countries?: string[];
   disabled?: boolean;
-  placeholder?: string;
   /** Id of the input, for a caller that labels it with a `<label htmlFor>`. */
   id?: string;
-  /** The input's accessible name, where it carries no label of its own. */
-  label?: string;
   /** Form field name, for callers that read the value back off a submit event. */
   name?: string;
 }
@@ -129,7 +126,7 @@ const CountryAutocomplete = forwardRef<
         inputRef={ref}
         id={props.id}
         name={props.name}
-        placeholder={props.placeholder ?? "Country"}
+        placeholder="Country"
         disabled={props.disabled}
         value={props.value}
         onChange={handleChange}
@@ -144,7 +141,6 @@ const CountryAutocomplete = forwardRef<
               </InputAdornment>
             ),
           },
-          htmlInput: props.label ? { "aria-label": props.label } : undefined,
         }}
         sx={{
           "& .MuiOutlinedInput-root": {
@@ -156,8 +152,12 @@ const CountryAutocomplete = forwardRef<
       {/* Portalled, not absolutely positioned inside the wrapper: in the game
           this input sits in a short scrolling tray, which would otherwise clip
           the list. Floating it free lets it open over the map. */}
+      {/* An empty box closes the list whoever emptied it. Typing it empty is
+          handled above, but the caller can clear the value too — committing a
+          guess does exactly that — and a list left open then floats over the
+          very countries the next guess has to reach. */}
       <Popper
-        open={showSuggestions && suggestions.length > 0}
+        open={props.value !== "" && showSuggestions && suggestions.length > 0}
         anchorEl={wrapperRef.current}
         placement="bottom-start"
         sx={{

@@ -9,7 +9,7 @@ export interface NewSuggestion {
   albumId: string;
   /** ISO alpha-2. A stored record outlives any display string we might rename. */
   countryCode: string;
-  /** Why, optionally. Omitted from the record when blank, never written as "". */
+  /** Why, optionally. Already trimmed and already absent when the box was blank. */
   note?: string;
 }
 
@@ -41,8 +41,9 @@ export default function useSuggestions(): Suggestions {
     await push(ref(db, "suggestions"), {
       albumId: suggestion.albumId,
       countryCode: suggestion.countryCode,
-      // Written only when there is one — `$other: false` in the rules means an
-      // empty string would be a stored field saying nothing.
+      // Belt to the form's brace, and the reason this is the boundary that
+      // decides: the SDK throws on an `undefined` value, so the field has to be
+      // either present and non-empty or absent from the object entirely.
       ...(suggestion.note ? { note: suggestion.note } : {}),
       uid,
       createdAt: serverTimestamp(),

@@ -9,7 +9,6 @@ import {
 } from "../helpers/dailyRun";
 import { competitionAlbums, library } from "../music/library";
 import {
-  Album,
   LibraryAlbum,
   Song,
   SongMetadata,
@@ -48,7 +47,8 @@ export interface GameState {
   screen: Screen;
   // "" until a mode is chosen, then one of GAME_MODES.
   gameMode: string;
-  albums: Album[];
+  /** The pool the next Song is drawn from, shrinking by one per round. */
+  albums: LibraryAlbum[];
   dailySongs: Song[];
   dailySongIndex: number;
   song: Song;
@@ -115,7 +115,10 @@ export type GameAction =
  * they get that day already holding the answers. The seed is there to make Runs
  * comparable between players, and there is no second Run to fall back on.
  */
-function pickRandomSong(albums: Album[]): { song: Song; albums: Album[] } {
+function pickRandomSong(albums: LibraryAlbum[]): {
+  song: Song;
+  albums: LibraryAlbum[];
+} {
   const albumIndex = Math.floor(Math.random() * albums.length);
   // Invariant: the album pool outlasts any session (it only shrinks by one per
   // round), so a random in-range index always lands on an album with at least
@@ -141,10 +144,10 @@ function pickRandomSong(albums: Album[]): { song: Song; albums: Album[] } {
  * Song rather than nothing.
  */
 function pickDailySong(
-  albums: Album[],
+  albums: LibraryAlbum[],
   dailySongs: Song[],
   dailySongIndex: number,
-): { song: Song; albums: Album[]; dailySongIndex: number } {
+): { song: Song; albums: LibraryAlbum[]; dailySongIndex: number } {
   const song = dailySongs[dailySongIndex];
   if (song === undefined) {
     return { ...pickRandomSong(albums), dailySongIndex };

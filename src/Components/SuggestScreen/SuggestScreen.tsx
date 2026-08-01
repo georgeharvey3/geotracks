@@ -5,6 +5,7 @@ import Suggest from "../Suggest/Suggest";
 import { useGame } from "../../context/GameContext";
 import useSuggestions from "../../hooks/useSuggestions";
 import { countryNameByCode } from "../../map/geography";
+import { COLORS } from "../../tokens";
 
 /**
  * Container for the Suggestion screen: the write seam wired to the form, and the
@@ -40,7 +41,9 @@ const SuggestScreen = () => {
         <LibraryMusicIcon sx={{ color: "inherit" }} />
         <Typography variant="h2">Suggest an album</Typography>
       </Box>
-      <Typography variant="body2" sx={{ mb: 2, opacity: 0.8 }}>
+      {/* Secondary copy on the night backdrop is `paperMuted`, the mirror of
+          the app pages' `inkMuted` — not the page's paper at reduced opacity. */}
+      <Typography variant="body2" sx={{ mb: 2, color: COLORS.paperMuted }}>
         Music the app is missing, from anywhere in the world.
       </Typography>
 

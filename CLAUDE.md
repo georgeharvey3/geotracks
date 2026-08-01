@@ -259,9 +259,11 @@ No new mocking boundaries have been added for Explore — it reuses those four, 
 - Enter: next song (when round finished) — in Explore, Skip
 - Typing auto-focuses the country input; Escape blurs it
 
-### CountryInput Component
+### The country picker
 
-Custom autocomplete (`src/Components/CountryInput/`) built with React state — no external autocomplete library. Supports arrow-key navigation, Enter to select, and Escape/click-outside to close. The optional `countries` prop narrows the suggestion list (Explore passes the Playable countries); it defaults to every country.
+**`src/Components/CountryAutocomplete/`** is the app's one country picker, and there is exactly one: a controlled field (`value` / `onChange`) built with React state — no external autocomplete library, deliberately, so there is one set of arrow-key semantics. Arrow keys navigate, Enter selects the highlighted suggestion (and otherwise falls through to the enclosing form), Escape and a click outside close, and an empty box closes the list whoever emptied it. The optional `countries` prop narrows the suggestions (Explore passes the Playable countries); it defaults to every country. The list opens in a `Popper` portalled out of whatever short scrolling box it sits in, and selects on **click, not mousedown**, so a dismissed list cannot pass the click through to the map underneath.
+
+**`src/Components/CountryInput/`** wraps it for guessing and is nothing else: a `<form>`, a Send button, and clearing the box once the guess is committed. Keeping the two apart is what let the Suggestion form reuse the picker — a nested `<form>` is invalid HTML, and there was no `value`/`onChange` to read before the split.
 
 ## Agent skills
 

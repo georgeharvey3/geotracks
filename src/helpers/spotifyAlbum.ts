@@ -54,8 +54,3 @@ export function extractAlbumId(input: string): AlbumIdResult {
 
   return { ok: false, reason: "invalid" };
 }
-
-/** The canonical, token-free address of an album. */
-export function albumUrl(albumId: string): string {
-  return `https://open.spotify.com/album/${albumId}`;
-}

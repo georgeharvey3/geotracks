@@ -15,6 +15,7 @@ import Spinner from "../Spinner/Spinner";
 import { extractAlbumId } from "../../helpers/spotifyAlbum";
 import { countryCodeByName } from "../../map/geography";
 import { NewSuggestion } from "../../hooks/useSuggestions";
+import { MONO } from "../../theme";
 
 /** Matches the `.validate` rule on `suggestions/$id/note`. */
 const NOTE_MAX = 500;
@@ -97,7 +98,7 @@ const Suggest = (props: SuggestProps) => {
       <Card>
         <Stack spacing={1.5} alignItems="center" sx={{ py: 1 }}>
           <LibraryMusicIcon />
-          <Typography variant="h3" sx={{ fontSize: "1.125rem" }}>
+          <Typography variant="h2" sx={{ fontSize: "1.125rem" }}>
             Suggestion received
           </Typography>
           {/* Honest rather than warm: there is no reply coming, because the
@@ -168,7 +169,7 @@ const Suggest = (props: SuggestProps) => {
                   mt: 0.5,
                   textAlign: "right",
                   color: "text.secondary",
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  fontFamily: MONO,
                 }}
               >
                 {fields.note.length}/{NOTE_MAX}
@@ -182,19 +183,27 @@ const Suggest = (props: SuggestProps) => {
             </Typography>
           )}
 
-          <Box sx={{ display: "flex", justifyContent: "center", pt: 0.5 }}>
-            {sending ? (
-              <Spinner />
-            ) : (
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={<SendIcon />}
-                disabled={!link.ok || countryCode === undefined}
-              >
-                {status === "failed" ? "Try again" : "Send suggestion"}
-              </Button>
-            )}
+          {/* The button stays put and goes dead while the write is in flight,
+              as the leaderboard's Save does; the spinner appears beside it
+              rather than in place of it, so nothing under the cursor moves. */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 1.5,
+              pt: 0.5,
+            }}
+          >
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<SendIcon />}
+              disabled={!link.ok || countryCode === undefined || sending}
+            >
+              {status === "failed" ? "Try again" : "Send suggestion"}
+            </Button>
+            {sending && <Spinner />}
           </Box>
         </Stack>
       </form>

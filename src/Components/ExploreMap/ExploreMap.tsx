@@ -28,13 +28,22 @@ interface ExploreMapProps {
  * this supplies only what a pick means here (ADR-0003).
  */
 const ExploreMap = (props: ExploreMapProps) => {
+  const { playableCountries } = props;
   const playableCodes = useMemo(() => {
-    const codes = props.playableCountries.flatMap((name) => {
+    const codes = playableCountries.flatMap((name) => {
       const code = countryCodeByName(name);
       return code ? [code] : [];
     });
     return new Set(codes);
-  }, [props.playableCountries]);
+  }, [playableCountries]);
+
+  // The same set by name, because a commit arrives as a name: the alternative
+  // is converting it back to a code the base map already had, and inventing a
+  // sentinel for the conversion that fails.
+  const playableNames = useMemo(
+    () => new Set(playableCountries),
+    [playableCountries],
+  );
 
   const selectedCode =
     props.selectedCountry === null
@@ -71,9 +80,7 @@ const ExploreMap = (props: ExploreMapProps) => {
       // than navigating anywhere.
       armOnTouch={false}
       onCommit={(name) =>
-        playableCodes.has(countryCodeByName(name) ?? "")
-          ? props.onSelect(name)
-          : props.onAskAbout(name)
+        playableNames.has(name) ? props.onSelect(name) : props.onAskAbout(name)
       }
       // The two picks are the two marks: mint alone is 2.0:1 against land, and
       // the preview fill is lighter still.

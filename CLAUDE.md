@@ -113,7 +113,7 @@ The **guess board** (`src/Components/Guesses/Guesses.tsx`) shows only the latest
 
 **Explore** (issue #37) is the surface where a player chooses a country in order to listen to it. It is **not a Game mode**: nothing is scored, recorded or submitted, there are no rounds, Guesses or Attempts, and it never touches the game's album pool, daily seeding, score or turn counter. It is reached from a third primary button on the menu (`SHOW_EXPLORE`), and it wears the same full-bleed layout as the game screen — map covering the viewport with `ExplorePanel` floating over a corner in landscape, a content-sized bottom tray in portrait (both via the shared `PanelSurface`).
 
-- **Playable countries** — a country is Playable when the app holds at least one Album for it: 123 of 246 today (121 polygons, 15 of the 87 straggler markers). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
+- **Playable countries** — a country is Playable when the app holds at least one Album for it: 134 of 246 today (132 polygons, 15 of the 87 straggler markers). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
 - **Fills** — four flat states: inert land (non-playable), land (Playable), the near-white highlight (hover), and green for the country now playing. No rings or halos; Explore leaves the base map's `overlay` slot unused.
 - **Country queue** — built on first selection from all of a country's Albums' Songs, shuffled. Skip advances it; it is exhausted before any Song repeats, then drawn afresh and continued (the fresh draw never opens with the Song just heard). Choosing a country again — later in the visit, or on a later visit — **resumes** it rather than restarting it. Choosing the country already playing is a no-op.
 - **Playback** — choosing a country or skipping starts playback automatically on every device (the click on the map is itself the user gesture, so the game's desktop-width gate is deliberately not carried over). A finished Song advances the queue; pausing stops that run, because auto-advance is driven by the finished signal and nothing else. The track card is shown **un-gated** from the first note — artwork, title, artist, Album and the Spotify link — because Explore has nothing to withhold.
@@ -134,6 +134,12 @@ It is the third full-bleed map surface, wearing the game screen's layout exactly
 - **Exits** — the floating home button, plus the leaderboard button that appears in place of the name box once the score is saved. **No "Play again"**: `RESET_TO_MENU` keeps the shrunken album pool and the advanced `dailySongIndex`, so a second Run in the same session draws random songs rather than the day's seeded ten, and a replay shortcut would advertise a Run that isn't comparable.
 - **Lifetime** — in memory only, like Explore's queues. Leaving the screen discards the Run and a reload loses it; persisting it belongs with #1, which has to introduce device storage anyway.
 
+### Music library
+
+Every Album in the app comes from the **Smithsonian Folkways Archive**, catalogued by hand into six per-continent Google Sheets in 2023 and then looked up on Spotify one album at a time. `src/albums.json` is the result and is now the only record of it: 785 albums across 134 countries, edited by hand from here on.
+
+The coverage review (issue #41) is closed. It reconciled the library against the sheets and added the 125 albums that pass had never reached; the twenty it could not resolve — mostly untitled-by-year entries like `China`, `Croatia` and `One Sky` — were left out, and every country they belong to is Playable from another album regardless. The tooling that did it has been removed; it is in the history if it is ever wanted again.
+
 ### Geo Hints System
 
 When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E/SE/S/SW/W/NW) to the correct country. Uses the Haversine formula (`src/helpers/getDistance.ts`) and bearing calculation (`src/helpers/getBearing.ts`) with coordinates from `src/countries.json`.
@@ -145,7 +151,7 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` context hooks
 - `src/context/ExploreContext.tsx` — `ExploreProvider` + `useExplore()`, mounted as GameProvider's sibling
 - `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`, `useHasHover`
-- `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }`
+- `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }` (four-space indent, non-ASCII as `\uXXXX`; in `.prettierignore` so both survive a format run)
 - `src/countries.json` — Array of `{ code, name, lat, lon }` used for autocomplete, distance/bearing calculations, and the map join
 - `src/map/` — Map geometry: generated `countries-50m.topo.json` + `stragglers.json`, the `geography.ts` join, and the shared `fills.ts` palette
 - `src/Components/WorldMap/BaseMap.tsx` — The surface-neutral map (see “Map Interface”)

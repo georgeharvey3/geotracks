@@ -1,11 +1,16 @@
-import albumsJSON from "../albums.json";
 import countriesJSON from "../countries.json";
 import getDistance from "../helpers/getDistance";
 import getBearing from "../helpers/getBearing";
 import getDailySongs from "../helpers/getDailySongs";
-import { DAILY_RUN_VERSION, DailyRunRecord } from "../helpers/dailyRun";
+import {
+  DAILY_RUN_VERSION,
+  DailyRunRecord,
+  dayString,
+} from "../helpers/dailyRun";
+import { competitionAlbums, library } from "../music/library";
 import {
   Album,
+  LibraryAlbum,
   Song,
   SongMetadata,
   Guess,
@@ -37,7 +42,7 @@ export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 // `screen` is the app's single router. Explore keeps its own state in its own
 // reducer (ADR-0003), but which surface is on screen is decided in one place.
 export type Screen =
-  "menu" | "scoreboard" | "playing" | "runSummary" | "explore";
+  "menu" | "scoreboard" | "playing" | "runSummary" | "explore" | "suggest";
 
 export interface GameState {
   screen: Screen;
@@ -67,6 +72,17 @@ export interface GameState {
   nameInputValue: string;
   /** Whether this Run's score has been written to the leaderboard. One per Run. */
   scoreSubmitted: boolean;
+  /**
+   * The country the Suggestion form opens on, as an alpha-2 code, or "" when
+   * the screen was reached from the menu with nobody in mind.
+   *
+   * This is the *whole* of what the game reducer knows about a Suggestion: the
+   * router opening a screen with an argument, as `RESUME_RUN` opens one with a
+   * record. The form's own state — the fields, their validity, the write in
+   * flight — is local to it, and the write goes through `useSuggestions`. The
+   * reducer has no business knowing about a Spotify link.
+   */
+  suggestCountryCode: string;
 }
 
 export type GameAction =
@@ -78,6 +94,9 @@ export type GameAction =
   | { type: "SHOW_RUN_SUMMARY"; record: DailyRunRecord }
   | { type: "SHOW_SCOREBOARD" }
   | { type: "SHOW_EXPLORE" }
+  // The country code is a prefill and nothing more: Explore dispatches it with
+  // the country the player asked about, the menu dispatches it without one.
+  | { type: "SHOW_SUGGEST"; countryCode?: string }
   | { type: "SUBMIT_GUESS"; countryAnswer: string }
   | { type: "TOGGLE_GEO_HINTS"; checked: boolean }
   | { type: "NEXT_SONG" }
@@ -145,8 +164,15 @@ function pickDailySong(
   };
 }
 
-export function createInitialState(albums: Album[] = albumsJSON): GameState {
-  const dailySongs = getDailySongs(albums);
+export function createInitialState(
+  albums: LibraryAlbum[] = library,
+  today: string = dayString(new Date()),
+): GameState {
+  // Competition draws from the Library as it stood before today: a Community
+  // album added by a deploy must not change the day's ten under anyone
+  // part-way through them. Every other draw below takes the whole Library, so
+  // Explore and Infinite have it the moment it ships.
+  const dailySongs = getDailySongs(competitionAlbums(albums, today));
   // The Song the menu is standing on is the one Infinite opens with, and no
   // mode has been chosen yet — so it is drawn at random and the day is still
   // whole. `START_RUN` is what spends the day's first Song.
@@ -173,6 +199,7 @@ export function createInitialState(albums: Album[] = albumsJSON): GameState {
     turns: [],
     nameInputValue: "",
     scoreSubmitted: false,
+    suggestCountryCode: "",
   };
 }
 
@@ -362,6 +389,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SHOW_EXPLORE":
       return { ...state, screen: "explore" };
 
+    case "SHOW_SUGGEST":
+      return {
+        ...state,
+        screen: "suggest",
+        suggestCountryCode: action.countryCode ?? "",
+      };
+
     case "SUBMIT_GUESS": {
       const { countryAnswer } = action;
       const guessedCountry = countriesJSON.find(
@@ -497,6 +531,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         gameMode: "",
         song: picked.song,
         albums: picked.albums,
+        // The home button is the only way off the Suggestion form, so this is
+        // where the country it opened on stops being anybody's business.
+        suggestCountryCode: "",
       };
     }
 

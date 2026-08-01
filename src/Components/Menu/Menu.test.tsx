@@ -14,16 +14,27 @@ const createDefaultProps = (
   onDailyRun: vi.fn(),
   setShowScoreboard: vi.fn(),
   setShowExplore: vi.fn(),
+  setShowSuggest: vi.fn(),
   ...overrides,
 });
 
 describe("Menu", () => {
-  it("renders all four buttons", () => {
+  it("renders all five buttons", () => {
     render(<Menu {...createDefaultProps()} />);
     expect(screen.getByText("Competition Mode")).toBeInTheDocument();
     expect(screen.getByText("Infinite Mode")).toBeInTheDocument();
     expect(screen.getByText("Explore")).toBeInTheDocument();
     expect(screen.getByText("Scoreboard")).toBeInTheDocument();
+    expect(screen.getByText("Suggest an album")).toBeInTheDocument();
+  });
+
+  it("opens the Suggestion form", async () => {
+    const props = createDefaultProps();
+    render(<Menu {...props} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: /Suggest an album/i }),
+    );
+    expect(props.setShowSuggest).toHaveBeenCalled();
   });
 
   // One control in three states of the day's record, so the label is the only

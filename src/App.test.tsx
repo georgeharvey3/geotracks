@@ -7,23 +7,29 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "./test-utils";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
 import getDailySongs from "./helpers/getDailySongs";
-import albumsJSON from "./albums.json";
+import { competitionAlbums, library } from "./music/library";
+import { dayString } from "./helpers/dailyRun";
 import countriesJSON from "./countries.json";
-import { Album } from "./types";
 import { spotifyPlayerControl } from "./test/spotifyPlayerFake";
 import { leaderboardControl } from "./test/leaderboardFake";
+import { suggestionControl } from "./test/suggestionFake";
 import { DAILY_RUN_STORAGE_KEY } from "./hooks/useDailyRun";
 
 // Integration tests mount the real <App> (real reducer, context, routing and
-// keyboard shortcuts) and mock ONLY the two side-effectful seams: the Spotify
-// player and the leaderboard. No iframe, no network, no MSW.
+// keyboard shortcuts) and mock ONLY the side-effectful seams: the Spotify
+// player, the leaderboard, and the Suggestion write — the one boundary the
+// community suggestions feature added. Everything else it brought (the Library
+// union, the `liveFrom` gate, the form's own validity) is pure and needs
+// nothing. No iframe, no network, no MSW.
 vi.mock("./hooks/useSpotifyPlayer", () => import("./test/spotifyPlayerFake"));
 vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
+vi.mock("./hooks/useSuggestions", () => import("./test/suggestionFake"));
 
 // The map's pan/zoom wrapper is the one part jsdom cannot run (d3-zoom); the
 // rest of the map is real, so map guesses go through the real guess pipeline.
@@ -36,13 +42,15 @@ vi.mock("react-simple-maps", async (importOriginal) => ({
 // tests know the correct answer per turn. Infinite does *not* — it draws at
 // random (issue #49) — so its answer is read from the Song the player was
 // handed, never from this list.
-const dailySongs = getDailySongs(albumsJSON as Album[]);
+const dailySongs = getDailySongs(
+  competitionAlbums(library, dayString(new Date())),
+);
 const answerAt = (round: number) => dailySongs[round]!.country;
 
 // Every track link in the library, against the country it comes from: no link
 // appears under two countries, so this reads back an answer unambiguously.
 const countryByLink = new Map(
-  (albumsJSON as Album[]).flatMap((album) =>
+  library.flatMap((album) =>
     album.tracks.map((track) => [track, album.country] as const),
   ),
 );
@@ -195,6 +203,7 @@ const summaryRow = (turnNumber: number, country: string) =>
 beforeEach(() => {
   spotifyPlayerControl.reset();
   leaderboardControl.reset();
+  suggestionControl.reset();
   // Load-bearing: the Daily Run is spent the moment Competition is started, so
   // without this the second test to reach it finds the day already gone.
   localStorage.clear();
@@ -861,6 +870,135 @@ describe("App integration", () => {
 
       expect(
         screen.getByRole("button", { name: "Competition Mode" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("suggesting an album", () => {
+    const ALBUM_URL =
+      "https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3?si=abcdef";
+    const ALBUM_ID = "1DFixLWuPkv3KT3TnV35m3";
+
+    const linkBox = () => screen.getByLabelText("Album on Spotify");
+    const countryBox = () =>
+      screen.getByLabelText("Country the music comes from");
+    const sendButton = () =>
+      screen.getByRole("button", { name: /Send suggestion|Try again/i });
+
+    async function openSuggest() {
+      render(<App />);
+      await userEvent.click(
+        screen.getByRole("button", { name: /Suggest an album/i }),
+      );
+    }
+
+    /**
+     * Choose a country from the picker's own list, as `CountryInput`'s tests
+     * do — the suggestion's label is split across a `<strong>`, so it is found
+     * by its text rather than by an accessible name.
+     */
+    async function chooseCountry(country: string) {
+      await userEvent.type(countryBox(), country.slice(0, 3));
+      const list = await screen.findByRole("list");
+      const item = within(list)
+        .getAllByRole("button")
+        .find((option) => option.textContent === country)!;
+      await userEvent.click(item);
+    }
+
+    /** Fill the two required fields, choosing the country from the picker. */
+    async function fillForm(country = "Chad") {
+      await userEvent.type(linkBox(), ALBUM_URL);
+      await chooseCountry(country);
+    }
+
+    it("carries an album, a country and a note through to the write", async () => {
+      await openSuggest();
+      await fillForm();
+      await userEvent.type(screen.getByLabelText("Why (optional)"), "Great");
+      await userEvent.click(sendButton());
+
+      // The id, not the URL: storing the URL would mean keeping a stranger's
+      // `?si=` share-tracking token indefinitely for no benefit.
+      expect(suggestionControl.submitted()).toEqual([
+        { albumId: ALBUM_ID, countryCode: "TD", note: "Great" },
+      ]);
+    });
+
+    it("leaves the note out of the record when it is blank", async () => {
+      await openSuggest();
+      await fillForm();
+      await userEvent.click(sendButton());
+
+      expect(suggestionControl.submitted()).toEqual([
+        { albumId: ALBUM_ID, countryCode: "TD" },
+      ]);
+    });
+
+    it("replaces the form with a confirmation, and offers another", async () => {
+      await openSuggest();
+      await fillForm();
+      await userEvent.click(sendButton());
+
+      expect(
+        await screen.findByText("Suggestion received"),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText("Album on Spotify")).toBeNull();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Suggest another/i }),
+      );
+      expect(linkBox()).toHaveValue("");
+    });
+
+    it("holds the send button until both required fields are good", async () => {
+      await openSuggest();
+      expect(sendButton()).toBeDisabled();
+
+      await userEvent.type(linkBox(), ALBUM_URL);
+      expect(sendButton()).toBeDisabled();
+
+      await chooseCountry("Chad");
+      expect(sendButton()).toBeEnabled();
+    });
+
+    it("names a track link for what it is", async () => {
+      await openSuggest();
+      await userEvent.type(
+        linkBox(),
+        "https://open.spotify.com/track/1DFixLWuPkv3KT3TnV35m3",
+      );
+
+      expect(
+        screen.getByText(/track link — paste the album/i),
+      ).toBeInTheDocument();
+      expect(sendButton()).toBeDisabled();
+    });
+
+    it("keeps what was typed when the write fails, and can be retried", async () => {
+      suggestionControl.failWrites();
+      await openSuggest();
+      await fillForm();
+      await userEvent.click(sendButton());
+
+      expect(await screen.findByText(/didn't send/i)).toBeInTheDocument();
+      // Nothing is lost: the values are still there to send again.
+      expect(linkBox()).toHaveValue(ALBUM_URL);
+      expect(countryBox()).toHaveValue("Chad");
+
+      suggestionControl.reset();
+      await userEvent.click(screen.getByRole("button", { name: /Try again/i }));
+      expect(
+        await screen.findByText("Suggestion received"),
+      ).toBeInTheDocument();
+    });
+
+    it("returns to the menu from the Home control", async () => {
+      await openSuggest();
+      await userEvent.click(homeButton());
+
+      expect(
+        screen.getByRole("button", { name: /Infinite Mode/i }),
       ).toBeInTheDocument();
     });
   });

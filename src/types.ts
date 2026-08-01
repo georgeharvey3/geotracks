@@ -4,6 +4,23 @@ export interface Album {
   tracks: string[];
 }
 
+/**
+ * An Album that entered the Library through an accepted Suggestion rather than
+ * from the Smithsonian Folkways Archive the rest of it was catalogued from.
+ *
+ * `liveFrom` (`YYYY-MM-DD`) is the only thing that distinguishes one at runtime,
+ * and it is not provenance — it is the switch-on date for **Competition**. A
+ * Community album joins the Library at once and Competition only once the day
+ * has passed that date, so no day's Daily Songs can change under a player
+ * part-way through them. See `src/music/library.ts`.
+ */
+export interface CommunityAlbum extends Album {
+  liveFrom: string;
+}
+
+/** An entry of the Library, from either album file. */
+export type LibraryAlbum = Album | CommunityAlbum;
+
 export interface Country {
   code: string;
   name: string;

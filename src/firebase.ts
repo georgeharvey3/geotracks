@@ -33,12 +33,14 @@ function getAuthOrThrow(existing: FirebaseApp): Auth {
 
 // Cache the in-flight/completed anonymous sign-in so concurrent callers (reads
 // and writes) share a single credential instead of racing separate sign-ins.
-let anonAuthPromise: Promise<unknown> | null = null;
+let anonAuthPromise: Promise<string> | null = null;
 
-// Resolve once an anonymous user exists. RTDB rules gate every write on
-// `auth != null`, so callers must await this before submitting a score. Rejects
-// with `auth/invalid-api-key` when no valid API key is configured.
-export function ensureAnonymousAuth(): Promise<unknown> {
+// Resolve with the anonymous user's uid once one exists. RTDB rules gate every
+// write on `auth != null`, so callers must await this before writing; the uid
+// itself is what a Suggestion stores, since a public-write node with no
+// attributable identity is one that can only be defended by deleting all of it.
+// Rejects with `auth/invalid-api-key` when no valid API key is configured.
+export function ensureAnonymousAuth(): Promise<string> {
   let authInstance: Auth;
   try {
     authInstance = getAuthOrThrow(app);
@@ -49,14 +51,16 @@ export function ensureAnonymousAuth(): Promise<unknown> {
   }
 
   if (authInstance.currentUser) {
-    return Promise.resolve(authInstance.currentUser);
+    return Promise.resolve(authInstance.currentUser.uid);
   }
   if (!anonAuthPromise) {
-    anonAuthPromise = signInAnonymously(authInstance).catch((error) => {
-      // Allow a later call to retry if this sign-in failed.
-      anonAuthPromise = null;
-      throw error;
-    });
+    anonAuthPromise = signInAnonymously(authInstance)
+      .then((credential) => credential.user.uid)
+      .catch((error) => {
+        // Allow a later call to retry if this sign-in failed.
+        anonAuthPromise = null;
+        throw error;
+      });
   }
   return anonAuthPromise;
 }

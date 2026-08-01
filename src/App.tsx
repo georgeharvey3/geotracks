@@ -8,6 +8,7 @@ import RunSummaryScreen from "./Components/RunSummaryScreen/RunSummaryScreen";
 import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
 import ExploreScreen from "./Components/ExploreScreen/ExploreScreen";
+import SuggestScreen from "./Components/SuggestScreen/SuggestScreen";
 
 import {
   GameProvider,
@@ -51,6 +52,9 @@ function AppContent() {
     case "explore":
       content = <ExploreScreen />;
       break;
+    case "suggest":
+      content = <SuggestScreen />;
+      break;
     case "menu":
     default:
       content = (
@@ -61,6 +65,7 @@ function AppContent() {
           onDailyRun={onDailyRun}
           setShowScoreboard={() => dispatch({ type: "SHOW_SCOREBOARD" })}
           setShowExplore={() => dispatch({ type: "SHOW_EXPLORE" })}
+          setShowSuggest={() => dispatch({ type: "SHOW_SUGGEST" })}
         />
       );
   }
@@ -77,7 +82,7 @@ function AppContent() {
       showMenuButton={state.screen !== "menu"}
       fullBleed={isMapSurface}
       screenKey={state.screen}
-      // Both content pages stand on the map: they are the two screens that are
+      // Every content page stands on the map: they are the screens that are
       // about the game without being made of it, and the backdrop is what says
       // so. The map surfaces have no use for it — they *are* the map.
       backdrop={isMapSurface ? undefined : <BackdropMap />}

@@ -19,6 +19,10 @@ interface ExploreProps {
   onSkipClicked: () => void;
   onSelectCountry: (countryName: string) => void;
   onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  /** The silent country the player has picked in order to ask about it. */
+  askedAboutCountry: string | null;
+  onAskAboutCountry: (countryName: string) => void;
+  onSuggestClicked: () => void;
   embedRef: React.Ref<HTMLDivElement>;
   countryInputRef: React.RefObject<HTMLInputElement>;
 }
@@ -42,7 +46,9 @@ const Explore = (props: ExploreProps) => (
       <ExploreMap
         playableCountries={props.playableCountries}
         selectedCountry={props.country}
+        askedAboutCountry={props.askedAboutCountry}
         onSelect={props.onSelectCountry}
+        onAskAbout={props.onAskAboutCountry}
       />
     </Box>
 
@@ -57,6 +63,8 @@ const Explore = (props: ExploreProps) => (
       onPlayClicked={props.onPlayClicked}
       onSkipClicked={props.onSkipClicked}
       onFormSubmit={props.onFormSubmit}
+      askedAboutCountry={props.askedAboutCountry}
+      onSuggestClicked={props.onSuggestClicked}
       playableCountries={props.playableCountries}
       countryInputRef={props.countryInputRef}
     />

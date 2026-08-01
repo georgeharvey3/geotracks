@@ -15,14 +15,17 @@ interface ExploreMapProps {
   playableCountries: string[];
   /** The country being listened to, or null before the first choice. */
   selectedCountry: string | null;
+  /** The silent country the player has picked in order to ask about it. */
+  askedAboutCountry: string | null;
   onSelect: (countryName: string) => void;
+  onAskAbout: (countryName: string) => void;
 }
 
 /**
  * The map as Explore's whole interface: Playable countries are live and
- * selectable, the rest are drawn and named but inert. Everything about how a
- * country is picked comes from <BaseMap>; this supplies only what a pick means
- * here (ADR-0003).
+ * selectable, and the silent ones are selectable too — not to listen to, but to
+ * ask about. Everything about how a country is picked comes from <BaseMap>;
+ * this supplies only what a pick means here (ADR-0003).
  */
 const ExploreMap = (props: ExploreMapProps) => {
   const playableCodes = useMemo(() => {
@@ -38,38 +41,52 @@ const ExploreMap = (props: ExploreMapProps) => {
       ? undefined
       : countryCodeByName(props.selectedCountry);
 
+  const askedAboutCode =
+    props.askedAboutCountry === null
+      ? undefined
+      : countryCodeByName(props.askedAboutCountry);
+
   const fillFor = (code: string | undefined, previewed: boolean): string => {
-    // An absence of music looks the same as an absence of a country: both are
-    // shapes the player can see and name but not choose.
-    if (code === undefined || !playableCodes.has(code)) {
-      return MAP_FILLS.inertLand;
-    }
+    // A shape the app has no country for at all: nothing to play and nothing to
+    // ask about either, so it stays inert.
+    if (code === undefined) return MAP_FILLS.inertLand;
     if (code === selectedCode) return NOW_PLAYING_FILL;
-    if (previewed) return MAP_FILLS.highlight;
-    return MAP_FILLS.land;
+    // The country being asked about keeps the preview fill after the pointer
+    // has gone: it is picked, and the panel is now talking about it.
+    if (previewed || code === askedAboutCode) return MAP_FILLS.highlight;
+    return playableCodes.has(code) ? MAP_FILLS.land : MAP_FILLS.inertLand;
   };
 
   return (
     <BaseMap
       fillFor={fillFor}
-      selectable={(code) => playableCodes.has(code)}
-      // Silent countries still answer to hover: an absence of music is not an
-      // absence of geography.
+      // Every country the app knows can be picked. An absence of music was an
+      // absence of nothing but music; now it is an invitation.
+      selectable={() => true}
       labelFor={(code) => countryNameByCode(code)}
       // Reached from the menu, which stands on this map in the dark.
       veil="lift"
-      // Nothing here is irreversible, so a single tap is enough on touch too.
+      // Nothing here is irreversible, so a single tap is enough on touch too —
+      // which is exactly why a silent country only tells the panel below rather
+      // than navigating anywhere.
       armOnTouch={false}
-      onCommit={props.onSelect}
-      // Only the country playing is marked: mint alone is 2.0:1 against land.
-      marked={(code) => code === selectedCode}
+      onCommit={(name) =>
+        playableCodes.has(countryCodeByName(name) ?? "")
+          ? props.onSelect(name)
+          : props.onAskAbout(name)
+      }
+      // The two picks are the two marks: mint alone is 2.0:1 against land, and
+      // the preview fill is lighter still.
+      marked={(code) => code === selectedCode || code === askedAboutCode}
       countryAttributes={(code) => ({
         "data-explore-state":
           code === selectedCode
             ? "playing"
-            : playableCodes.has(code)
-              ? "playable"
-              : "silent",
+            : code === askedAboutCode
+              ? "asked"
+              : playableCodes.has(code)
+                ? "playable"
+                : "silent",
       })}
     />
   );

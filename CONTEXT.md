@@ -14,6 +14,14 @@ _Avoid_: Track, tune.
 A record the app holds for one country, and the unit its music is catalogued in. A country may have many; a Song belongs to exactly one.
 _Avoid_: Record, release.
 
+**Library**:
+Every Album the app holds, whatever its origin: what Explore and Infinite draw from, and the thing a Suggestion asks to be let into. It is two files, because the provenance of the Smithsonian Folkways catalogue is worth keeping separable — the filename is the record of where an Album came from.
+_Avoid_: Catalogue (kept as the verb — the Folkways albums were _catalogued_ by hand), pool, collection.
+
+**Community album**:
+An Album that entered the Library through an accepted Suggestion, rather than from the Smithsonian Folkways Archive the rest of it was catalogued from. It joins the Library at once, but joins **Competition** only from the following calendar day, so that no day's Daily Songs can change while someone is playing them.
+_Avoid_: User album, submitted album.
+
 **Clip**:
 The capped excerpt of a Song heard during a round — long enough to place the music, short enough to keep the round moving. Explore is not a round and plays the whole Song.
 _Avoid_: Snippet.
@@ -102,8 +110,12 @@ The surface where a player chooses a country in order to listen to it, rather th
 _Avoid_: Explore mode (it is not a Game mode), free play, jukebox.
 
 **Playable country**:
-A country the app holds at least one Album for, and so one a player may choose in Explore. The rest are non-playable: still drawn on the Map and still named on hover, but not selectable — an absence of music is not an absence of geography.
+A country the app holds at least one Album for, and so one a player may choose in Explore _in order to listen to it_. The rest are non-playable: drawn on the Map, named on hover, and selectable too — but what picking one does is ask about it rather than play it. An absence of music is not an absence of geography, and it is now an invitation.
 _Avoid_: Unlocked, available, greyed-out, disabled.
+
+**Suggestion**:
+A player's proposal that the app add an Album: the album on Spotify, the country they say it belongs to, and optionally why. It is not an Album and holds no Songs; it becomes one only if it is accepted, by a human, outside the app. The app collects Suggestions and does not act on them.
+_Avoid_: Submission (the app already submits _scores_, and a second submission concept would make "the submission failed" ambiguous between two async writes to the same database), request, nomination.
 
 **Country queue**:
 The order a Playable country's Songs are heard in: drawn afresh, and exhausted before any Song repeats. A player who leaves a country and comes back picks up where they left off rather than starting the country over.

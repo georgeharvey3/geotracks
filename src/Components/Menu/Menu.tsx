@@ -2,6 +2,7 @@ import { Box, Button, Stack } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import PublicIcon from "@mui/icons-material/Public";
 import { GameModes } from "../../types";
 import { DayStatus } from "../../helpers/dailyRun";
@@ -16,7 +17,22 @@ interface MenuProps {
   onDailyRun: () => void;
   setShowScoreboard: (show: boolean) => void;
   setShowExplore: () => void;
+  setShowSuggest: () => void;
 }
+
+// The secondary tier's treatment on the night backdrop: the outlined buttons
+// here are drawn in the page's own foreground, which on the menu is paper
+// rather than the theme's ink. There is no third tier to reach for — a text
+// link would be a rung this system does not have — so anything that is not one
+// of the three primary choices wears this.
+const SECONDARY_ON_NIGHT = {
+  color: COLORS.paper,
+  borderColor: COLORS.paper,
+  "&:hover": {
+    borderColor: COLORS.paper,
+    bgcolor: "rgba(247, 245, 236, 0.12)",
+  },
+};
 
 // One control in three states, so the label is what changes and not the button.
 // A finished day reopens its Run summary rather than going dead: the Run is
@@ -56,24 +72,26 @@ const Menu = (props: MenuProps) => (
       >
         Explore
       </Button>
-      {/* The secondary action is drawn in the page's foreground, which on the
-          menu is paper rather than the theme's ink: the outlined button is the
-          one control here made of nothing but its own outline. */}
       <Button
         variant="outlined"
         size="large"
         startIcon={<LeaderboardIcon />}
         onClick={() => props.setShowScoreboard(true)}
-        sx={{
-          color: COLORS.paper,
-          borderColor: COLORS.paper,
-          "&:hover": {
-            borderColor: COLORS.paper,
-            bgcolor: "rgba(247, 245, 236, 0.12)",
-          },
-        }}
+        sx={SECONDARY_ON_NIGHT}
       >
         Scoreboard
+      </Button>
+      {/* Secondary, sitting with the scoreboard rather than becoming a fourth
+          filled button: a primary here would make suggesting an album a peer of
+          Competition, Infinite and Explore, and it is not one. */}
+      <Button
+        variant="outlined"
+        size="large"
+        startIcon={<LibraryMusicIcon />}
+        onClick={props.setShowSuggest}
+        sx={SECONDARY_ON_NIGHT}
+      >
+        Suggest an album
       </Button>
     </Stack>
   </Box>

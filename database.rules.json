@@ -21,6 +21,30 @@
           ".validate": false
         }
       }
+    },
+    "suggestions": {
+      "$suggestionId": {
+        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['albumId', 'countryCode', 'uid', 'createdAt'])",
+        "albumId": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{22}$/)"
+        },
+        "countryCode": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Z]{2}$/)"
+        },
+        "note": {
+          ".validate": "newData.isString() && newData.val().length <= 500"
+        },
+        "uid": {
+          ".validate": "newData.val() == auth.uid"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && newData.val() == now"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }

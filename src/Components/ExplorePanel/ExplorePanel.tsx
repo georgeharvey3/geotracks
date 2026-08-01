@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
+import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import SkipNextIcon from "@mui/icons-material/SkipNext";
 
 import CountryInput from "../CountryInput/CountryInput";
@@ -22,6 +23,9 @@ interface ExplorePanelProps {
   onPlayClicked: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onSkipClicked: () => void;
   onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  /** The silent country the player has picked in order to ask about it. */
+  askedAboutCountry: string | null;
+  onSuggestClicked: () => void;
   /** The Playable countries, the only ones the input may suggest. */
   playableCountries: string[];
   countryInputRef: React.RefObject<HTMLInputElement>;
@@ -76,6 +80,25 @@ const ExplorePanel = (props: ExplorePanelProps) => (
         </Stack>
 
         <TrackReveal song={props.song} />
+      </Stack>
+    )}
+
+    {/* The offer, not the navigation: picking a silent country puts this here
+        and stops. Going to the form is a deliberate second action, so a stray
+        tap while listening can never cost the Song. */}
+    {props.askedAboutCountry !== null && (
+      <Stack spacing={0.75} alignItems="center" sx={{ mt: 1.5 }}>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          No music from {props.askedAboutCountry} yet
+        </Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<LibraryMusicIcon />}
+          onClick={props.onSuggestClicked}
+        >
+          Suggest an album
+        </Button>
       </Stack>
     )}
 

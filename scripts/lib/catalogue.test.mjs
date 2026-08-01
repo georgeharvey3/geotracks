@@ -19,9 +19,12 @@ import {
   rank,
   isConfident,
   serialiseLibrary,
-} from "./backfill-albums.mjs";
+  // Vitest owns the bare name in this file.
+  describe as describeCandidate,
+} from "./catalogue.mjs";
+import { albumIdFrom } from "./spotify.mjs";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 describe("serialiseLibrary", () => {
   it("round-trips the committed albums.json byte for byte", () => {
@@ -197,5 +200,68 @@ describe("isConfident", () => {
 
   it("refuses when there is nothing to judge", () => {
     expect(isConfident([])).toBe(false);
+  });
+});
+
+describe("describe", () => {
+  it("ticks the signals that corroborate, and names the ones that don't", () => {
+    expect(
+      describeCandidate({
+        score: 1,
+        label: "Smithsonian Folkways Recordings",
+        labelMatches: true,
+        releaseYear: 2007,
+        yearMatches: true,
+        totalTracks: 11,
+      }),
+    ).toBe("1.00 · Smithsonian Folkways Recordings ✓ · 2007 ✓ · 11 tracks");
+  });
+
+  it("says so when Spotify returned no label at all", () => {
+    expect(
+      describeCandidate({
+        score: 0.76,
+        label: "",
+        labelMatches: false,
+        releaseYear: null,
+        yearMatches: false,
+        totalTracks: 16,
+      }),
+    ).toBe("0.76 · no label · ? · 16 tracks");
+  });
+});
+
+describe("albumIdFrom", () => {
+  // The review prompt's most important input: when the search misses, a human
+  // goes and finds the record and pastes whatever Spotify's UI gave them.
+  it("reads the id out of a share link, with its tracking parameter", () => {
+    expect(
+      albumIdFrom(
+        "https://open.spotify.com/album/63VFjCo8dPOoELNHXJLjpd?si=abc123",
+      ),
+    ).toBe("63VFjCo8dPOoELNHXJLjpd");
+  });
+
+  it("reads a spotify: URI and a bare id", () => {
+    expect(albumIdFrom("spotify:album:63VFjCo8dPOoELNHXJLjpd")).toBe(
+      "63VFjCo8dPOoELNHXJLjpd",
+    );
+    expect(albumIdFrom("  63VFjCo8dPOoELNHXJLjpd  ")).toBe(
+      "63VFjCo8dPOoELNHXJLjpd",
+    );
+  });
+
+  // The prompt distinguishes a link from a command by this returning null, so
+  // a single letter must never look like an id.
+  it("is null for the prompt's own commands and for junk", () => {
+    for (const input of ["r", "s", "q", "1", "", "not a link"]) {
+      expect(albumIdFrom(input)).toBeNull();
+    }
+  });
+
+  it("is null for a track link, which is not an album", () => {
+    expect(
+      albumIdFrom("https://open.spotify.com/track/0EnhV8BpUTfsNYmHg5ayzi"),
+    ).toBeNull();
   });
 });

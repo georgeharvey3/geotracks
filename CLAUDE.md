@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `node scripts/build-map-geometry.mjs` — Regenerate the map's bundled country geometry (only needed after changing `src/countries.json` or the straggler threshold; see ADR-0002)
 - `node scripts/build-logo-assets.ts` — Regenerate `public/`'s favicon, PWA icons and `logo.svg` from the mark's geometry (only needed after changing the mark; needs Chrome on the machine)
 - `node scripts/backfill-albums.mjs` — Reconcile `src/albums.json` against the Folkways catalogue and look up what's missing on Spotify (dry run; `--apply` to merge — see “Music library”)
+- `node scripts/review-albums.mjs` — Walk what the backfill would not decide, one album at a time (see “Music library”)
 
 ### CI/CD & deployment
 
@@ -141,10 +142,14 @@ Every Album in the app comes from the **Smithsonian Folkways Archive**, catalogu
 
 The catalogue is now committed as `scripts/data/folkways-catalogue.json` — the sheets' country + title columns, 805 albums — so the gap is a diff rather than a memory. `src/albums.json` is a **strict subset** of it: every album the app holds is in the catalogue, and the 145 that aren't yet held are exactly the work left. `node scripts/backfill-albums.mjs` computes that diff, searches Spotify for each missing album and reports what it found; `--apply` merges the confident matches.
 
-Two things about that script are load-bearing rather than incidental:
+The backfill comes in two halves, and the split is the point: **the machine settles what it can prove, and hands a human everything else** rather than guessing. A wrong match here is a player asked to name a country from another country's music — the one error the app cannot show them.
 
-- **It only ever adds.** Albums already in `albums.json` are left untouched, so a re-run is safe and the file's provenance is stable.
-- **It refuses to guess.** The archive is full of near-identical titles (`Music of Indonesia, Vol. 1` through `Vol. 20`), so a match is auto-accepted only on a close title _and_ an archive label _and_ no equally-good runner-up. Everything else goes to `scripts/data/backfill-report.md` for a human. A wrong match here is a player asked to guess a country from another country's music — the one error the app cannot show them.
+- `scripts/backfill-albums.mjs` runs the whole gap in one pass. It **only ever adds**, so a re-run is safe. A match is auto-accepted only on a close title, no equally-good runner-up, **and** a corroborating release year. Everything else goes to `scripts/data/backfill-review.json`.
+- `scripts/review-albums.mjs` walks that pile interactively: it shows the candidates and takes a number, a fresh search, or **a Spotify link pasted in** — the last being the one that matters, because when search misses, finding the record yourself is the only fix. Each acceptance is written to `albums.json` immediately, so quitting halfway loses nothing, and re-running resumes (an album in the library is no longer in the gap).
+
+Shared plumbing lives in `scripts/lib/`: `spotify.mjs` (the API client) and `catalogue.mjs` (matching, and reading/writing the library).
+
+Two findings about Spotify are recorded in those files because they cost a debugging round each and are invisible from the code alone: **search results are `SimplifiedAlbumObject` and carry no `label`**, and **`label` is deprecated and no longer returned even on the full album object** — so the release year is the only corroboration available. `GET /albums?ids=` also 403s outright for a client-credentials token. That is why 20 of the 145 missing albums, the ones whose catalogue title has no year, can never auto-accept and always reach the review pile.
 
 The sheets' `Group` column is an ethnic group as often as a country, so the catalogue records its two resolutions in `_resolved` and `_excluded` rather than burying them.
 
@@ -161,7 +166,8 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`, `useHasHover`
 - `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }` (four-space indent, non-ASCII as `\uXXXX` — `backfill-albums.mjs` preserves both)
 - `scripts/data/folkways-catalogue.json` — The Folkways catalogue the library is reconciled against (see “Music library”)
-- `scripts/backfill-albums.mjs` — The reconciliation + Spotify lookup, with `scripts/backfill-albums.test.mjs` pinning its serialiser and matcher
+- `scripts/backfill-albums.mjs` — The batch reconciliation + Spotify lookup; `scripts/review-albums.mjs` — the interactive pass over what it wouldn't decide
+- `scripts/lib/spotify.mjs` / `scripts/lib/catalogue.mjs` — Their shared API client and matching, with `catalogue.test.mjs` pinning the serialiser, the matcher and the confidence gate
 - `src/countries.json` — Array of `{ code, name, lat, lon }` used for autocomplete, distance/bearing calculations, and the map join
 - `src/map/` — Map geometry: generated `countries-50m.topo.json` + `stragglers.json`, the `geography.ts` join, and the shared `fills.ts` palette
 - `src/Components/WorldMap/BaseMap.tsx` — The surface-neutral map (see “Map Interface”)

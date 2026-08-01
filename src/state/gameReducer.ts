@@ -3,6 +3,7 @@ import countriesJSON from "../countries.json";
 import getDistance from "../helpers/getDistance";
 import getBearing from "../helpers/getBearing";
 import getDailySongs from "../helpers/getDailySongs";
+import { DAILY_RUN_VERSION, DailyRunRecord } from "../helpers/dailyRun";
 import {
   Album,
   Song,
@@ -69,7 +70,12 @@ export interface GameState {
 }
 
 export type GameAction =
+  // Infinite's way in. Competition arrives through the three Daily Run actions
+  // below instead, so the day's record decides which one the menu offers.
   | { type: "SET_MODE"; mode: string }
+  | { type: "START_RUN" }
+  | { type: "RESUME_RUN"; record: DailyRunRecord }
+  | { type: "SHOW_RUN_SUMMARY"; record: DailyRunRecord }
   | { type: "SHOW_SCOREBOARD" }
   | { type: "SHOW_EXPLORE" }
   | { type: "SUBMIT_GUESS"; countryAnswer: string }
@@ -160,6 +166,138 @@ const roundReset = {
   roundPoints: 0,
 };
 
+// Fields reset when a Run begins or is left behind: everything a Run
+// accumulates, back to nothing.
+const runReset = {
+  ...roundReset,
+  geoHintsEnabled: false,
+  showGeoHints: false,
+  questionIndex: 0,
+  turnIndex: 0,
+  score: 0,
+  turns: [] as TurnResult[],
+  nameInputValue: "",
+  scoreSubmitted: false,
+};
+
+/**
+ * Open Competition on the day's first Song. The Run is *the day's seeded ten*,
+ * so it is anchored at index 0 whatever else the session has drawn from the
+ * list already — a Run that opened halfway down it would not be the Run
+ * everyone else played.
+ */
+function startRun(state: GameState): GameState {
+  const picked = pickNextSong(state.albums, state.dailySongs, 0);
+
+  return {
+    ...state,
+    ...runReset,
+    screen: "playing",
+    gameMode: GAME_MODES.competition,
+    song: picked.song,
+    albums: picked.albums,
+    dailySongIndex: picked.dailySongIndex,
+  };
+}
+
+/**
+ * The day's record, back as the Run it describes — the inbound half of the
+ * mapping `dailyRunRecordFrom` is the outbound half of. Both directions are
+ * written out field by field on purpose (ADR-0004): a field that matters to
+ * persistence cannot be renamed without walking past them.
+ */
+function resumedRun(state: GameState, record: DailyRunRecord): GameState {
+  // `dailySongIndex` is the *next* Song to draw, so the one in flight is the
+  // one before it.
+  const song = state.dailySongs[record.dailySongIndex - 1];
+  // Fail open: a record we cannot land a Song from is a bug of ours, and the
+  // player should get their Run rather than a dead button.
+  if (!song) return startRun(state);
+
+  const { round } = record;
+  return {
+    ...state,
+    screen: "playing",
+    gameMode: GAME_MODES.competition,
+    song,
+    dailySongIndex: record.dailySongIndex,
+    turnIndex: record.turnIndex,
+    questionIndex: record.turnIndex,
+    score: record.score,
+    turns: record.turns,
+    scoreSubmitted: record.scoreSubmitted,
+    nameInputValue: "",
+    // The round in flight comes back with the Run. Restoring to a clean turn
+    // boundary would let two wrong guesses plus a reload buy back a fresh
+    // 150-point first attempt.
+    guesses: round.guesses,
+    submitted: round.guesses.length > 0,
+    finished: round.finished,
+    correct: round.correct,
+    roundPoints: round.roundPoints,
+    geoHintsEnabled: round.geoHintsEnabled,
+    // Only the scoring flag is stored, because only it is owed to the Run. The
+    // switch comes back on with it: the round has already been charged for the
+    // hints, so showing them is the generous reading of a record that cannot
+    // say whether the player had since hidden them.
+    showGeoHints: round.geoHintsEnabled,
+    errorMessage:
+      round.finished && !round.correct ? `Answer was: ${song.country}` : "",
+  };
+}
+
+/** The other way a record comes back: a Run already played, as its summary. */
+function reopenedRunSummary(
+  state: GameState,
+  record: DailyRunRecord,
+): GameState {
+  return {
+    ...state,
+    ...runReset,
+    screen: "runSummary",
+    gameMode: GAME_MODES.competition,
+    turnIndex: NUM_COMPETITION_TURNS,
+    dailySongIndex: record.dailySongIndex,
+    score: record.score,
+    turns: record.turns,
+    // Load-bearing: without it the name box comes back, and one score goes onto
+    // the append-only leaderboard every time the summary is reopened.
+    scoreSubmitted: record.scoreSubmitted,
+  };
+}
+
+/**
+ * The Run as the day's record, or `null` when the player is not on one. The
+ * status is read from the Run's own turn count rather than the screen: the
+ * record has to still read "finished" long after the player walked back to the
+ * menu. See ADR-0004 for why this is a hand-mapped record and not a state dump.
+ */
+export function dailyRunRecordFrom(
+  state: GameState,
+  day: string,
+): DailyRunRecord | null {
+  if (state.gameMode !== GAME_MODES.competition) return null;
+
+  return {
+    v: DAILY_RUN_VERSION,
+    date: day,
+    status:
+      state.turnIndex >= NUM_COMPETITION_TURNS ? "finished" : "in-progress",
+    turnIndex: state.turnIndex,
+    score: state.score,
+    dailySongIndex: state.dailySongIndex,
+    scoreSubmitted: state.scoreSubmitted,
+    turns: state.turns,
+    round: {
+      guesses: state.guesses,
+      geoHintsEnabled: state.geoHintsEnabled,
+      finished: state.finished,
+      correct: state.correct,
+      roundPoints: state.roundPoints,
+    },
+  };
+}
+
 /**
  * The finished round, snapshotted as the Run's record of it. Called as the round
  * is retired, so `state` is still the round that just ended.
@@ -184,6 +322,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "SET_MODE":
       return { ...state, gameMode: action.mode, screen: "playing" };
+
+    // Starting the Daily Run spends the day. Nothing here consults storage —
+    // the day's record is read above the reducer and arrives on the action.
+    case "START_RUN":
+      return startRun(state);
+
+    case "RESUME_RUN":
+      return resumedRun(state, action.record);
+
+    // Today's Run, seen again. A finished Run outlives the session that played
+    // it, so its summary is reopened from the record rather than from state.
+    case "SHOW_RUN_SUMMARY":
+      return reopenedRunSummary(state, action.record);
 
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };
@@ -315,21 +466,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       return {
         ...state,
-        ...roundReset,
+        // Leaving the screen discards the Run *from state*. The day's record
+        // outlives it in storage — that is what the menu reads to decide
+        // whether today's Run is still to play, half-played or done.
+        ...runReset,
         screen: "menu",
         gameMode: "",
-        geoHintsEnabled: false,
-        showGeoHints: false,
-        questionIndex: 0,
-        turnIndex: 0,
-        score: 0,
-        // Leaving the screen discards the Run: it lives in memory only, for as
-        // long as the player stays on it. The name box goes with it — the
-        // leaderboard write no longer reloads the page, so nothing else would
-        // stop one player's name carrying into the next Run.
-        turns: [],
-        nameInputValue: "",
-        scoreSubmitted: false,
         song: picked.song,
         albums: picked.albums,
         dailySongIndex: picked.dailySongIndex,

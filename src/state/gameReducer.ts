@@ -86,58 +86,78 @@ export type GameAction =
   | { type: "SCORE_SUBMITTED" }
   | { type: "SET_SONG_METADATA"; link: string; metadata: SongMetadata };
 
-// Pure song selection: mirrors the daily-seeded-then-random pool behaviour.
-// Returns the chosen song plus the album pool and daily index after selection.
-function pickNextSong(
+/**
+ * A Song drawn at random from the album pool, with its Album removed so a
+ * session never plays the same record twice.
+ *
+ * This is what every draw *except* Competition's makes. The day's seeded list
+ * belongs to the Daily Run alone (issue #49): a player who opens Infinite first
+ * would otherwise hear today's Competition Songs, and then walk into the one Run
+ * they get that day already holding the answers. The seed is there to make Runs
+ * comparable between players, and there is no second Run to fall back on.
+ */
+function pickRandomSong(albums: Album[]): { song: Song; albums: Album[] } {
+  const albumIndex = Math.floor(Math.random() * albums.length);
+  // Invariant: the album pool outlasts any session (it only shrinks by one per
+  // round), so a random in-range index always lands on an album with at least
+  // one track.
+  const album = albums[albumIndex]!;
+  const trackIndex = Math.floor(Math.random() * album.tracks.length);
+
+  return {
+    song: {
+      country: album.country,
+      link: album.tracks[trackIndex]!,
+      album: album.album_name,
+    },
+    albums: albums.filter((_, index) => index !== albumIndex),
+  };
+}
+
+/**
+ * The next Song of the day's seeded ten — Competition's draw, and the only one
+ * that walks `dailySongIndex`. Past the end of the list the day has nothing left
+ * to say, so it falls back to a random draw; with 785 Albums that is
+ * unreachable, but a pool too small to seed ten Songs from must still yield a
+ * Song rather than nothing.
+ */
+function pickDailySong(
   albums: Album[],
   dailySongs: Song[],
   dailySongIndex: number,
 ): { song: Song; albums: Album[]; dailySongIndex: number } {
-  let song: Song;
-  let nextDailyIndex = dailySongIndex;
-  let albumIndexToRemove = -1;
-
-  const dailySong = dailySongs[dailySongIndex];
-  if (dailySong !== undefined) {
-    song = dailySong;
-    nextDailyIndex = dailySongIndex + 1;
-    albumIndexToRemove = albums.findIndex(
-      (a) => a.album_name === dailySong.album,
-    );
-  } else {
-    albumIndexToRemove = Math.floor(Math.random() * albums.length);
-    // Invariant: the album pool outlasts any session (it only shrinks by one
-    // per round), so a random in-range index always lands on an album with at
-    // least one track.
-    const albumChoice = albums[albumIndexToRemove]!;
-    const songIndexChoice = Math.floor(
-      Math.random() * albumChoice.tracks.length,
-    );
-    song = {
-      country: albumChoice.country,
-      link: albumChoice.tracks[songIndexChoice]!,
-      album: albumChoice.album_name,
-    };
+  const song = dailySongs[dailySongIndex];
+  if (song === undefined) {
+    return { ...pickRandomSong(albums), dailySongIndex };
   }
 
-  const nextAlbums =
-    albumIndexToRemove >= 0
-      ? albums.filter((_, index) => index !== albumIndexToRemove)
-      : albums;
+  // The Song is already chosen; its Album leaves the pool so a later random
+  // draw cannot land on the record the day has already spent.
+  const albumIndex = albums.findIndex((a) => a.album_name === song.album);
 
-  return { song, albums: nextAlbums, dailySongIndex: nextDailyIndex };
+  return {
+    song,
+    albums:
+      albumIndex >= 0
+        ? albums.filter((_, index) => index !== albumIndex)
+        : albums,
+    dailySongIndex: dailySongIndex + 1,
+  };
 }
 
 export function createInitialState(albums: Album[] = albumsJSON): GameState {
   const dailySongs = getDailySongs(albums);
-  const picked = pickNextSong(albums, dailySongs, 0);
+  // The Song the menu is standing on is the one Infinite opens with, and no
+  // mode has been chosen yet — so it is drawn at random and the day is still
+  // whole. `START_RUN` is what spends the day's first Song.
+  const picked = pickRandomSong(albums);
 
   return {
     screen: "menu",
     gameMode: "",
     albums: picked.albums,
     dailySongs,
-    dailySongIndex: picked.dailySongIndex,
+    dailySongIndex: 0,
     song: picked.song,
     guesses: [],
     submitted: false,
@@ -187,7 +207,7 @@ const runReset = {
  * everyone else played.
  */
 function startRun(state: GameState): GameState {
-  const picked = pickNextSong(state.albums, state.dailySongs, 0);
+  const picked = pickDailySong(state.albums, state.dailySongs, 0);
 
   return {
     ...state,
@@ -425,44 +445,45 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
-      const picked = pickNextSong(
-        state.albums,
-        state.dailySongs,
-        state.dailySongIndex,
-      );
-
-      const base: GameState = {
+      const nextRound: GameState = {
         ...state,
         ...roundReset,
         questionIndex: state.questionIndex + 1,
-        song: picked.song,
-        albums: picked.albums,
-        dailySongIndex: picked.dailySongIndex,
       };
 
+      // Which list the next Song comes off is the whole of issue #49: the day's
+      // seeded ten are Competition's, and Infinite draws at random beside them.
       if (state.gameMode === GAME_MODES.competition) {
+        const picked = pickDailySong(
+          state.albums,
+          state.dailySongs,
+          state.dailySongIndex,
+        );
         const reachedFinalTurn = state.turnIndex === NUM_COMPETITION_TURNS - 1;
+
         return {
-          ...base,
+          ...nextRound,
+          song: picked.song,
+          albums: picked.albums,
+          dailySongIndex: picked.dailySongIndex,
           geoHintsEnabled: false,
           showGeoHints: false,
           turnIndex: state.turnIndex + 1,
           // The retired turn joins the Run's record. Only Competition keeps one:
           // Infinite never ends, so nothing would ever read it.
           turns: [...state.turns, turnResultFrom(state)],
-          screen: reachedFinalTurn ? "runSummary" : base.screen,
+          screen: reachedFinalTurn ? "runSummary" : nextRound.screen,
         };
       }
 
-      return base;
+      const picked = pickRandomSong(state.albums);
+      return { ...nextRound, song: picked.song, albums: picked.albums };
     }
 
     case "RESET_TO_MENU": {
-      const picked = pickNextSong(
-        state.albums,
-        state.dailySongs,
-        state.dailySongIndex,
-      );
+      // The menu is nobody's mode, so its Song is a random one and the day is
+      // left exactly as the player left it.
+      const picked = pickRandomSong(state.albums);
 
       return {
         ...state,
@@ -474,7 +495,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         gameMode: "",
         song: picked.song,
         albums: picked.albums,
-        dailySongIndex: picked.dailySongIndex,
       };
     }
 

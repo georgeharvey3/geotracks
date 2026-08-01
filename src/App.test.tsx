@@ -32,10 +32,24 @@ vi.mock("react-simple-maps", async (importOriginal) => ({
   ZoomableGroup: (await import("./test/zoomableGroupFake")).default,
 }));
 
-// The reducer seeds each round from getDailySongs(albums); compute the same
-// deterministic daily set here so tests know the correct answer per round.
+// Competition plays the day's seeded ten; compute the same deterministic set
+// here so tests know the correct answer per turn. Infinite does *not* — it
+// draws at random (issue #49) — so its answer is read from the Song the player
+// was handed, never from this list.
 const dailySongs = getDailySongs(albumsJSON as Album[]);
 const answerAt = (round: number) => dailySongs[round]!.country;
+
+// Every track link in the library, against the country it comes from: no link
+// appears under two countries, so this reads back an answer unambiguously.
+const countryByLink = new Map(
+  (albumsJSON as Album[]).flatMap((album) =>
+    album.tracks.map((track) => [track, album.country] as const),
+  ),
+);
+
+/** The answer to the round now being played, whichever Song it drew. */
+const currentAnswer = () =>
+  countryByLink.get(spotifyPlayerControl.loadedLink()!)!;
 
 const allCountryNames = countriesJSON.map((c) => c.name);
 function wrongCountriesFor(answer: string, count: number): string[] {
@@ -316,7 +330,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      const wrong = wrongCountriesFor(answerAt(0), 1)[0]!;
+      const wrong = wrongCountriesFor(currentAnswer(), 1)[0]!;
       await submitGuess(wrong);
 
       expect(screen.getByText(wrong)).toBeInTheDocument();
@@ -332,7 +346,7 @@ describe("App integration", () => {
 
       await userEvent.click(screen.getByLabelText("GeoHints"));
 
-      const wrong = wrongCountriesFor(answerAt(0), 1)[0]!;
+      const wrong = wrongCountriesFor(currentAnswer(), 1)[0]!;
       await submitGuess(wrong);
 
       // Once in the guess list, once on the map.
@@ -345,7 +359,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      const answer = answerAt(0);
+      const answer = currentAnswer();
       for (const wrong of wrongCountriesFor(answer, 5)) {
         await submitGuess(wrong);
       }
@@ -362,7 +376,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      for (const wrong of wrongCountriesFor(answerAt(0), 5)) {
+      for (const wrong of wrongCountriesFor(currentAnswer(), 5)) {
         await submitGuess(wrong);
       }
       await userEvent.click(screen.getByRole("button", { name: /Next Song/i }));
@@ -377,7 +391,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      const answer = answerAt(0);
+      const answer = currentAnswer();
       const wrong = wrongCountriesFor(answer, 1)[0]!;
 
       await guessOnMap(wrong);
@@ -396,7 +410,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      const [typed, clicked] = wrongCountriesFor(answerAt(0), 2) as [
+      const [typed, clicked] = wrongCountriesFor(currentAnswer(), 2) as [
         string,
         string,
       ];
@@ -423,7 +437,7 @@ describe("App integration", () => {
       await startInfinite();
       act(() => spotifyPlayerControl.emitReady());
 
-      const answer = answerAt(0);
+      const answer = currentAnswer();
       const wrongs = wrongCountriesFor(answer, 5);
       for (const wrong of wrongs) {
         await guessOnMap(wrong);

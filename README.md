@@ -10,7 +10,7 @@ GeoTracks is a music geography guessing game. Players listen to a short Spotify 
 - **Infinite** — Unlimited rounds for casual play, no scoring.
 - **Scoreboard** — View the top 10 competition scores.
 
-Each day everyone starts with the same seeded set of songs (deterministic per calendar date), so scores are comparable. Once the daily set is exhausted, songs are chosen at random.
+Competition plays the same ten songs for everyone each day (seeded deterministically from the calendar date), so scores are comparable. Infinite draws at random from the whole library instead — playing it first never gives away the day's songs.
 
 ## How Scoring Works
 

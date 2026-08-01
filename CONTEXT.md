@@ -46,6 +46,10 @@ _Avoid_: Test, session, game (a session may hold several Runs); attempt (an Atte
 The single Competition Run a browser profile may play on a given calendar day. It is spent the moment the player starts it, not when they finish it; left unfinished, it is resumed where it stood rather than restarted; once complete, it is seen again as its Run summary. It rolls over at device-local midnight, together with the day's seeded Songs.
 _Avoid_: Daily challenge, daily attempt, one attempt per day.
 
+**Daily Songs**:
+The day's ten seeded Songs, the same for everyone who plays that calendar day, and the reason two Daily Run scores can be compared at all. They are the Daily Run's and no one else's: Infinite and the Song the menu opens on are drawn at random beside them, so nothing outside Competition can hand a player the day's answers early or spend one of its Songs.
+_Avoid_: The daily set, today's playlist, the seed (the seed is what produces them).
+
 **Turn result**:
 What a Run keeps about one finished turn: the Song as it was heard, the Turn outcome, how many attempts it took, the points it contributed, and whether geo-hints were on. The turn's individual Guesses are _not_ kept — how the player got there stops mattering once the turn is over.
 

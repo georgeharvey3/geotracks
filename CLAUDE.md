@@ -12,8 +12,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run test:coverage` — Run the suite with a V8 coverage report (`coverage/`); reported only, no enforced gate
 - `node scripts/build-map-geometry.mjs` — Regenerate the map's bundled country geometry (only needed after changing `src/countries.json` or the straggler threshold; see ADR-0002)
 - `node scripts/build-logo-assets.ts` — Regenerate `public/`'s favicon, PWA icons and `logo.svg` from the mark's geometry (only needed after changing the mark; needs Chrome on the machine)
-- `node scripts/backfill-albums.mjs` — Reconcile `src/albums.json` against the Folkways catalogue and look up what's missing on Spotify (dry run; `--apply` to merge — see “Music library”)
-- `node scripts/review-albums.mjs` — Walk what the backfill would not decide, one album at a time (see “Music library”)
 
 ### CI/CD & deployment
 
@@ -115,7 +113,7 @@ The **guess board** (`src/Components/Guesses/Guesses.tsx`) shows only the latest
 
 **Explore** (issue #37) is the surface where a player chooses a country in order to listen to it. It is **not a Game mode**: nothing is scored, recorded or submitted, there are no rounds, Guesses or Attempts, and it never touches the game's album pool, daily seeding, score or turn counter. It is reached from a third primary button on the menu (`SHOW_EXPLORE`), and it wears the same full-bleed layout as the game screen — map covering the viewport with `ExplorePanel` floating over a corner in landscape, a content-sized bottom tray in portrait (both via the shared `PanelSurface`).
 
-- **Playable countries** — a country is Playable when the app holds at least one Album for it: 122 of 246 today (120 polygons, 15 of the 87 straggler markers), and rising as the Folkways backfill lands (see “Music library”). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
+- **Playable countries** — a country is Playable when the app holds at least one Album for it: 134 of 246 today (132 polygons, 15 of the 87 straggler markers). Non-playable countries take the inert-land fill, keep the default cursor and ignore clicks, but **still show their name on hover** — an absence of music is not an absence of geography. Shapes the app has no country for at all look identical and differ only in having no name to show.
 - **Fills** — four flat states: inert land (non-playable), land (Playable), the near-white highlight (hover), and green for the country now playing. No rings or halos; Explore leaves the base map's `overlay` slot unused.
 - **Country queue** — built on first selection from all of a country's Albums' Songs, shuffled. Skip advances it; it is exhausted before any Song repeats, then drawn afresh and continued (the fresh draw never opens with the Song just heard). Choosing a country again — later in the visit, or on a later visit — **resumes** it rather than restarting it. Choosing the country already playing is a no-op.
 - **Playback** — choosing a country or skipping starts playback automatically on every device (the click on the map is itself the user gesture, so the game's desktop-width gate is deliberately not carried over). A finished Song advances the queue; pausing stops that run, because auto-advance is driven by the finished signal and nothing else. The track card is shown **un-gated** from the first note — artwork, title, artist, Album and the Spotify link — because Explore has nothing to withhold.
@@ -138,20 +136,9 @@ It is the third full-bleed map surface, wearing the game screen's layout exactly
 
 ### Music library
 
-Every Album in the app comes from the **Smithsonian Folkways Archive**, catalogued by hand into six per-continent Google Sheets in 2023 and then looked up on Spotify one album at a time. That second step never finished, which is what issue #41 is about.
+Every Album in the app comes from the **Smithsonian Folkways Archive**, catalogued by hand into six per-continent Google Sheets in 2023 and then looked up on Spotify one album at a time. `src/albums.json` is the result and is now the only record of it: 785 albums across 134 countries, edited by hand from here on.
 
-The catalogue is now committed as `scripts/data/folkways-catalogue.json` — the sheets' country + title columns, 805 albums — so the gap is a diff rather than a memory. `src/albums.json` is a **strict subset** of it: every album the app holds is in the catalogue, and the 145 that aren't yet held are exactly the work left. `node scripts/backfill-albums.mjs` computes that diff, searches Spotify for each missing album and reports what it found; `--apply` merges the confident matches.
-
-The backfill comes in two halves, and the split is the point: **the machine settles what it can prove, and hands a human everything else** rather than guessing. A wrong match here is a player asked to name a country from another country's music — the one error the app cannot show them.
-
-- `scripts/backfill-albums.mjs` runs the whole gap in one pass. It **only ever adds**, so a re-run is safe. A match is auto-accepted only on a close title, no equally-good runner-up, **and** a corroborating release year. Everything else goes to `scripts/data/backfill-review.json`.
-- `scripts/review-albums.mjs` walks that pile interactively: it shows the candidates and takes a number, a fresh search, or **a Spotify link pasted in** — the last being the one that matters, because when search misses, finding the record yourself is the only fix. Each acceptance is written to `albums.json` immediately, so quitting halfway loses nothing, and re-running resumes (an album in the library is no longer in the gap).
-
-Shared plumbing lives in `scripts/lib/`: `spotify.mjs` (the API client) and `catalogue.mjs` (matching, and reading/writing the library).
-
-Two findings about Spotify are recorded in those files because they cost a debugging round each and are invisible from the code alone: **search results are `SimplifiedAlbumObject` and carry no `label`**, and **`label` is deprecated and no longer returned even on the full album object** — so the release year is the only corroboration available. `GET /albums?ids=` also 403s outright for a client-credentials token. That is why 20 of the 145 missing albums, the ones whose catalogue title has no year, can never auto-accept and always reach the review pile.
-
-The sheets' `Group` column is an ethnic group as often as a country, so the catalogue records its two resolutions in `_resolved` and `_excluded` rather than burying them.
+The coverage review (issue #41) is closed. It reconciled the library against the sheets and added the 125 albums that pass had never reached; the twenty it could not resolve — mostly untitled-by-year entries like `China`, `Croatia` and `One Sky` — were left out, and every country they belong to is Playable from another album regardless. The tooling that did it has been removed; it is in the history if it is ever wanted again.
 
 ### Geo Hints System
 
@@ -164,10 +151,7 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/context/GameContext.tsx` — `GameProvider` + `useGame()` / `useLeaderboard()` context hooks
 - `src/context/ExploreContext.tsx` — `ExploreProvider` + `useExplore()`, mounted as GameProvider's sibling
 - `src/hooks/` — Side-effect seams: `useSpotifyPlayer`, `useKeyboardShortcuts`, `useLeaderboard`, `useHasHover`
-- `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }` (four-space indent, non-ASCII as `\uXXXX` — `backfill-albums.mjs` preserves both)
-- `scripts/data/folkways-catalogue.json` — The Folkways catalogue the library is reconciled against (see “Music library”)
-- `scripts/backfill-albums.mjs` — The batch reconciliation + Spotify lookup; `scripts/review-albums.mjs` — the interactive pass over what it wouldn't decide
-- `scripts/lib/spotify.mjs` / `scripts/lib/catalogue.mjs` — Their shared API client and matching, with `catalogue.test.mjs` pinning the serialiser, the matcher and the confidence gate
+- `src/albums.json` — Array of `{ country, album_name, tracks: [spotify_urls] }` (four-space indent, non-ASCII as `\uXXXX`; in `.prettierignore` so both survive a format run)
 - `src/countries.json` — Array of `{ code, name, lat, lon }` used for autocomplete, distance/bearing calculations, and the map join
 - `src/map/` — Map geometry: generated `countries-50m.topo.json` + `stragglers.json`, the `geography.ts` join, and the shared `fills.ts` palette
 - `src/Components/WorldMap/BaseMap.tsx` — The surface-neutral map (see “Map Interface”)

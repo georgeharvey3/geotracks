@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   DailyRunRecord,
-  DailyRunStatus,
+  DayStatus,
   dayString,
   isRecordForDay,
   parseDailyRun,
@@ -17,7 +17,7 @@ export interface DailyRun {
   /** Today's record, or `null` when today's Run is still to play. */
   record: DailyRunRecord | null;
   /** What the menu needs: is today's Run unplayed, half-played, or done. */
-  status: "none" | DailyRunStatus;
+  status: DayStatus;
 }
 
 /**

@@ -4,7 +4,7 @@ import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import PublicIcon from "@mui/icons-material/Public";
 import { GameModes } from "../../types";
-import { DailyRunStatus } from "../../helpers/dailyRun";
+import { DayStatus } from "../../helpers/dailyRun";
 import { COLORS } from "../../tokens";
 
 interface MenuProps {
@@ -12,7 +12,7 @@ interface MenuProps {
   /** Infinite's way in. Competition goes through the Daily Run instead. */
   setGameMode: (mode: string) => void;
   /** Today's Competition Run: still to play, half-played, or done. */
-  dailyRunStatus: "none" | DailyRunStatus;
+  dailyRunStatus: DayStatus;
   onDailyRun: () => void;
   setShowScoreboard: (show: boolean) => void;
   setShowExplore: () => void;
@@ -22,7 +22,7 @@ interface MenuProps {
 // A finished day reopens its Run summary rather than going dead: the Run is
 // already stored to make resuming work, and a player coming back at lunchtime
 // most likely wants *what was that track?*, which is half the summary's job.
-const DAILY_RUN_LABELS: Record<"none" | DailyRunStatus, string> = {
+const DAILY_RUN_LABELS: Record<DayStatus, string> = {
   none: "Competition Mode",
   "in-progress": "Resume today's Run",
   finished: "Today's Run",

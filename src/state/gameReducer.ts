@@ -201,6 +201,72 @@ function startRun(state: GameState): GameState {
 }
 
 /**
+ * The day's record, back as the Run it describes — the inbound half of the
+ * mapping `dailyRunRecordFrom` is the outbound half of. Both directions are
+ * written out field by field on purpose (ADR-0004): a field that matters to
+ * persistence cannot be renamed without walking past them.
+ */
+function resumedRun(state: GameState, record: DailyRunRecord): GameState {
+  // `dailySongIndex` is the *next* Song to draw, so the one in flight is the
+  // one before it.
+  const song = state.dailySongs[record.dailySongIndex - 1];
+  // Fail open: a record we cannot land a Song from is a bug of ours, and the
+  // player should get their Run rather than a dead button.
+  if (!song) return startRun(state);
+
+  const { round } = record;
+  return {
+    ...state,
+    screen: "playing",
+    gameMode: GAME_MODES.competition,
+    song,
+    dailySongIndex: record.dailySongIndex,
+    turnIndex: record.turnIndex,
+    questionIndex: record.turnIndex,
+    score: record.score,
+    turns: record.turns,
+    scoreSubmitted: record.scoreSubmitted,
+    nameInputValue: "",
+    // The round in flight comes back with the Run. Restoring to a clean turn
+    // boundary would let two wrong guesses plus a reload buy back a fresh
+    // 150-point first attempt.
+    guesses: round.guesses,
+    submitted: round.guesses.length > 0,
+    finished: round.finished,
+    correct: round.correct,
+    roundPoints: round.roundPoints,
+    geoHintsEnabled: round.geoHintsEnabled,
+    // Only the scoring flag is stored, because only it is owed to the Run. The
+    // switch comes back on with it: the round has already been charged for the
+    // hints, so showing them is the generous reading of a record that cannot
+    // say whether the player had since hidden them.
+    showGeoHints: round.geoHintsEnabled,
+    errorMessage:
+      round.finished && !round.correct ? `Answer was: ${song.country}` : "",
+  };
+}
+
+/** The other way a record comes back: a Run already played, as its summary. */
+function reopenedRunSummary(
+  state: GameState,
+  record: DailyRunRecord,
+): GameState {
+  return {
+    ...state,
+    ...runReset,
+    screen: "runSummary",
+    gameMode: GAME_MODES.competition,
+    turnIndex: NUM_COMPETITION_TURNS,
+    dailySongIndex: record.dailySongIndex,
+    score: record.score,
+    turns: record.turns,
+    // Load-bearing: without it the name box comes back, and one score goes onto
+    // the append-only leaderboard every time the summary is reopened.
+    scoreSubmitted: record.scoreSubmitted,
+  };
+}
+
+/**
  * The Run as the day's record, or `null` when the player is not on one. The
  * status is read from the Run's own turn count rather than the screen: the
  * record has to still read "finished" long after the player walked back to the
@@ -262,61 +328,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "START_RUN":
       return startRun(state);
 
-    case "RESUME_RUN": {
-      const { record } = action;
-      // `dailySongIndex` is the *next* Song to draw, so the one in flight is
-      // the one before it.
-      const song = state.dailySongs[record.dailySongIndex - 1];
-      // Fail open: a record we cannot land a Song from is a bug of ours, and
-      // the player should get their Run rather than a dead button.
-      if (!song) return startRun(state);
-
-      const { round } = record;
-      return {
-        ...state,
-        screen: "playing",
-        gameMode: GAME_MODES.competition,
-        song,
-        dailySongIndex: record.dailySongIndex,
-        turnIndex: record.turnIndex,
-        questionIndex: record.turnIndex,
-        score: record.score,
-        turns: record.turns,
-        scoreSubmitted: record.scoreSubmitted,
-        nameInputValue: "",
-        // The round in flight comes back with the Run. Restoring to a clean
-        // turn boundary would let two wrong guesses plus a reload buy back a
-        // fresh 150-point first attempt.
-        guesses: round.guesses,
-        submitted: round.guesses.length > 0,
-        finished: round.finished,
-        correct: round.correct,
-        roundPoints: round.roundPoints,
-        geoHintsEnabled: round.geoHintsEnabled,
-        showGeoHints: round.geoHintsEnabled,
-        errorMessage:
-          round.finished && !round.correct ? `Answer was: ${song.country}` : "",
-      };
-    }
+    case "RESUME_RUN":
+      return resumedRun(state, action.record);
 
     // Today's Run, seen again. A finished Run outlives the session that played
     // it, so its summary is reopened from the record rather than from state.
-    case "SHOW_RUN_SUMMARY": {
-      const { record } = action;
-      return {
-        ...state,
-        ...runReset,
-        screen: "runSummary",
-        gameMode: GAME_MODES.competition,
-        turnIndex: NUM_COMPETITION_TURNS,
-        dailySongIndex: record.dailySongIndex,
-        score: record.score,
-        turns: record.turns,
-        // Load-bearing: without it the name box comes back, and one score goes
-        // onto the append-only leaderboard every time the summary is reopened.
-        scoreSubmitted: record.scoreSubmitted,
-      };
-    }
+    case "SHOW_RUN_SUMMARY":
+      return reopenedRunSummary(state, action.record);
 
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };

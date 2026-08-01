@@ -17,6 +17,7 @@ import countriesJSON from "./countries.json";
 import { Album } from "./types";
 import { spotifyPlayerControl } from "./test/spotifyPlayerFake";
 import { leaderboardControl } from "./test/leaderboardFake";
+import { DAILY_RUN_STORAGE_KEY } from "./hooks/useDailyRun";
 
 // Integration tests mount the real <App> (real reducer, context, routing and
 // keyboard shortcuts) and mock ONLY the two side-effectful seams: the Spotify
@@ -835,7 +836,7 @@ describe("App integration", () => {
       await startCompetition();
       await userEvent.click(homeButton());
 
-      localStorage.setItem("geotracks:dailyRun", "{ half a record");
+      localStorage.setItem(DAILY_RUN_STORAGE_KEY, "{ half a record");
       reload();
 
       expect(

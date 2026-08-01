@@ -34,7 +34,8 @@ function runInProgress(): GameState {
 
 beforeEach(() => {
   localStorage.clear();
-  vi.useFakeTimers();
+  // Only Date: faking every timer would take React's scheduler with it.
+  vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(AUGUST_1);
 });
 

@@ -25,6 +25,13 @@ export interface DailyRunRound {
 
 export type DailyRunStatus = "in-progress" | "finished";
 
+/**
+ * The three states of the day as anything outside this module sees them: the
+ * two a record can be in, plus the one there is no record for. What the menu's
+ * Competition button is drawn from.
+ */
+export type DayStatus = "none" | DailyRunStatus;
+
 export interface DailyRunRecord {
   v: typeof DAILY_RUN_VERSION;
   /** The device-local calendar day, `YYYY-MM-DD` — the seed's day, not UTC's. */

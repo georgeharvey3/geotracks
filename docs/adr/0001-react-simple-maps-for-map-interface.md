@@ -8,6 +8,7 @@ or satellite imagery. We chose **react-simple-maps** (d3-geo + a bundled TopoJSO
 rendered as inline SVG with no external tile provider.
 
 **Why, and the alternatives rejected:**
+
 - **react-leaflet + GeoJSON** and **MapLibre/Mapbox GL** are built for slippy, tiled,
   pan-and-zoom map browsing. They bring a live tile-provider dependency (or a blank basemap that
   reinvents react-simple-maps with more weight) plus heavier bundles and config/lock-in — cost we

@@ -22,9 +22,38 @@
         }
       }
     },
+    "communityAlbums": {
+      ".read": true,
+      "$albumId": {
+        ".write": "auth != null && auth.uid === 'ylygYsvdKIhWoqQvZIvVRMjifsR2' && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['country', 'album_name', 'tracks', 'liveFrom'])",
+        "country": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+        },
+        "album_name": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+        },
+        "liveFrom": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
+        },
+        "suggestion": {
+          ".validate": "newData.isString() && newData.val().length <= 32"
+        },
+        "tracks": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().matches(/^https:[/][/]open[.]spotify[.]com[/]track[/][A-Za-z0-9]{22}$/)"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "suggestions": {
+      ".read": "auth != null && auth.uid === 'ylygYsvdKIhWoqQvZIvVRMjifsR2'",
       "$suggestionId": {
-        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".write": "(auth != null && !data.exists() && newData.exists()) || (auth != null && auth.uid === 'ylygYsvdKIhWoqQvZIvVRMjifsR2')",
         ".validate": "newData.hasChildren(['albumId', 'countryCode', 'uid', 'createdAt'])",
         "albumId": {
           ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{22}$/)"

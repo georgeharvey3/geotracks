@@ -13,12 +13,13 @@ import userEvent from "@testing-library/user-event";
 
 import App from "./App";
 import getDailySongs from "./helpers/getDailySongs";
-import { competitionAlbums, library } from "./music/library";
+import { bundledAlbums, competitionAlbums } from "./music/library";
 import { dayString } from "./helpers/dailyRun";
 import countriesJSON from "./countries.json";
 import { spotifyPlayerControl } from "./test/spotifyPlayerFake";
 import { leaderboardControl } from "./test/leaderboardFake";
 import { suggestionControl } from "./test/suggestionFake";
+import { communityAlbumsControl } from "./test/communityAlbumsFake";
 import { DAILY_RUN_STORAGE_KEY } from "./hooks/useDailyRun";
 
 // Integration tests mount the real <App> (real reducer, context, routing and
@@ -30,6 +31,10 @@ import { DAILY_RUN_STORAGE_KEY } from "./hooks/useDailyRun";
 vi.mock("./hooks/useSpotifyPlayer", () => import("./test/spotifyPlayerFake"));
 vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
 vi.mock("./hooks/useSuggestions", () => import("./test/suggestionFake"));
+vi.mock(
+  "./hooks/useCommunityAlbums",
+  () => import("./test/communityAlbumsFake"),
+);
 
 // The map's pan/zoom wrapper is the one part jsdom cannot run (d3-zoom); the
 // rest of the map is real, so map guesses go through the real guess pipeline.
@@ -42,15 +47,17 @@ vi.mock("react-simple-maps", async (importOriginal) => ({
 // tests know the correct answer per turn. Infinite does *not* — it draws at
 // random (issue #49) — so its answer is read from the Song the player was
 // handed, never from this list.
+// The suite runs with no live albums (the fake is ready-and-empty by default),
+// so the Competition pool is the bundled half exactly.
 const dailySongs = getDailySongs(
-  competitionAlbums(library, dayString(new Date())),
+  competitionAlbums(bundledAlbums, dayString(new Date())),
 );
 const answerAt = (round: number) => dailySongs[round]!.country;
 
 // Every track link in the library, against the country it comes from: no link
 // appears under two countries, so this reads back an answer unambiguously.
 const countryByLink = new Map(
-  library.flatMap((album) =>
+  bundledAlbums.flatMap((album) =>
     album.tracks.map((track) => [track, album.country] as const),
   ),
 );
@@ -694,6 +701,59 @@ describe("App integration", () => {
    * jsdom's is synchronous and well-behaved, so there is nothing to fake; the
    * clock is what gets faked, and only where a day has to turn over.
    */
+  describe("the live half of the Library", () => {
+    afterEach(() => communityAlbumsControl.reset());
+
+    it("holds Competition shut until the albums have arrived", () => {
+      communityAlbumsControl.loading();
+      render(<App />);
+
+      // The day's ten are drawn *by index* from a pool that is part bundled and
+      // part live. Seeding before the live half lands gives a different ten,
+      // played onto the same leaderboard, with nothing looking wrong.
+      const competition = screen.getByRole("button", {
+        name: /Loading today's songs/,
+      });
+      expect(competition).toBeDisabled();
+    });
+
+    it("keeps Competition shut when the read fails, rather than seeding short", () => {
+      communityAlbumsControl.failed();
+      render(<App />);
+
+      // The one place in the app that fails *closed*: the Daily Run's stored
+      // record fails open, because a serialization bug of ours must not look
+      // like a punishment, whereas a Run on the wrong pool is worse than no Run
+      // at all, being counted.
+      expect(
+        screen.getByRole("button", { name: /songs are unavailable/ }),
+      ).toBeDisabled();
+    });
+
+    it("leaves Infinite and Explore open throughout", async () => {
+      communityAlbumsControl.failed();
+      render(<App />);
+
+      // Neither is compared between players, so neither has anything to
+      // corrupt; the bundled half is all they ever needed.
+      expect(
+        screen.getByRole("button", { name: /Infinite Mode/ }),
+      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: /Explore/ })).toBeEnabled();
+    });
+
+    it("opens Competition once the albums land", async () => {
+      communityAlbumsControl.loading();
+      render(<App />);
+
+      act(() => communityAlbumsControl.ready([]));
+
+      expect(
+        await screen.findByRole("button", { name: "Competition Mode" }),
+      ).toBeEnabled();
+    });
+  });
+
   describe("the Daily Run", () => {
     afterEach(() => {
       vi.useRealTimers();

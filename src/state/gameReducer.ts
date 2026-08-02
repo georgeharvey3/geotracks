@@ -7,7 +7,11 @@ import {
   DailyRunRecord,
   dayString,
 } from "../helpers/dailyRun";
-import { competitionAlbums, library } from "../music/library";
+import {
+  bundledAlbums,
+  competitionAlbums,
+  libraryWith,
+} from "../music/library";
 import {
   LibraryAlbum,
   Song,
@@ -41,7 +45,17 @@ export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 // `screen` is the app's single router. Explore keeps its own state in its own
 // reducer (ADR-0003), but which surface is on screen is decided in one place.
 export type Screen =
-  "menu" | "scoreboard" | "playing" | "runSummary" | "explore" | "suggest";
+  | "menu"
+  | "scoreboard"
+  | "playing"
+  | "runSummary"
+  | "explore"
+  | "suggest"
+  // Where Suggestions are reviewed. Not a player's screen: no control anywhere
+  // in the app leads to it, and it is reached only by the `#admin` hash. What
+  // keeps it shut is not that — it is the RTDB rules, which hand the Suggestions
+  // to one uid; this screen is empty for everyone else who finds it.
+  | "admin";
 
 export interface GameState {
   screen: Screen;
@@ -89,11 +103,16 @@ export type GameAction =
   // Infinite's way in. Competition arrives through the three Daily Run actions
   // below instead, so the day's record decides which one the menu offers.
   | { type: "SET_MODE"; mode: string }
+  // The live half of the Library, arriving from the database after the app has
+  // already rendered on the bundled half.
+  | { type: "ALBUMS_LOADED"; albums: LibraryAlbum[]; today: string }
   | { type: "START_RUN" }
   | { type: "RESUME_RUN"; record: DailyRunRecord }
   | { type: "SHOW_RUN_SUMMARY"; record: DailyRunRecord }
   | { type: "SHOW_SCOREBOARD" }
   | { type: "SHOW_EXPLORE" }
+  // Dispatched from the `#admin` hash alone — nothing in the UI sends it.
+  | { type: "SHOW_ADMIN" }
   // The country code is a prefill and nothing more: Explore dispatches it with
   // the country the player asked about, the menu dispatches it without one.
   | { type: "SHOW_SUGGEST"; countryCode?: string }
@@ -168,7 +187,7 @@ function pickDailySong(
 }
 
 export function createInitialState(
-  albums: LibraryAlbum[] = library,
+  albums: LibraryAlbum[] = bundledAlbums,
   today: string = dayString(new Date()),
 ): GameState {
   // Competition draws from the Library as it stood before today: a Community
@@ -386,8 +405,39 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SHOW_RUN_SUMMARY":
       return reopenedRunSummary(state, action.record);
 
+    // The live albums have arrived. The bundled half rendered the app already,
+    // so this is a **top-up**: the pool gains what it has never seen, and the
+    // day's ten are recomputed now that the pool they seed from is whole.
+    //
+    // Appending is safe rather than merely convenient — an album that has just
+    // arrived cannot already have been drawn, so nothing here can resurrect a
+    // Song this session has played. Recomputing `dailySongs` is safe because
+    // Competition is shut until this lands (ADR-0007): a Run seeded from a
+    // partial pool would play a different ten onto the same leaderboard with
+    // nothing looking wrong, so the menu refuses to start one. The guard below
+    // says the same thing in the reducer, where it cannot be forgotten.
+    case "ALBUMS_LOADED": {
+      if (state.gameMode === GAME_MODES.competition) return state;
+
+      const held = new Set(state.albums.map((album) => album.album_name));
+      const fresh = action.albums.filter(
+        (album) => !held.has(album.album_name),
+      );
+
+      return {
+        ...state,
+        albums: [...state.albums, ...fresh],
+        dailySongs: getDailySongs(
+          competitionAlbums(libraryWith(action.albums), action.today),
+        ),
+      };
+    }
+
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };
+
+    case "SHOW_ADMIN":
+      return { ...state, screen: "admin" };
 
     case "SHOW_EXPLORE":
       return { ...state, screen: "explore" };

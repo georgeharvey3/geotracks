@@ -11,6 +11,7 @@ const createDefaultProps = (
   gameModes,
   setGameMode: vi.fn(),
   dailyRunStatus: "none" as const,
+  libraryStatus: "ready" as const,
   onDailyRun: vi.fn(),
   setShowScoreboard: vi.fn(),
   setShowExplore: vi.fn(),

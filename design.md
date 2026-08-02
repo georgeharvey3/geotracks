@@ -30,14 +30,14 @@ CSS. One resolved value in all three keeps a single red on screen.
 
 ## Macrostructure families
 
-- **Menu / Scoreboard / Suggest (content pages)** — centred column on `Base`,
+- **Menu / Scoreboard / Suggest / Suggestion review (content pages)** — centred column on `Base`,
   capped at `sm`, standing on the **night backdrop** (below): the map under a
   black veil, which is ground rather than enrichment — nothing is added to the
   column. Typography and the button stack carry it. These are the screens that
   are _about_ the game without being made of it, and the backdrop is what says
   so. Their foreground is **paper on night**, the mirror of the app pages' ink
   on paper; opaque surfaces they contain (the scoreboard's table card, the
-  Suggestion form's) are cream and take ink back. The Suggestion form's card is
+  Suggestion form's, the review queue's) are cream and take ink back. The Suggestion form's card is
   load-bearing rather than decorative: `TextField` here is cream, so unwrapped
   on the night its boxes would float on black with no surface underneath them.
 - **Game / Explore (app pages)** — **Workbench**: the map is a live surface

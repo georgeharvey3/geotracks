@@ -1,4 +1,4 @@
-import { library } from "../music/library";
+import { bundledAlbums } from "../music/library";
 import { LibraryAlbum, Song } from "../types";
 
 /**
@@ -30,6 +30,8 @@ export interface ExploreState {
 }
 
 export type ExploreAction =
+  // The live half of the Library, arriving after the screen already exists.
+  | { type: "ALBUMS_LOADED"; albums: LibraryAlbum[] }
   | { type: "SELECT_COUNTRY"; country: string }
   | { type: "ASK_ABOUT"; country: string }
   | { type: "SKIP" }
@@ -63,7 +65,7 @@ function drawQueue(songs: Song[], after?: Song): CountryQueue {
 }
 
 export function createInitialExploreState(
-  albums: LibraryAlbum[] = library,
+  albums: LibraryAlbum[] = bundledAlbums,
 ): ExploreState {
   const songsByCountry: Record<string, Song[]> = {};
   const playableCountries: string[] = [];
@@ -101,6 +103,33 @@ export function exploreReducer(
   action: ExploreAction,
 ): ExploreState {
   switch (action.type) {
+    // A country whose music arrives late simply becomes Playable. Queues are
+    // built per country on first selection, so a country nobody has chosen yet
+    // has nothing to reconcile — and one already being listened to keeps the
+    // queue it has, since a queue that grew mid-Song would change what comes
+    // next under the listener.
+    case "ALBUMS_LOADED": {
+      const songsByCountry = { ...state.songsByCountry };
+      const playableCountries = [...state.playableCountries];
+
+      for (const album of action.albums) {
+        const songs = album.tracks.map((link) => ({
+          country: album.country,
+          link,
+          album: album.album_name,
+        }));
+        const held = songsByCountry[album.country];
+        if (held === undefined) {
+          songsByCountry[album.country] = songs;
+          playableCountries.push(album.country);
+        } else {
+          songsByCountry[album.country] = [...held, ...songs];
+        }
+      }
+
+      return { ...state, songsByCountry, playableCountries };
+    }
+
     case "SELECT_COUNTRY": {
       const { country } = action;
       const songs = state.songsByCountry[country];

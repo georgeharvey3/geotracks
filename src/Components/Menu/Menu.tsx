@@ -6,6 +6,7 @@ import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import PublicIcon from "@mui/icons-material/Public";
 import { GameModes } from "../../types";
 import { DayStatus } from "../../helpers/dailyRun";
+import { LibraryStatus } from "../../hooks/useCommunityAlbums";
 import { COLORS } from "../../tokens";
 
 interface MenuProps {
@@ -14,6 +15,11 @@ interface MenuProps {
   setGameMode: (mode: string) => void;
   /** Today's Competition Run: still to play, half-played, or done. */
   dailyRunStatus: DayStatus;
+  /**
+   * Whether the live half of the Library has arrived. Competition waits on it;
+   * Infinite and Explore never do.
+   */
+  libraryStatus: LibraryStatus;
   onDailyRun: () => void;
   setShowScoreboard: (show: boolean) => void;
   setShowExplore: () => void;
@@ -44,6 +50,23 @@ const DAILY_RUN_LABELS: Record<DayStatus, string> = {
   finished: "Today's Run",
 };
 
+// What Competition says while it cannot be started, and why it cannot.
+//
+// **The day's ten are drawn by index from a pool that is part bundled and part
+// live**, so a Run started before the live half arrives would be seeded from a
+// shorter pool: a different ten, played against the same leaderboard, with
+// nothing anywhere looking wrong. This is the one place in the app that fails
+// *closed* — the Daily Run's stored record fails open, because a serialization
+// bug of ours must not look like a punishment, whereas a Run on the wrong pool
+// is worse than no Run at all, being counted. See ADR-0007.
+//
+// The two waits are worded apart on purpose: one resolves by waiting, the other
+// does not resolve at all until the network does.
+const LIBRARY_LABELS: Partial<Record<LibraryStatus, string>> = {
+  loading: "Loading today's songs…",
+  failed: "Today's songs are unavailable",
+};
+
 const Menu = (props: MenuProps) => (
   <Box sx={{ mt: 4 }}>
     <Stack spacing={2} sx={{ maxWidth: 280, mx: "auto" }}>
@@ -52,8 +75,10 @@ const Menu = (props: MenuProps) => (
         size="large"
         startIcon={<EmojiEventsIcon />}
         onClick={props.onDailyRun}
+        disabled={props.libraryStatus !== "ready"}
       >
-        {DAILY_RUN_LABELS[props.dailyRunStatus]}
+        {LIBRARY_LABELS[props.libraryStatus] ??
+          DAILY_RUN_LABELS[props.dailyRunStatus]}
       </Button>
       <Button
         variant="contained"

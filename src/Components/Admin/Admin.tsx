@@ -5,7 +5,6 @@ import GoogleIcon from "@mui/icons-material/Google";
 import SuggestionRow from "../SuggestionRow/SuggestionRow";
 import Spinner from "../Spinner/Spinner";
 import { Admin as AdminSeam } from "../../hooks/useAdmin";
-import { acceptedSuggestionKeys } from "../../music/library";
 import { MONO } from "../../theme";
 
 /**
@@ -128,7 +127,6 @@ const Admin = ({ access, signIn, signOut, reject }: AdminSeam) => {
             <SuggestionRow
               key={suggestion.key}
               suggestion={suggestion}
-              accepted={acceptedSuggestionKeys.has(suggestion.key)}
               onReject={() => void reject(suggestion.key)}
             />
           ))}

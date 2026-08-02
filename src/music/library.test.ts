@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import albumsJSON from "../albums.json";
-import communityAlbumsJSON from "../community-albums.json";
-import { competitionAlbums, library } from "./library";
+import { bundledAlbums, competitionAlbums, libraryWith } from "./library";
 import { Album, CommunityAlbum, LibraryAlbum } from "../types";
 
 const folkways = (name: string): Album => ({
@@ -16,27 +15,42 @@ const community = (name: string, liveFrom: string): CommunityAlbum => ({
   liveFrom,
 });
 
-describe("library", () => {
-  it("is both album files, and nothing else", () => {
-    // Whatever `community-albums.json` holds today — it ships empty and grows
-    // one accepted Suggestion at a time — the Library is exactly the union.
-    expect(library).toHaveLength(
-      albumsJSON.length + communityAlbumsJSON.length,
-    );
-    for (const album of [...albumsJSON, ...communityAlbumsJSON]) {
-      expect(library).toContainEqual(album);
-    }
+describe("bundledAlbums", () => {
+  it("is the Folkways file and nothing else", () => {
+    // The half that ships. Community albums live in the database now, so
+    // nothing here should ever have grown a `liveFrom`.
+    expect(bundledAlbums).toEqual(albumsJSON);
+    expect(bundledAlbums.some((album) => "liveFrom" in album)).toBe(false);
+  });
+});
+
+describe("libraryWith", () => {
+  it("is the bundled albums, then the live ones", () => {
+    const live = community("live", "2026-01-01");
+    const merged = libraryWith([live]);
+
+    expect(merged).toHaveLength(bundledAlbums.length + 1);
+    expect(merged[merged.length - 1]).toBe(live);
   });
 
-  it("keeps the Folkways albums first, so nothing about the seed moves", () => {
-    expect(library.slice(0, albumsJSON.length)).toEqual(albumsJSON);
+  it("keeps the bundled albums first and in order, so the seed does not move", () => {
+    // The daily seed draws *by index* into this array. Two players are owed the
+    // same albums in the same sequence, so where the live half is spliced in is
+    // a correctness property rather than a tidiness one.
+    expect(libraryWith([community("live", "2026-01-01")]).slice(0, 3)).toEqual(
+      bundledAlbums.slice(0, 3),
+    );
+  });
+
+  it("is exactly the bundled half when nothing is live", () => {
+    expect(libraryWith([])).toEqual(bundledAlbums);
   });
 });
 
 describe("competitionAlbums", () => {
   const today = "2026-08-01";
 
-  it("keeps every Folkways album — they carry no liveFrom and are always live", () => {
+  it("keeps every bundled album — they carry no liveFrom and are always live", () => {
     const albums: LibraryAlbum[] = [folkways("a"), folkways("b")];
     expect(competitionAlbums(albums, today)).toEqual(albums);
   });
@@ -70,5 +84,19 @@ describe("competitionAlbums", () => {
       live,
       last,
     ]);
+  });
+
+  it("gives the same pool whether an album is held back or absent", () => {
+    // What makes a live Library safe to seed from: an album before its
+    // `liveFrom` is indistinguishable from one that has not been accepted yet,
+    // so a player who loads before it is accepted and a player who loads after
+    // are drawing from the same array.
+    const bundled = [folkways("a"), folkways("b")];
+    const held = community("held", "2026-08-02");
+
+    expect(competitionAlbums(libraryWith([]), today)).toEqual(
+      competitionAlbums(libraryWith([held]), today),
+    );
+    expect(competitionAlbums([...bundled, held], today)).toEqual(bundled);
   });
 });

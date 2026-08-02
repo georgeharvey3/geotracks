@@ -7,7 +7,11 @@ import {
   DailyRunRecord,
   dayString,
 } from "../helpers/dailyRun";
-import { competitionAlbums, library } from "../music/library";
+import {
+  bundledAlbums,
+  competitionAlbums,
+  libraryWith,
+} from "../music/library";
 import {
   LibraryAlbum,
   Song,
@@ -99,6 +103,9 @@ export type GameAction =
   // Infinite's way in. Competition arrives through the three Daily Run actions
   // below instead, so the day's record decides which one the menu offers.
   | { type: "SET_MODE"; mode: string }
+  // The live half of the Library, arriving from the database after the app has
+  // already rendered on the bundled half.
+  | { type: "ALBUMS_LOADED"; albums: LibraryAlbum[]; today: string }
   | { type: "START_RUN" }
   | { type: "RESUME_RUN"; record: DailyRunRecord }
   | { type: "SHOW_RUN_SUMMARY"; record: DailyRunRecord }
@@ -180,7 +187,7 @@ function pickDailySong(
 }
 
 export function createInitialState(
-  albums: LibraryAlbum[] = library,
+  albums: LibraryAlbum[] = bundledAlbums,
   today: string = dayString(new Date()),
 ): GameState {
   // Competition draws from the Library as it stood before today: a Community
@@ -397,6 +404,34 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     // it, so its summary is reopened from the record rather than from state.
     case "SHOW_RUN_SUMMARY":
       return reopenedRunSummary(state, action.record);
+
+    // The live albums have arrived. The bundled half rendered the app already,
+    // so this is a **top-up**: the pool gains what it has never seen, and the
+    // day's ten are recomputed now that the pool they seed from is whole.
+    //
+    // Appending is safe rather than merely convenient — an album that has just
+    // arrived cannot already have been drawn, so nothing here can resurrect a
+    // Song this session has played. Recomputing `dailySongs` is safe because
+    // Competition is shut until this lands (ADR-0007): a Run seeded from a
+    // partial pool would play a different ten onto the same leaderboard with
+    // nothing looking wrong, so the menu refuses to start one. The guard below
+    // says the same thing in the reducer, where it cannot be forgotten.
+    case "ALBUMS_LOADED": {
+      if (state.gameMode === GAME_MODES.competition) return state;
+
+      const held = new Set(state.albums.map((album) => album.album_name));
+      const fresh = action.albums.filter(
+        (album) => !held.has(album.album_name),
+      );
+
+      return {
+        ...state,
+        albums: [...state.albums, ...fresh],
+        dailySongs: getDailySongs(
+          competitionAlbums(libraryWith(action.albums), action.today),
+        ),
+      };
+    }
 
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };

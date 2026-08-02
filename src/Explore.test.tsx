@@ -11,6 +11,10 @@ import { setHoverCapability } from "./test/hoverCapability";
 vi.mock("./hooks/useSpotifyPlayer", () => import("./test/spotifyPlayerFake"));
 vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
 vi.mock("./hooks/useSuggestions", () => import("./test/suggestionFake"));
+vi.mock(
+  "./hooks/useCommunityAlbums",
+  () => import("./test/communityAlbumsFake"),
+);
 
 vi.mock("react-simple-maps", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-simple-maps")>()),

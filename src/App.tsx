@@ -18,6 +18,7 @@ import {
   useDailyRun,
   useGame,
   useLeaderboard,
+  useLibraryStatus,
 } from "./context/GameContext";
 import { ExploreProvider } from "./context/ExploreContext";
 import { GAME_MODES } from "./state/gameReducer";
@@ -28,6 +29,7 @@ function AppContent() {
   const { state, dispatch } = useGame();
   const leaderboard = useLeaderboard();
   const dailyRun = useDailyRun();
+  const libraryStatus = useLibraryStatus();
 
   // The app's only piece of URL awareness, and it exists because the review
   // screen must be reachable without being advertised: no control anywhere leads
@@ -109,6 +111,7 @@ function AppContent() {
           gameModes={GAME_MODES}
           setGameMode={(mode) => dispatch({ type: "SET_MODE", mode })}
           dailyRunStatus={dailyRun.status}
+          libraryStatus={libraryStatus}
           onDailyRun={onDailyRun}
           setShowScoreboard={() => dispatch({ type: "SHOW_SCOREBOARD" })}
           setShowExplore={() => dispatch({ type: "SHOW_EXPLORE" })}

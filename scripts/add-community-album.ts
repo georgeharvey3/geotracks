@@ -1,5 +1,5 @@
 /**
- * Accept a Suggestion: write one Community album into `src/community-albums.json`.
+ * Accept a Suggestion: write one Community album into the database.
  *
  *   node scripts/add-community-album.ts [--live-from YYYY-MM-DD] [--dry-run]
  *   node scripts/add-community-album.ts <album-url-or-id> <ALPHA2> [...]
@@ -11,12 +11,17 @@
  * what the human review step is for. Hand-copying fifteen track URLs per album
  * is the only reason it exists.
  *
- * **It reads the database and never writes to it.** The read goes through the
- * Firebase CLI, logged in as the project owner, which is the same privilege the
- * console gives and needs no admin SDK and no service-account JSON on disk. What
- * it will not do is write back: there is no "reviewed" flag to keep in step with
- * anything, and a Suggestion already accepted is recognised by the `suggestion`
- * key recorded on our side, in the album we wrote out.
+ * **The album goes into the database, not into a file** (ADR-0007). Everything
+ * here — the read and the write — goes through the Firebase CLI, logged in as
+ * the project owner: the console's own privilege, with no admin SDK and no
+ * service-account JSON on disk. Accepting is a single atomic multi-path update
+ * that writes the album and deletes the Suggestion it came from, so the review
+ * queue empties itself and there is no "reviewed" flag to keep in step.
+ *
+ * It cannot be a button in the review screen, and the reason is not squeamishness
+ * about browsers writing to databases: the album's track list comes from
+ * Spotify's catalogue API, which needs the client secret below. oEmbed gives a
+ * title and a cover and no tracks.
  *
  * Credentials come from `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` in the
  * gitignored `.env` — **without** a `VITE_` prefix, which would publish the
@@ -29,7 +34,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -41,12 +46,11 @@ import { extractAlbumId } from "../src/helpers/spotifyAlbum.ts";
 import type { Album, CommunityAlbum } from "../src/types.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const communityPath = join(root, "src", "community-albums.json");
 
-// The two album files are read from disk rather than through
-// `src/music/library.ts`, which owns the union everywhere else: that module
-// imports the JSON as ESM, which under bare node would need an import
-// attribute, and it pulls in the app's module graph behind it.
+// `albums.json` is read from disk rather than through `src/music/library.ts`,
+// which owns the bundled half everywhere else: that module imports the JSON as
+// ESM, which under bare node would need an import attribute, and it pulls in the
+// app's module graph behind it.
 const readJSON = (path: string): unknown =>
   JSON.parse(readFileSync(join(root, path), "utf8"));
 
@@ -247,28 +251,100 @@ interface SuggestionRecord {
  * service-account JSON on disk. The client cannot read `suggestions` and the
  * owner can, which is the entire review step.
  */
-function readSuggestions(): { key: string; record: SuggestionRecord }[] {
-  let raw: string;
+function firebaseCLI(args: string[], input?: string): string {
   try {
-    raw = execFileSync("firebase", ["database:get", "/suggestions"], {
+    return execFileSync("firebase", args, {
       cwd: root,
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
+      input,
+      stdio: ["pipe", "pipe", "pipe"],
     });
-  } catch {
+  } catch (error) {
     fail(
-      "Could not read the suggestions. Install the Firebase CLI and log in:\n" +
-        "  npm install -g firebase-tools && firebase login",
+      "The Firebase CLI failed. Install it and log in:\n" +
+        "  npm install -g firebase-tools && firebase login\n\n" +
+        `  ${error instanceof Error ? error.message.split("\n")[0] : error}`,
     );
   }
+}
 
-  // An empty node reads back as `null`, not as `{}`.
-  const parsed = JSON.parse(raw) as Record<string, SuggestionRecord> | null;
+/** One node, parsed. An empty node reads back as `null`, not as `{}`. */
+function firebaseGet(path: string): unknown {
+  return JSON.parse(firebaseCLI(["database:get", path]));
+}
+
+function readSuggestions(): { key: string; record: SuggestionRecord }[] {
+  const parsed = firebaseGet("/suggestions") as Record<
+    string,
+    SuggestionRecord
+  > | null;
   if (!parsed) return [];
 
   return Object.entries(parsed)
     .map(([key, record]) => ({ key, record }))
     .sort((a, b) => a.record.createdAt - b.record.createdAt);
+}
+
+// Firebase's own push-key alphabet: 64 characters in ASCII order, which is what
+// makes the keys sort chronologically as plain strings. The app relies on that
+// ordering — the daily seed draws by index into the Library, so every player is
+// owed the same albums in the same sequence.
+const PUSH_CHARS =
+  "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * A push key, generated here because a multi-path update has to name its paths
+ * and so cannot use `push()`. Eight characters of timestamp followed by twelve
+ * random ones; the real implementation also increments the random half when two
+ * keys are made in the same millisecond, which this cannot be, being run once
+ * per invocation by a human.
+ */
+function pushKey(now = Date.now()): string {
+  let time = now;
+  const stamp: string[] = [];
+  for (let i = 7; i >= 0; i -= 1) {
+    stamp[i] = PUSH_CHARS[time % 64]!;
+    time = Math.floor(time / 64);
+  }
+
+  let key = stamp.join("");
+  for (let i = 0; i < 12; i += 1) {
+    key += PUSH_CHARS[Math.floor(Math.random() * 64)]!;
+  }
+  return key;
+}
+
+/** Every accepted Community album, as the app reads them. */
+function readCommunityAlbums(): Record<string, CommunityAlbum> {
+  return (
+    (firebaseGet("/communityAlbums") as Record<
+      string,
+      CommunityAlbum
+    > | null) ?? {}
+  );
+}
+
+/**
+ * Accept, in one write: the album lands and the Suggestion it came from is
+ * deleted.
+ *
+ * A **multi-path update from the root**, which RTDB applies atomically — so
+ * there is no window in which the album exists and the Suggestion is still
+ * queued, or the reverse. The key is generated here rather than by `push`
+ * because the update has to name both paths at once, and RTDB push keys are
+ * plain sortable strings: chronological, and the order the app relies on.
+ */
+function acceptIntoDatabase(
+  key: string,
+  album: CommunityAlbum,
+  suggestion: string | null,
+): void {
+  const update: Record<string, unknown> = {
+    [`/communityAlbums/${key}`]: album,
+  };
+  if (suggestion) update[`/suggestions/${suggestion}`] = null;
+
+  firebaseCLI(["database:update", "/", "-"], JSON.stringify(update));
 }
 
 /**
@@ -284,31 +360,25 @@ const plain = (text: string): string =>
 /**
  * List what is waiting, and ask which one to accept.
  *
- * Accepted Suggestions are **marked rather than hidden**, and the mark comes
- * from the `suggestion` key on our own side of the line: nothing is ever written
- * back to the database, so there is no "reviewed" flag and this is the only
- * thing that can distinguish one. A Suggestion that is *declined* has nowhere to
- * be recorded at all and will sit in this list until it is deleted in the
- * Firebase console, which is the one thing the console is still for.
+ * There is no "already accepted" state to show: accepting deletes the Suggestion
+ * in the same write that stores the album, so this list holds only what is still
+ * undecided. Declining one deletes it too, from the review screen.
  */
 async function pickSuggestion(
-  community: CommunityAlbum[],
   countries: { code: string; name: string }[],
 ): Promise<{ album: string; code: string; suggestion: string }> {
   const suggestions = readSuggestions();
   if (suggestions.length === 0) fail("No Suggestions waiting.");
 
-  const accepted = new Set(community.map((album) => album.suggestion));
   const nameOf = (code: string) =>
     countries.find((entry) => entry.code === code)?.name ?? `unknown (${code})`;
 
   console.log("");
-  suggestions.forEach(({ key, record }, index) => {
+  suggestions.forEach(({ record }, index) => {
     const day = new Date(record.createdAt).toISOString().slice(0, 10);
-    const mark = accepted.has(key) ? " · already accepted" : "";
     console.log(
       `  ${`${index + 1}`.padStart(2)}. ${nameOf(record.countryCode)} · ` +
-        `${record.albumId} · ${day}${mark}`,
+        `${record.albumId} · ${day}`,
     );
     if (record.note) console.log(`      "${plain(record.note)}"`);
   });
@@ -331,9 +401,6 @@ async function pickSuggestion(
 
   const chosen = suggestions[Number(answer) - 1];
   if (!chosen) fail(`Not one of the numbers above: ${answer}`);
-  if (accepted.has(chosen.key)) {
-    fail("That Suggestion is already in the Library.");
-  }
 
   return {
     album: chosen.record.albumId,
@@ -354,14 +421,13 @@ const countries = readJSON("src/countries.json") as {
   name: string;
 }[];
 const folkways = readJSON("src/albums.json") as Album[];
-const community = readJSON("src/community-albums.json") as CommunityAlbum[];
 
 // Either the album was named on the command line, or we go and read what has
 // been suggested. Both arrive here as the same two strings, and everything
 // below this line is the same work whichever it was.
 const chosen = args.named
   ? { ...args.named, suggestion: null }
-  : await pickSuggestion(community, countries);
+  : await pickSuggestion(countries);
 
 const link = extractAlbumId(chosen.album);
 if (!link.ok) {
@@ -385,7 +451,9 @@ if (tracks.length === 0) fail("That album has no tracks.");
 
 // Duplicates are caught by track URL, not by album id: `albums.json` stores
 // tracks and holds no album ids at all. A track we already have means this is a
-// re-submission of a record already in the Library.
+// re-submission of a record already in the Library — checked across both halves,
+// the bundled file and what is already in the database.
+const community = Object.values(readCommunityAlbums());
 const held = new Map<string, string>();
 for (const entry of [...folkways, ...community]) {
   for (const track of entry.tracks) held.set(track, entry.album_name);
@@ -402,27 +470,27 @@ const entry: CommunityAlbum = {
   album_name: album.name,
   tracks,
   liveFrom: args.liveFrom ?? tomorrow(new Date()),
-  // Only when it came from one. This is the whole record of what has been
-  // accepted — the database is never written back to, so an album added by hand
-  // carries no key and the listing has nothing to mark.
+  // Only when it came from one, and kept as provenance rather than bookkeeping:
+  // the Suggestion is deleted in the same write, so there is no queue left to
+  // reconcile this against.
   ...(chosen.suggestion ? { suggestion: chosen.suggestion } : {}),
 };
 
 const artists = album.artists.map((artist) => artist.name).join(", ");
 console.log(`\n  ${entry.album_name} — ${artists}`);
 console.log(`  ${entry.country} · ${tracks.length} tracks`);
+console.log(`  live in Explore and Infinite at once`);
 console.log(`  live in Competition after ${entry.liveFrom}\n`);
 
 if (args.dryRun) {
   console.log(JSON.stringify(entry, null, 2));
   console.log("\n  --dry-run: nothing written.\n");
 } else {
-  // Two-space JSON, and not `.prettierignore`d: `albums.json` is excluded
-  // because it is huge and hand-maintained with a `\uXXXX` convention, whereas
-  // this file is small and machine-written, so Prettier owns it.
-  writeFileSync(
-    communityPath,
-    `${JSON.stringify([...community, entry], null, 2)}\n`,
-  );
-  console.log(`  Written to src/community-albums.json.\n`);
+  acceptIntoDatabase(pushKey(), entry, chosen.suggestion);
+  console.log("  Written to communityAlbums. No deploy needed.");
+  if (chosen.suggestion) {
+    console.log("  The Suggestion it came from is gone from the queue.\n");
+  } else {
+    console.log("");
+  }
 }

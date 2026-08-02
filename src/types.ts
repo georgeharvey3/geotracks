@@ -18,9 +18,10 @@ export interface CommunityAlbum extends Album {
   liveFrom: string;
   /**
    * The `suggestions/{pushId}` this album was accepted from, when it came from
-   * the form rather than being added by hand. Nothing in `src/` reads it: it is
-   * how `scripts/add-community-album.ts` knows which Suggestions it has already
-   * dealt with, which is what lets the node stay something we only ever read.
+   * the form rather than being added by hand. Nothing reads it — accepting
+   * deletes the Suggestion in the same write, so there is no queue left to
+   * reconcile against. It is kept as provenance: the record of where an album
+   * came from, once the thing it came from is gone.
    */
   suggestion?: string;
 }

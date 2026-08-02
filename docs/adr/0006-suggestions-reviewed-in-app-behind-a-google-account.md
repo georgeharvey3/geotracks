@@ -1,6 +1,9 @@
 # Suggestions are reviewed in the app, behind a Google account
 
-**Status:** accepted
+**Status:** accepted, partly superseded by
+[ADR-0007](0007-community-albums-live-in-the-database.md): the accept script now writes to the
+database, so an accepted Suggestion is deleted in the same write and the "already accepted" marker
+described below no longer exists.
 
 **Supersedes** the parts of [ADR-0005](0005-suggestions-collected-in-the-app-and-accepted-by-a-commit.md)
 that put "any in-app review or moderation UI" out of scope, and its statement that the Firebase

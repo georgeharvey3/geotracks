@@ -22,6 +22,9 @@
         }
       }
     },
+    "communityAlbums": {
+      ".read": true
+    },
     "suggestions": {
       ".read": "auth != null && auth.uid === 'ylygYsvdKIhWoqQvZIvVRMjifsR2'",
       "$suggestionId": {

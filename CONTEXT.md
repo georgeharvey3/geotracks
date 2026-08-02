@@ -15,11 +15,11 @@ A record the app holds for one country, and the unit its music is catalogued in.
 _Avoid_: Record, release.
 
 **Library**:
-Every Album the app holds, whatever its origin: what Explore and Infinite draw from, and the thing a Suggestion asks to be let into. It is two files, because the provenance of the Smithsonian Folkways catalogue is worth keeping separable — the filename is the record of where an Album came from.
+Every Album the app holds, whatever its origin: what Explore and Infinite draw from, and the thing a Suggestion asks to be let into. It is in two places — a file that ships with the app and a database node that does not — because the half that changes is small and the half that is large never changes. The file is the Smithsonian Folkways catalogue, and being the file is the record of where those Albums came from.
 _Avoid_: Catalogue (kept as the verb — the Folkways albums were _catalogued_ by hand), pool, collection.
 
 **Community album**:
-An Album that entered the Library through an accepted Suggestion, rather than from the Smithsonian Folkways Archive the rest of it was catalogued from. It joins the Library at once, but joins **Competition** only from the following calendar day, so that no day's Daily Songs can change while someone is playing them.
+An Album that entered the Library through an accepted Suggestion, rather than from the Smithsonian Folkways Archive the rest of it was catalogued from. It lives in the database rather than in the app, so it is playable the moment it is accepted, without a release. It joins **Competition** only from a later calendar day, so that no day's Daily Songs can change while someone is playing them.
 _Avoid_: User album, submitted album.
 
 **Clip**:

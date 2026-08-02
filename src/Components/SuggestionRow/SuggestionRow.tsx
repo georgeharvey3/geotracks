@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Chip, Link, Stack, Typography } from "@mui/material";
+import { Box, Button, Link, Stack, Typography } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -11,8 +11,6 @@ import { MONO } from "../../theme";
 
 interface SuggestionRowProps {
   suggestion: StoredSuggestion;
-  /** Whether this Suggestion is already an Album in the Library. */
-  accepted: boolean;
   onReject: () => void;
 }
 
@@ -129,18 +127,17 @@ const SuggestionRow = (props: SuggestionRowProps) => {
         </Box>
 
         <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
-          {props.accepted ? (
-            <Chip size="small" label="In the Library" />
-          ) : (
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<ContentCopyIcon />}
-              onClick={copy}
-            >
-              {copied ? "Command copied" : "Copy accept command"}
-            </Button>
-          )}
+          {/* There is no "already accepted" state to show: accepting deletes
+              the Suggestion in the same write, so an accepted one is gone from
+              this queue rather than marked in it. */}
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<ContentCopyIcon />}
+            onClick={copy}
+          >
+            {copied ? "Command copied" : "Copy accept command"}
+          </Button>
           <Button
             size="small"
             variant={armed ? "contained" : "outlined"}

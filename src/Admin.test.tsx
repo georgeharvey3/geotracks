@@ -20,6 +20,10 @@ import type { StoredSuggestion } from "./hooks/useAdmin";
 vi.mock("./hooks/useSpotifyPlayer", () => import("./test/spotifyPlayerFake"));
 vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
 vi.mock("./hooks/useSuggestions", () => import("./test/suggestionFake"));
+vi.mock(
+  "./hooks/useCommunityAlbums",
+  () => import("./test/communityAlbumsFake"),
+);
 vi.mock("./hooks/useAdmin", () => import("./test/adminFake"));
 
 vi.mock("react-simple-maps", async (importOriginal) => ({

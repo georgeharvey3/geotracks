@@ -1,6 +1,11 @@
 # Suggestions are collected in the app and accepted by a commit
 
-**Status:** accepted
+**Status:** accepted, partly superseded by
+[ADR-0006](0006-suggestions-reviewed-in-app-behind-a-google-account.md) (there is an in-app review
+screen) and [ADR-0007](0007-community-albums-live-in-the-database.md) (Community albums live in the
+database, `src/community-albums.json` is deleted, and the accept script writes to the database). The
+decision this ADR is really about — that accepting is a human judgement made outside the app, and
+that `liveFrom` is what keeps a day's Songs still — is unchanged.
 
 A player should be able to suggest an album for the app to add (issue #40). The whole of this is one
 decision seen from five sides, and split apart each half reads as arbitrary — `liveFrom` in

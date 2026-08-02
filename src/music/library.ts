@@ -1,68 +1,62 @@
 import albumsJSON from "../albums.json";
-import communityAlbumsJSON from "../community-albums.json";
-import { CommunityAlbum, LibraryAlbum } from "../types";
-
-// An *assignment*, not a cast. The file ships empty, which TypeScript reads as
-// `never[]` — every property access on it is an error, including the one below.
-// Naming the type here fixes that, and unlike `as` it stays a real check: the
-// day the file has entries in it, a malformed one fails the build.
-const communityAlbums: CommunityAlbum[] = communityAlbumsJSON;
+import { Album, LibraryAlbum } from "../types";
 
 /**
- * The **Library**: every Album the app holds, whatever its origin. Explore and
- * Infinite draw from this, and it is the thing a Suggestion asks to be let into.
+ * The **bundled** half of the Library, and the only half that ships with the
+ * app: every Album catalogued by hand from the Smithsonian Folkways Archive.
  *
- * It is two files because `albums.json` carries a claim worth keeping true —
- * every entry in it came from the Smithsonian Folkways Archive, catalogued by
- * hand. Appending Community albums to it would make that claim quietly false
- * and unseparable forever, so **the filename is the provenance record** and
- * `Album` gains no `source` field: every consumer of an Album would otherwise
- * grow an optional field it has to decide to ignore.
+ * It stays a static asset for a reason that is about size and mutability rather
+ * than trust — 785 albums and 12,111 track URLs, 0.91 MB raw and 245 KB gzipped
+ * behind a content hash the CDN caches indefinitely. Read from the database
+ * instead, that is most of a megabyte fetched on every session, uncached and
+ * metered. The half that changes is the small one (ADR-0007).
  *
- * **This module owns the union, and nothing else imports a raw album JSON.**
- * Leaving `gameReducer`, `exploreReducer` and the tests to concatenate for
- * themselves means four places to keep in step, and the failure mode when one is
- * missed is Explore offering a country the game's pool has never heard of.
+ * The filename is also the provenance record, which is why `Album` gains no
+ * `source` field: every entry here came from Folkways, and nothing else does.
  */
-export const library: LibraryAlbum[] = [...albumsJSON, ...communityAlbums];
+export const bundledAlbums: Album[] = albumsJSON;
 
 /**
- * The `suggestions/{pushId}` keys already accepted, recorded on the albums they
- * became. This is the only record there is: nothing is ever written back to the
- * database, so an accepted Suggestion looks exactly like a new one until it is
- * matched against this.
+ * The **Library**: every Album the app holds, bundled and live together. This is
+ * what Explore and Infinite draw from, and what a Suggestion asks to be let
+ * into.
  *
- * It reads a raw album JSON, which is this module's job and nobody else's — the
- * review screen asks the Library "have I dealt with this?" rather than opening
- * the file for itself.
+ * Live albums go **after** the bundled ones and arrive already ordered by their
+ * push key. Both halves of that matter, and not only for tidiness: the daily
+ * seed draws by index into this array, so two players are owed the same set in
+ * the same order (see `competitionAlbums`).
  */
-export const acceptedSuggestionKeys: ReadonlySet<string> = new Set(
-  communityAlbums
-    .map((album) => album.suggestion)
-    .filter((key): key is string => key !== undefined),
-);
+export function libraryWith(liveAlbums: LibraryAlbum[]): LibraryAlbum[] {
+  return [...bundledAlbums, ...liveAlbums];
+}
 
 /**
  * The Library as Competition may see it on a given day, `today` being the
- * device-local `YYYY-MM-DD` (`dayString`). Folkways albums carry no `liveFrom`
+ * device-local `YYYY-MM-DD` (`dayString`). Bundled albums carry no `liveFrom`
  * and are always in; a **Community album is in only once the day has passed the
  * date it names**.
  *
  * **This is load-bearing and is not dead weight.** `getDailySongs` seeds off the
  * calendar date and then draws *by array index*, splicing as it goes, and
  * `createInitialState` re-derives the day's ten from the current pool on every
- * page load. So adding one album anywhere changes every date's sequence, and a
- * deploy mid-day would break two things at once: two players on the same day
- * would play different Daily Songs onto the same leaderboard, and a single
- * player resuming an unfinished Run would find the six turns ahead of them drawn
- * from a sequence their first four were never part of.
+ * page load. What the seed is owed is therefore narrow and absolute: **the same
+ * set, in the same order, for every player on that date, and no change to it
+ * once the date has begun.** Without that, two players on one day play different
+ * Daily Songs onto the same leaderboard, and a player resuming an unfinished Run
+ * gets the six turns ahead of them from a sequence their first four were never
+ * part of.
  *
- * `liveFrom` is a **switch-on date, not a provenance date**, and is authored
- * *ahead* of the release — the day after the intended one. The comparison is
- * strict, so the album waits out the whole of the date it names: at the moment
- * of a release nobody anywhere on earth has passed it yet, and each player
- * crosses it at their own local midnight, the same boundary the Daily Run
- * already rolls over on.
+ * A bundled file gets that by being immutable between deploys. A database record
+ * gets it from this gate: an album is accepted into Explore and Infinite at
+ * once, and joins Competition only when every player has crossed its `liveFrom`
+ * at their own local midnight. `liveFrom` is a **switch-on date, not a
+ * provenance date**, authored a day ahead so that nobody anywhere has passed it
+ * at the moment it is written.
+ *
+ * The corollary is a discipline no code here can enforce: **an album whose
+ * `liveFrom` has passed is frozen.** Editing or deleting one changes this
+ * array's length and order for anyone loading afterwards, and hands them a
+ * different day.
  *
  * The date is an **argument, not the clock**. `vi.setSystemTime` moves the daily
  * seed with it and no test may assert which Songs a day yields, so a function

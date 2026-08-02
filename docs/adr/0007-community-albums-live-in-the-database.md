@@ -1,6 +1,6 @@
 # Community albums live in the database; Folkways stays bundled
 
-**Status:** proposed
+**Status:** accepted
 
 **Supersedes** ADR-0005's "no notion of the Library updating without a deploy", and the parts of
 [ADR-0005](0005-suggestions-collected-in-the-app-and-accepted-by-a-commit.md) and
@@ -53,9 +53,10 @@ deterministic without anything being stored to make it so. Bundled albums first,
 sorted by key.
 
 So `liveFrom` stays, in the record rather than in a file, defaulted by the accept script to tomorrow
-as it is today. **Promotion is not needed for Competition eligibility**, and the `community-albums.json`
-half of the split stops being an eligibility gate. It survives only as the periodic archival commit
-described at the end.
+as it is today. **Promotion is not needed for Competition eligibility**, and with it goes the last
+reason for `src/community-albums.json` to exist at all. The file is deleted rather than kept as an
+archive: a copy nothing reads is a copy nobody notices going stale, and it would have reintroduced
+the two-sources-of-truth problem the split was supposed to end.
 
 The discipline this demands is real and should be written down rather than assumed: **an album whose
 `liveFrom` has passed is frozen.** Editing or deleting one changes the pool's length and order for
@@ -92,9 +93,11 @@ Neither is compared between players, so neither has anything to corrupt.
 
 - **`src/albums.json` — Folkways.** Bundled. 0.91 MB, static, the provenance record.
 - **`communityAlbums/` in RTDB — every accepted Community album.** Live in Explore and Infinite at
-  once; in Competition from its own `liveFrom`.
-- **`src/community-albums.json` — an archival copy.** Committed periodically. Not read by
-  Competition, not an eligibility gate; it exists so the catalogue is in git.
+  once; in Competition from its own `liveFrom`. The only copy there is.
+
+`src/community-albums.json` is **deleted**. Provenance stays positional in the sense that matters —
+Folkways is the bundled file and nothing else is — but it is now a boundary between a file and a
+node rather than between two files.
 
 **The accept script writes to the database instead of a file**, through the Firebase CLI it already
 reads through — owner privilege, no admin SDK, no service-account JSON on disk. It stays a terminal
@@ -133,9 +136,12 @@ on first selection, so a country becoming Playable later needs nothing.
 The accept script's `--dry-run` prints what it would write to the database rather than to a file, and
 it keeps its duplicate check by track URL across both sources.
 
-**Community albums lose git history.** Until the archival commit catches up, the only copy is one
-mutable node — and the freeze discipline above means a mistake in a live album cannot simply be
-corrected, it has to be corrected on a future `liveFrom`. A committed periodic `firebase database:get`
-is the cheap mitigation and is worth having in place **before** this ships, not after. The 1 GB Spark
-storage cap is not a concern at this size; the 10 GB/month transfer cap is what would eventually
-bite, and keeping the 0.9 MB Folkways half bundled is what holds it far away.
+**Community albums have no copy in git, and this is the real cost of the whole ADR.** One mutable
+node behind one login is the entire catalogue: no diff, no history, no revert, and nothing in a clone
+to restore from. An accidental delete is unrecoverable, and the freeze discipline above is then the
+only thing standing between a careless edit and a day whose Songs quietly disagree between players. A
+scheduled `firebase database:get` kept somewhere outside the repo is the mitigation, and it is worth
+having **before** this ships rather than after; nothing in the codebase can enforce it.
+
+The 1 GB Spark storage cap is not a concern at this size. The 10 GB/month transfer cap is what would
+eventually bite, and keeping the 0.9 MB Folkways half bundled is what holds it far away.

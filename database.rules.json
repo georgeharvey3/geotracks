@@ -23,9 +23,9 @@
       }
     },
     "suggestions": {
-      ".read": "auth.uid === 'REPLACE_WITH_ADMIN_UID'",
+      ".read": "auth != null && auth.uid === 'ylygYsvdKIhWoqQvZIvVRMjifsR2'",
       "$suggestionId": {
-        ".write": "(auth != null && !data.exists() && newData.exists()) || auth.uid === 'REPLACE_WITH_ADMIN_UID'",
+        ".write": "(auth != null && !data.exists() && newData.exists()) || (auth != null && auth.uid === 'ylygYsvdKIhWoqQvZIvVRMjifsR2')",
         ".validate": "newData.hasChildren(['albumId', 'countryCode', 'uid', 'createdAt'])",
         "albumId": {
           ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{22}$/)"

@@ -1,9 +1,13 @@
 # Suggestions are reviewed in the app, behind a Google account
 
-**Status:** accepted, partly superseded by
+**Status:** accepted, partly superseded twice.
 [ADR-0007](0007-community-albums-live-in-the-database.md): the accept script now writes to the
 database, so an accepted Suggestion is deleted in the same write and the "already accepted" marker
 described below no longer exists.
+[ADR-0008](0008-suggestions-accepted-in-the-app-with-the-reviewers-spotify.md): **accepting is a
+button here now**, so "reject is a delete; accept is a clipboard" no longer holds — the reviewer
+signs in to their own Spotify with PKCE and the album's track list comes from the catalogue API
+without any secret. Everything below about the Google gate stands exactly as written.
 
 **Supersedes** the parts of [ADR-0005](0005-suggestions-collected-in-the-app-and-accepted-by-a-commit.md)
 that put "any in-app review or moderation UI" out of scope, and its statement that the Firebase

@@ -1,6 +1,11 @@
 # Community albums live in the database; Folkways stays bundled
 
-**Status:** accepted
+**Status:** accepted, with one conclusion overturned by
+[ADR-0008](0008-suggestions-accepted-in-the-app-with-the-reviewers-spotify.md): "a click in the
+review screen cannot accept an album" was right that the catalogue API needs a credential and wrong
+that the credential has to be the app's. The reviewer's own Spotify account, via PKCE, needs no
+secret — so accepting is now a button as well as a command, and `communityAlbums/` has the narrow,
+create-only admin write branch this ADR says it has none of.
 
 **Supersedes** ADR-0005's "no notion of the Library updating without a deploy", and the parts of
 [ADR-0005](0005-suggestions-collected-in-the-app-and-accepted-by-a-commit.md) and

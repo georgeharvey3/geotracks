@@ -18,15 +18,19 @@
  * that writes the album and deletes the Suggestion it came from, so the review
  * queue empties itself and there is no "reviewed" flag to keep in step.
  *
- * It cannot be a button in the review screen, and the reason is not squeamishness
- * about browsers writing to databases: the album's track list comes from
- * Spotify's catalogue API, which needs the client secret below. oEmbed gives a
- * title and a cover and no tracks.
+ * **The review screen can accept too now** (ADR-0008), so this is no longer the
+ * only way in. It reaches Spotify's catalogue by a different door — the reviewer
+ * signs in to their own Spotify account with PKCE, which needs no secret — and
+ * it writes the same record, through the same shared rules in
+ * `src/music/acceptance.ts`. This stays because it needs no Spotify sign-in and
+ * no browser, and because `--live-from` and adding an album nobody suggested
+ * both live here.
  *
  * Credentials come from `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` in the
- * gitignored `.env` — **without** a `VITE_` prefix, which would publish the
- * secret to every visitor. See the warning in `.env.example`; these are the
- * first genuine secrets this repo has.
+ * gitignored `.env`. The **secret** must never be given a `VITE_` prefix, which
+ * would publish it to every visitor; the id is a public client identifier and is
+ * separately exposed as `VITE_SPOTIFY_CLIENT_ID` for the review screen. See the
+ * warning in `.env.example`.
  *
  * Like the repo's other scripts, this runs under bare `node`, which strips
  * TypeScript's types but resolves imports as plain ESM — hence the explicit
@@ -40,6 +44,15 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 import { extractAlbumId } from "../src/helpers/spotifyAlbum.ts";
+// The rules the review screen also accepts by (ADR-0008): the `liveFrom`
+// default, the URL cleaning, the duplicate check and the record's own shape.
+// Import-free for the same reason `spotifyAlbum.ts` is.
+import {
+  cleanTrackUrl,
+  communityAlbumFrom,
+  heldTrack,
+  nextDay,
+} from "../src/music/acceptance.ts";
 // Types only, so node erases the import outright and never resolves it — which
 // is what lets this reach into `src/types.ts`, whose own imports it could not
 // follow. The album shape is declared in exactly one place regardless.
@@ -66,20 +79,6 @@ interface Args {
   named: { album: string; code: string } | null;
   liveFrom: string | null;
   dryRun: boolean;
-}
-
-/**
- * The day after `date`, device-local. The default switch-on date: `liveFrom` is
- * authored *ahead* of the release so that at the moment of a deploy nobody
- * anywhere has passed it yet, and every player crosses it at their own local
- * midnight. Override it with `--live-from` when the release date is known.
- */
-function tomorrow(date: Date): string {
-  const next = new Date(date);
-  next.setDate(next.getDate() + 1);
-  const month = `${next.getMonth() + 1}`.padStart(2, "0");
-  const day = `${next.getDate()}`.padStart(2, "0");
-  return `${next.getFullYear()}-${month}-${day}`;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -222,12 +221,12 @@ async function fetchTracks(album: SpotifyAlbum, token: string) {
     next = page.next;
   }
 
-  return items.map((track) => {
-    const url =
+  return items.map((track) =>
+    cleanTrackUrl(
       track.external_urls?.spotify ??
-      `https://open.spotify.com/track/${track.id}`;
-    return url.split(/[?#]/)[0]!;
-  });
+        `https://open.spotify.com/track/${track.id}`,
+    ),
+  );
 }
 
 // ------------------------------------------------------------- suggestions
@@ -454,27 +453,23 @@ if (tracks.length === 0) fail("That album has no tracks.");
 // re-submission of a record already in the Library — checked across both halves,
 // the bundled file and what is already in the database.
 const community = Object.values(readCommunityAlbums());
-const held = new Map<string, string>();
-for (const entry of [...folkways, ...community]) {
-  for (const track of entry.tracks) held.set(track, entry.album_name);
-}
-const duplicate = tracks.find((track) => held.has(track));
+const duplicate = heldTrack(tracks, [...folkways, ...community]);
 if (duplicate) {
   fail(
-    `Already in the Library, as "${held.get(duplicate)}" — matched on ${duplicate}.`,
+    `Already in the Library, as "${duplicate.albumName}" — matched on ${duplicate.track}.`,
   );
 }
 
-const entry: CommunityAlbum = {
+const entry: CommunityAlbum = communityAlbumFrom({
   country: country.name,
-  album_name: album.name,
+  albumName: album.name,
   tracks,
-  liveFrom: args.liveFrom ?? tomorrow(new Date()),
+  liveFrom: args.liveFrom ?? nextDay(new Date()),
   // Only when it came from one, and kept as provenance rather than bookkeeping:
   // the Suggestion is deleted in the same write, so there is no queue left to
   // reconcile this against.
-  ...(chosen.suggestion ? { suggestion: chosen.suggestion } : {}),
-};
+  suggestion: chosen.suggestion ?? undefined,
+});
 
 const artists = album.artists.map((artist) => artist.name).join(", ");
 console.log(`\n  ${entry.album_name} — ${artists}`);

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import "./App.css";
 import "./index.css";
@@ -31,16 +31,42 @@ function AppContent() {
 
   // The app's only piece of URL awareness, and it exists because the review
   // screen must be reachable without being advertised: no control anywhere leads
-  // to it. Read once at mount rather than watched — this is a bookmark, not
-  // routing, and the app has none. Leaving the screen by any of the ordinary
-  // exits clears the hash, so a reload lands back on the menu.
+  // to it.
+  //
+  // Watched, not read once at mount. Adding `#admin` to the address bar of a tab
+  // that is already open changes nothing else about the page — no navigation, no
+  // remount — so a mount-only read does nothing at all, and that is the most
+  // likely way anybody arrives here.
   useEffect(() => {
-    if (window.location.hash === "#admin") dispatch({ type: "SHOW_ADMIN" });
+    const openIfAsked = () => {
+      if (window.location.hash === "#admin") dispatch({ type: "SHOW_ADMIN" });
+    };
+    openIfAsked();
+    window.addEventListener("hashchange", openIfAsked);
+    return () => window.removeEventListener("hashchange", openIfAsked);
   }, [dispatch]);
 
+  // Leaving by any of the ordinary exits takes the hash with it, so a reload
+  // lands on the menu rather than straight back here.
+  //
+  // It clears on the way *out* and never on the way in, which is why it needs a
+  // ref: on mount both effects run in the same commit, and this one would see
+  // the hash beside a `screen` still reading "menu" — the dispatch above is
+  // queued, not applied — and strip the URL the moment it worked. `replaceState`
+  // fires no `hashchange`, so nothing here can loop.
+  const hasBeenAdmin = useRef(false);
   useEffect(() => {
-    if (state.screen !== "admin" && window.location.hash === "#admin") {
-      window.history.replaceState(null, "", window.location.pathname);
+    if (state.screen === "admin") {
+      hasBeenAdmin.current = true;
+    } else if (hasBeenAdmin.current) {
+      hasBeenAdmin.current = false;
+      if (window.location.hash === "#admin") {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
     }
   }, [state.screen]);
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import {
   cleanup,
+  fireEvent,
   readsAs,
   render,
   screen,
@@ -89,6 +90,32 @@ describe("Suggestion review", () => {
     expect(
       screen.getByRole("button", { name: /Sign in with Google/ }),
     ).toBeInTheDocument();
+  });
+
+  it("opens when the hash is added to a page that is already loaded", async () => {
+    // The likeliest way anyone gets here: type it into the address bar of an
+    // open tab. That navigates nowhere and remounts nothing, so a hash read
+    // only at mount does nothing at all.
+    render(<App />);
+    expect(screen.getByText("Competition Mode")).toBeInTheDocument();
+
+    window.location.hash = "#admin";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+
+    expect(
+      await screen.findByRole("heading", { name: "Suggestions" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the hash while it is open, so a reload comes back here", async () => {
+    openAdmin();
+
+    expect(
+      await screen.findByRole("heading", { name: "Suggestions" }),
+    ).toBeInTheDocument();
+    // Both hash effects run in the same commit on mount, and the one that
+    // clears would otherwise see a `screen` still reading "menu".
+    expect(window.location.hash).toBe("#admin");
   });
 
   it("prints the uid when the account is not the one the rules allow", async () => {

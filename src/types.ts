@@ -16,6 +16,13 @@ export interface Album {
  */
 export interface CommunityAlbum extends Album {
   liveFrom: string;
+  /**
+   * The `suggestions/{pushId}` this album was accepted from, when it came from
+   * the form rather than being added by hand. Nothing in `src/` reads it: it is
+   * how `scripts/add-community-album.ts` knows which Suggestions it has already
+   * dealt with, which is what lets the node stay something we only ever read.
+   */
+  suggestion?: string;
 }
 
 /** An entry of the Library, from either album file. */

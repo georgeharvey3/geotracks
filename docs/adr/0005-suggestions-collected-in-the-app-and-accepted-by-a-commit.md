@@ -136,9 +136,16 @@ album is not acceptable, so `scripts/add-community-album.ts` is in scope. It use
 client-credentials flow (no user login, free) with `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` in the
 gitignored `.env`, **without** the `VITE_` prefix — the first genuine secrets this repo has ever held,
 in a file otherwise full of things documented as explicitly _not_ secret, which is why the warning in
-`.env.example` is load-bearing. **It does not touch the database**: the Suggestion is read in the
-console and the id pasted in, so there is no admin SDK, no service-account JSON on disk, no write-back
-and no "reviewed" flag to keep in sync. Duplicates are caught by **track URL** rather than album id,
+`.env.example` is load-bearing. **It reads the database and never writes to it.** Copying an id and an
+alpha-2 code out of the console by hand is the same clerical work the script exists to abolish, so it
+lists the waiting Suggestions itself and accepts the one that is picked. The read goes through the
+**Firebase CLI** — already installed, already logged in as the owner (`firebase deploy --only database`
+is how the rules got there), with `.firebaserc` naming the project — so it is the console's privilege
+without an admin SDK or a service-account JSON on disk. What stays refused is the **write** back: there
+is no "reviewed" flag to keep in sync, and an accepted Suggestion is recognised instead by the
+`suggestion` push key recorded on `CommunityAlbum`, on our own side of the line. The cost is that a
+Suggestion which is _declined_ has nowhere to be recorded and sits in the listing until it is deleted
+in the console, which is what the console is still for. Duplicates are caught by **track URL** rather than album id,
 because `albums.json` stores tracks and holds no album ids at all. Query parameters are stripped, the
 country **name** is written (the join is by name), `liveFrom` defaults to tomorrow, and `--dry-run`
 prints the entry it would write. Nothing here can verify that the country makes sense; that is the

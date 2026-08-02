@@ -15,11 +15,11 @@ Pages deploy. The clerical work is already gone — the script lists the waiting
 the album — so what is left is purely the **shipping**, and shipping is the expensive part. An album
 somebody suggested waits on a release it has nothing to do with.
 
-The tempting conclusion is that the Library should be a database. It should not, and the numbers say
-so plainly. `src/albums.json` is 785 albums and 12,111 track URLs: **0.91 MB raw, 245 KB gzipped**,
-bundled behind a content hash and cached indefinitely by the CDN. Read from RTDB instead, that is
-~0.9 MB fetched **per session**, uncached and metered against Spark's 10 GB/month — about 11,000
-sessions before the free tier is spent, against effectively nothing today.
+The tempting conclusion is that the whole Library should be a database. It should not, and the
+numbers say so plainly. `src/albums.json` is 785 albums and 12,111 track URLs: **0.91 MB raw, 245 KB
+gzipped**, bundled behind a content hash and cached indefinitely by the CDN. Read from RTDB instead,
+that is ~0.9 MB fetched **per session**, uncached and metered against Spark's 10 GB/month — about
+11,000 sessions before the free tier is spent, against effectively nothing today.
 
 Three costs that are not about bytes. **Git stops being the source of truth** for a dataset
 catalogued by hand into six spreadsheets over two years: no diff, no history, no revert, and no copy
@@ -28,15 +28,73 @@ two-file split _is_ the Folkways record, and `Album` gains no `source` field del
 table means adding exactly the field that was refused. And **`createInitialState` would have to
 become async**, which is the synchronous heart of the reducer and of the Daily Run's resume path.
 
-## The split follows the shape of the data
+The half that changes is small, and the half that is large does not change. That is the whole basis
+of the split — **size and mutability, not trust.**
 
-The half that changes is small and the half that is large does not change. So:
+## Competition draws from the database too
 
-- **`src/albums.json` — Folkways.** Bundled. 0.91 MB, static, and the provenance record.
-- **`src/community-albums.json` — promoted Community albums.** Bundled. Small, and the half of the
-  community catalogue that Competition may draw from.
-- **`communityAlbums/` in RTDB — accepted, not yet promoted.** Live in Explore and Infinite from the
-  moment they are accepted, without a deploy.
+An earlier draft of this ADR kept Competition to the bundled files, on the grounds that a pool which
+can change at any moment cannot be seeded from. That confused the property being protected with one
+particular way of getting it.
+
+What `getDailySongs` actually needs is narrow. It takes `rand() * available.length`, splices, and
+repeats, so it depends on the pool's **length and order** — and `createInitialState` re-derives the
+day's ten on every page load. The invariant is therefore:
+
+> the effective Competition pool on date D is the same set, in the same order, for every player, and
+> does not change after date D begins.
+
+A file satisfies that by being immutable between deploys. **A database satisfies it just as well**,
+by two things it already has. `liveFrom` lives in the record and gates the set by date exactly as it
+does in a file — an album is accepted into Explore and Infinite immediately and joins Competition
+only once every player has crossed its date at their own local midnight. And RTDB children come back
+ordered by key, with push keys chronological and lexicographically sortable, so the order is
+deterministic without anything being stored to make it so. Bundled albums first, live albums after,
+sorted by key.
+
+So `liveFrom` stays, in the record rather than in a file, defaulted by the accept script to tomorrow
+as it is today. **Promotion is not needed for Competition eligibility**, and the `community-albums.json`
+half of the split stops being an eligibility gate. It survives only as the periodic archival commit
+described at the end.
+
+The discipline this demands is real and should be written down rather than assumed: **an album whose
+`liveFrom` has passed is frozen.** Editing or deleting one changes the pool's length and order for
+anybody who loads after the change, and silently gives them a different day. This is the same
+discipline that already applies to deploying a Folkways edit mid-day, which is an accepted risk
+today; the difference is that a database makes it one command instead of a release, so it wants
+saying out loud.
+
+## The cost that is real: a failed read is a wrong Run
+
+This is the one genuine objection to the paragraph above, and it is not the one the earlier draft
+made.
+
+Everything bundled cannot be half-loaded. A network read can. If the community half fails to arrive
+for one player, that player seeds Competition from a **shorter pool**, gets a different ten, plays
+them, and submits the score to the same leaderboard as everyone else. Nothing anywhere would look
+wrong. That is silent corruption of precisely the thing the daily seed exists to provide.
+
+So Competition **fails closed** on this read, which is the opposite of how the Daily Run's stored
+record behaves and deliberately so. A day record that will not parse hands the player a fresh Run,
+because a serialization bug of ours must not be indistinguishable from a punishment. Here the harm
+runs the other way: a Run played on the wrong pool is worse than a Run not started, because it is
+counted. Competition does not open until the album read has resolved, and says so if it cannot.
+
+That is a new loading state and not a new dependency: the app is already useless without the network
+— it streams from Spotify and reads the leaderboard over the same connection. A player who cannot
+reach the database cannot hear a Song either.
+
+**Explore and Infinite fail soft**, and keep the behaviour the earlier draft described: Folkways is
+bundled, so an unreachable database costs them their Community albums and costs them nothing else.
+Neither is compared between players, so neither has anything to corrupt.
+
+## Where things live
+
+- **`src/albums.json` — Folkways.** Bundled. 0.91 MB, static, the provenance record.
+- **`communityAlbums/` in RTDB — every accepted Community album.** Live in Explore and Infinite at
+  once; in Competition from its own `liveFrom`.
+- **`src/community-albums.json` — an archival copy.** Committed periodically. Not read by
+  Competition, not an eligibility gate; it exists so the catalogue is in git.
 
 **The accept script writes to the database instead of a file**, through the Firebase CLI it already
 reads through — owner privilege, no admin SDK, no service-account JSON on disk. It stays a terminal
@@ -46,70 +104,38 @@ click in the review screen cannot accept an album** without a paid Cloud Functio
 secret, and this is the reason — not squeamishness about browsers writing to databases.
 
 Accept becomes one atomic multi-path `update()`: write the album, delete the Suggestion it came from.
-The review queue then empties itself, and `acceptedSuggestionKeys` and the `suggestion` marker in the
-listing both stop having a job — an accepted Suggestion is simply gone. The key is still recorded on
-the album, now as provenance rather than as bookkeeping.
+The review queue then empties itself, and `acceptedSuggestionKeys` and the "already accepted" marker
+in both listings stop having a job — an accepted Suggestion is simply gone. The key is still recorded
+on the album, now as provenance rather than as bookkeeping.
 
-## `liveFrom` survives, and it was wrong to say otherwise
-
-Competition draws **only from the bundled files**, so nothing arriving from the database can move the
-daily seed. That is the property that matters: `getDailySongs` draws by array index and
-`createInitialState` re-derives the day's ten on every page load, so a pool that can change at any
-moment would hand two players on the same day different Daily Songs onto the same leaderboard, and
-hand a player resuming an unfinished Run six turns from a sequence their first four were never part
-of.
-
-It is tempting to conclude that `liveFrom` can then be deleted. It cannot, and this ADR exists partly
-to say so before somebody removes it. **Promotion** — moving an album out of the database and into
-`community-albums.json` — still changes the Competition pool, and still lands by a deploy that can
-happen at any hour. Comparability across players on a given day requires every one of them to be
-holding the same pool that day, and only a date gate gives that. Storing the day's ten in the Daily
-Run record would protect a player mid-Run but would not make two players' days agree.
-
-What changes is its **granularity**: `liveFrom` is authored once per promotion batch, at a release,
-instead of once per accepted album. The per-Suggestion friction — the question "what date should this
-be?" asked every single time — is what goes away.
-
-The alternative considered and rejected was that Community albums **never** reach Competition, which
-would delete `liveFrom` outright and leave Competition as the Folkways canon. It is coherent, and it
-was rejected because a contributor's album never appearing in the game proper is a poor answer to
-somebody who took the trouble to suggest one.
-
-## Reading it
-
-`communityAlbums/` gets `.read: true` — it is app content, like `scores`, and there is nothing in it
-a stranger could not see by using the app. It gets **no client write at all**: it inherits `false`
-from the root, and the owner's CLI bypasses rules, so unlike `suggestions` there is not even an admin
+`communityAlbums/` gets `.read: true` — it is app content, like `scores`, and holds nothing a
+stranger could not see by using the app. It gets **no client write at all**: it inherits `false` from
+the root, and the owner's CLI bypasses rules, so unlike `suggestions` there is not even an admin
 branch. The one destructive thing the review screen can do stays what ADR-0006 gave it: deleting a
 Suggestion.
 
-**The read fails soft.** Folkways is bundled, so an unreachable database costs Explore and Infinite
-their Community albums and costs Competition, the Daily Run and the whole game nothing. The app
-renders on the bundled Library immediately rather than waiting.
-
-Live albums arrive by an action that **tops up** the pools. This is safe rather than merely
-convenient: an album that has just arrived cannot already have been drawn, so appending it to
-Infinite's shrinking pool cannot resurrect a Song a session has already played. Explore's Country
-queues are built per country on first selection, so a country becoming Playable later needs nothing
-at all.
-
 ## Consequences
 
-`competitionAlbums(library, today)` stops taking the whole Library and takes the bundled files, which
-is what it was always really asking for. `src/music/library.ts` gains the union of bundled and live,
-and `library` stops being a constant — the reducers already take albums as a parameter, so the seam
-exists. A new hook, `useCommunityAlbums`, joins the others in `src/hooks/`, with a fake beside
-`leaderboardFake`; it is the fourth RTDB seam and the second read-only one.
+`competitionAlbums(albums, today)` keeps its job and its signature, and now filters a Library that is
+part bundled and part live. `src/music/library.ts` gains that union, and `library` stops being a
+constant — the reducers already take albums as a parameter, so the seam exists. A new hook,
+`useCommunityAlbums`, joins the others in `src/hooks/` with a fake beside `leaderboardFake`; it is
+the fourth RTDB seam and the second read-only one.
 
-The accept script gains a `--dry-run` that prints what it would write to the database rather than to
-a file, keeps its duplicate check by track URL across all three sources, and loses its `liveFrom`
-default. A **promote** script is new work and is not in this ADR — until it exists, promotion is a
-hand edit of `community-albums.json` and a delete from the node, which is acceptable at the volume
-this catalogue grows.
+**The menu grows a gate it did not have.** Competition cannot open until the read resolves, so the
+three-state Daily Run button gains a fourth, disabled state, and the failure needs wording that
+distinguishes "not yet" from "not today". Explore and Infinite stay openable throughout. Live albums
+arrive by an action that **tops up** the pools, which is safe rather than merely convenient: an album
+that has just arrived cannot already have been drawn, so appending it to Infinite's shrinking pool
+cannot resurrect a Song a session has already played. Explore's Country queues are built per country
+on first selection, so a country becoming Playable later needs nothing.
 
-**Community albums lose git history.** Each is re-derivable from the Suggestion that produced it
-until that Suggestion is deleted, and after promotion it is in a file again — but between those two
-points the only copy is one mutable node. A periodic `firebase database:get` committed as a backup is
-the cheap mitigation and is worth doing before this ships. The 1 GB Spark storage cap is not a
-concern at this size; the 10 GB/month transfer cap is what would eventually bite, and the bundled
-Folkways half is what keeps it far away.
+The accept script's `--dry-run` prints what it would write to the database rather than to a file, and
+it keeps its duplicate check by track URL across both sources.
+
+**Community albums lose git history.** Until the archival commit catches up, the only copy is one
+mutable node — and the freeze discipline above means a mistake in a live album cannot simply be
+corrected, it has to be corrected on a future `liveFrom`. A committed periodic `firebase database:get`
+is the cheap mitigation and is worth having in place **before** this ships, not after. The 1 GB Spark
+storage cap is not a concern at this size; the 10 GB/month transfer cap is what would eventually
+bite, and keeping the 0.9 MB Folkways half bundled is what holds it far away.

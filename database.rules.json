@@ -23,8 +23,9 @@
       }
     },
     "suggestions": {
+      ".read": "auth.uid === 'REPLACE_WITH_ADMIN_UID'",
       "$suggestionId": {
-        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".write": "(auth != null && !data.exists() && newData.exists()) || auth.uid === 'REPLACE_WITH_ADMIN_UID'",
         ".validate": "newData.hasChildren(['albumId', 'countryCode', 'uid', 'createdAt'])",
         "albumId": {
           ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{22}$/)"

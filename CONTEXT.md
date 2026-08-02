@@ -114,7 +114,7 @@ A country the app holds at least one Album for, and so one a player may choose i
 _Avoid_: Unlocked, available, greyed-out, disabled.
 
 **Suggestion**:
-A player's proposal that the app add an Album: the album on Spotify, the country they say it belongs to, and optionally why. It is not an Album and holds no Songs; it becomes one only if it is accepted, by a human, outside the app. The app collects Suggestions and does not act on them.
+A player's proposal that the app add an Album: the album on Spotify, the country they say it belongs to, and optionally why. It is not an Album and holds no Songs; it becomes one only if it is accepted, by a human. Suggestions are **reviewed** in the app, on a screen only the reviewer's account can read; accepting one is still a commit made outside it, and only rejecting can be done from the screen.
 _Avoid_: Submission (the app already submits _scores_, and a second submission concept would make "the submission failed" ambiguous between two async writes to the same database), request, nomination.
 
 **Country queue**:

@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import "./App.css";
 import "./index.css";
 
@@ -9,6 +11,7 @@ import Scoreboard from "./Components/ScoreBoard/ScoreBoard";
 import GameScreen from "./Components/GameScreen/GameScreen";
 import ExploreScreen from "./Components/ExploreScreen/ExploreScreen";
 import SuggestScreen from "./Components/SuggestScreen/SuggestScreen";
+import AdminScreen from "./Components/AdminScreen/AdminScreen";
 
 import {
   GameProvider,
@@ -25,6 +28,21 @@ function AppContent() {
   const { state, dispatch } = useGame();
   const leaderboard = useLeaderboard();
   const dailyRun = useDailyRun();
+
+  // The app's only piece of URL awareness, and it exists because the review
+  // screen must be reachable without being advertised: no control anywhere leads
+  // to it. Read once at mount rather than watched — this is a bookmark, not
+  // routing, and the app has none. Leaving the screen by any of the ordinary
+  // exits clears the hash, so a reload lands back on the menu.
+  useEffect(() => {
+    if (window.location.hash === "#admin") dispatch({ type: "SHOW_ADMIN" });
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (state.screen !== "admin" && window.location.hash === "#admin") {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [state.screen]);
 
   // One button, three states of the day's record: start today's Run, drop back
   // into the one left unfinished, or reopen the one already played.
@@ -54,6 +72,9 @@ function AppContent() {
       break;
     case "suggest":
       content = <SuggestScreen />;
+      break;
+    case "admin":
+      content = <AdminScreen />;
       break;
     case "menu":
     default:

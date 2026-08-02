@@ -1,6 +1,12 @@
 import albumsJSON from "../albums.json";
 import communityAlbumsJSON from "../community-albums.json";
-import { LibraryAlbum } from "../types";
+import { CommunityAlbum, LibraryAlbum } from "../types";
+
+// An *assignment*, not a cast. The file ships empty, which TypeScript reads as
+// `never[]` — every property access on it is an error, including the one below.
+// Naming the type here fixes that, and unlike `as` it stays a real check: the
+// day the file has entries in it, a malformed one fails the build.
+const communityAlbums: CommunityAlbum[] = communityAlbumsJSON;
 
 /**
  * The **Library**: every Album the app holds, whatever its origin. Explore and
@@ -18,7 +24,23 @@ import { LibraryAlbum } from "../types";
  * themselves means four places to keep in step, and the failure mode when one is
  * missed is Explore offering a country the game's pool has never heard of.
  */
-export const library: LibraryAlbum[] = [...albumsJSON, ...communityAlbumsJSON];
+export const library: LibraryAlbum[] = [...albumsJSON, ...communityAlbums];
+
+/**
+ * The `suggestions/{pushId}` keys already accepted, recorded on the albums they
+ * became. This is the only record there is: nothing is ever written back to the
+ * database, so an accepted Suggestion looks exactly like a new one until it is
+ * matched against this.
+ *
+ * It reads a raw album JSON, which is this module's job and nobody else's — the
+ * review screen asks the Library "have I dealt with this?" rather than opening
+ * the file for itself.
+ */
+export const acceptedSuggestionKeys: ReadonlySet<string> = new Set(
+  communityAlbums
+    .map((album) => album.suggestion)
+    .filter((key): key is string => key !== undefined),
+);
 
 /**
  * The Library as Competition may see it on a given day, `today` being the

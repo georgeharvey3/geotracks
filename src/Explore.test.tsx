@@ -10,6 +10,11 @@ import { setHoverCapability } from "./test/hoverCapability";
 // context, real routing, real map) with only the side-effectful seams faked.
 vi.mock("./hooks/useSpotifyPlayer", () => import("./test/spotifyPlayerFake"));
 vi.mock("./hooks/useLeaderboard", () => import("./test/leaderboardFake"));
+vi.mock("./hooks/useSuggestions", () => import("./test/suggestionFake"));
+vi.mock(
+  "./hooks/useCommunityAlbums",
+  () => import("./test/communityAlbumsFake"),
+);
 
 vi.mock("react-simple-maps", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-simple-maps")>()),
@@ -208,11 +213,11 @@ describe("Explore", () => {
       );
     });
 
-    it("offers the pointer no invitation to click it", async () => {
+    it("invites the pointer, now that there is something to say about it", async () => {
       render(<App />);
       await enterExplore();
 
-      expect(mapTarget(SILENT)).toHaveStyle({ cursor: "default" });
+      expect(mapTarget(SILENT)).toHaveStyle({ cursor: "pointer" });
       expect(mapTarget(PLAYABLE)).toHaveStyle({ cursor: "pointer" });
     });
 
@@ -225,15 +230,63 @@ describe("Explore", () => {
       expect(screen.getByText(SILENT)).toBeInTheDocument();
     });
 
-    it("ignores a click rather than walking the player into a dead end", async () => {
+    it("is picked as the country being asked about, and says so", async () => {
       render(<App />);
       await enterExplore();
 
       await userEvent.click(mapTarget(SILENT));
 
       expect(
-        screen.getByText("Choose a country to hear its music"),
+        screen.getByText(`No music from ${SILENT} yet`),
       ).toBeInTheDocument();
+      expect(mapTarget(SILENT)).toHaveAttribute("data-explore-state", "asked");
+    });
+
+    /**
+     * The whole reason the map click does not navigate. Explore commits on a
+     * single tap, and leaving the screen unmounts the player — so if a silent
+     * country went straight to the form, one stray tap would cost the Song as
+     * well as the screen.
+     */
+    it("does not stop the music when it is picked mid-Song", async () => {
+      render(<App />);
+      await enterExplore();
+      await choose(PLAYABLE);
+      const playing = playingLink();
+
+      await userEvent.click(mapTarget(SILENT));
+
+      expect(playingLink()).toBe(playing);
+      expect(pauseButton()).toBeInTheDocument();
+      // The country being listened to is untouched by the question.
+      expect(mapTarget(PLAYABLE)).toHaveAttribute(
+        "data-explore-state",
+        "playing",
+      );
+    });
+
+    it("hands the country to the Suggestion form on a second, deliberate action", async () => {
+      render(<App />);
+      await enterExplore();
+      await userEvent.click(mapTarget(SILENT));
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Suggest an album/i }),
+      );
+
+      expect(screen.getByLabelText("Country the music comes from")).toHaveValue(
+        SILENT,
+      );
+    });
+
+    it("lets the offer go when a country with music is chosen instead", async () => {
+      render(<App />);
+      await enterExplore();
+      await userEvent.click(mapTarget(SILENT));
+
+      await choose(PLAYABLE);
+
+      expect(screen.queryByText(`No music from ${SILENT} yet`)).toBeNull();
     });
   });
 

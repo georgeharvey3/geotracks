@@ -80,6 +80,12 @@ const onRetryLoad = vi.fn(() => {
 const embedRef = vi.fn();
 
 export const spotifyPlayerControl = {
+  /**
+   * The link of the Song the player is currently loaded with. Outside
+   * Competition the app draws at random (issue #49), so this is the only place
+   * a test can learn which Song the player was actually handed.
+   */
+  loadedLink: () => loadedLink,
   emitReady: () =>
     emit({ songReady: true, songLoadFailed: false, songFinished: false }),
   emitPlaying: () =>

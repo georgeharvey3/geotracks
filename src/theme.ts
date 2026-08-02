@@ -2,6 +2,14 @@ import { createTheme } from "@mui/material/styles";
 
 import { COLORS } from "./tokens";
 
+/**
+ * The mono stack, in one place. Mono has exactly one job in this system —
+ * figures that line up — and every component that reaches for it directly
+ * (rather than through `variant="overline"`) imports this rather than writing
+ * the stack out again.
+ */
+export const MONO = "'JetBrains Mono', ui-monospace, monospace";
+
 // The system is defined in `design.md`; this is MUI's view of it. Colours come
 // from `src/tokens.ts` and are never written literally here.
 const theme = createTheme({
@@ -56,7 +64,7 @@ const theme = createTheme({
     // Mono keeps the one job it earns: figures that line up. Scores, distances
     // and country codes are tabular; running copy is not.
     overline: {
-      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+      fontFamily: MONO,
       letterSpacing: "0.1em",
       textTransform: "uppercase",
     },

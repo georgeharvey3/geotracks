@@ -106,6 +106,14 @@ describe("RunSummaryPanel", () => {
     ).toBeInTheDocument();
   });
 
+  // A Daily Run reopened on a later visit knows the score went in, but the name
+  // it went in under lived on the screen the player has since left.
+  it("confirms a saved score it has no name for", () => {
+    render(<RunSummaryPanel {...defaultProps} nameInputValue="" saved />);
+    expect(screen.getByText("Saved to the leaderboard")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Name...")).not.toBeInTheDocument();
+  });
+
   it("offers another attempt when the write fails", () => {
     render(
       <RunSummaryPanel {...defaultProps} nameInputValue="Ada" saveFailed />,

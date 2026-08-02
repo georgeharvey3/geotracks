@@ -64,8 +64,13 @@ const RunSummaryPanel = (props: RunSummaryPanelProps) => {
         <Stack spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
           <Stack direction="row" spacing={0.5} alignItems="center">
             <CheckCircleIcon fontSize="small" color="success" />
+            {/* A Daily Run reopened on a later visit knows the score went in
+                but not what it went in under: the name lived on the screen the
+                player has since left, and is not part of the day's record. */}
             <Typography variant="body2">
-              Saved as {props.nameInputValue}
+              {props.nameInputValue
+                ? `Saved as ${props.nameInputValue}`
+                : "Saved to the leaderboard"}
             </Typography>
           </Stack>
           <Button

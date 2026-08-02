@@ -10,26 +10,56 @@ const createDefaultProps = (
 ) => ({
   gameModes,
   setGameMode: vi.fn(),
+  dailyRunStatus: "none" as const,
+  libraryStatus: "ready" as const,
+  onDailyRun: vi.fn(),
   setShowScoreboard: vi.fn(),
   setShowExplore: vi.fn(),
+  setShowSuggest: vi.fn(),
   ...overrides,
 });
 
 describe("Menu", () => {
-  it("renders all four buttons", () => {
+  it("renders all five buttons", () => {
     render(<Menu {...createDefaultProps()} />);
     expect(screen.getByText("Competition Mode")).toBeInTheDocument();
     expect(screen.getByText("Infinite Mode")).toBeInTheDocument();
     expect(screen.getByText("Explore")).toBeInTheDocument();
     expect(screen.getByText("Scoreboard")).toBeInTheDocument();
+    expect(screen.getByText("Suggest an album")).toBeInTheDocument();
   });
 
-  it("calls setGameMode with competition when Competition button clicked", async () => {
-    const setGameMode = vi.fn();
-    render(<Menu {...createDefaultProps({ setGameMode })} />);
-    await userEvent.click(screen.getByText("Competition Mode"));
-    expect(setGameMode).toHaveBeenCalledWith("competition");
+  it("opens the Suggestion form", async () => {
+    const props = createDefaultProps();
+    render(<Menu {...props} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: /Suggest an album/i }),
+    );
+    expect(props.setShowSuggest).toHaveBeenCalled();
   });
+
+  // One control in three states of the day's record, so the label is the only
+  // thing that moves.
+  it.each([
+    ["none", "Competition Mode"],
+    ["in-progress", "Resume today's Run"],
+    ["finished", "Today's Run"],
+  ] as const)("offers %s as '%s'", (dailyRunStatus, label) => {
+    render(<Menu {...createDefaultProps({ dailyRunStatus })} />);
+    expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+  });
+
+  it.each(["none", "in-progress", "finished"] as const)(
+    "calls onDailyRun from the Competition button when the day is %s",
+    async (dailyRunStatus) => {
+      const onDailyRun = vi.fn();
+      render(<Menu {...createDefaultProps({ dailyRunStatus, onDailyRun })} />);
+      await userEvent.click(
+        screen.getByRole("button", { name: /Competition Mode|Run/ }),
+      );
+      expect(onDailyRun).toHaveBeenCalled();
+    },
+  );
 
   it("calls setGameMode with infinite when Infinite button clicked", async () => {
     const setGameMode = vi.fn();

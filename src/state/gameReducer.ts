@@ -1,10 +1,19 @@
-import albumsJSON from "../albums.json";
 import countriesJSON from "../countries.json";
 import getDistance from "../helpers/getDistance";
 import getBearing from "../helpers/getBearing";
 import getDailySongs from "../helpers/getDailySongs";
 import {
-  Album,
+  DAILY_RUN_VERSION,
+  DailyRunRecord,
+  dayString,
+} from "../helpers/dailyRun";
+import {
+  bundledAlbums,
+  competitionAlbums,
+  libraryWith,
+} from "../music/library";
+import {
+  LibraryAlbum,
   Song,
   SongMetadata,
   Guess,
@@ -36,13 +45,24 @@ export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 // `screen` is the app's single router. Explore keeps its own state in its own
 // reducer (ADR-0003), but which surface is on screen is decided in one place.
 export type Screen =
-  "menu" | "scoreboard" | "playing" | "runSummary" | "explore";
+  | "menu"
+  | "scoreboard"
+  | "playing"
+  | "runSummary"
+  | "explore"
+  | "suggest"
+  // Where Suggestions are reviewed. Not a player's screen: no control anywhere
+  // in the app leads to it, and it is reached only by the `#admin` hash. What
+  // keeps it shut is not that — it is the RTDB rules, which hand the Suggestions
+  // to one uid; this screen is empty for everyone else who finds it.
+  | "admin";
 
 export interface GameState {
   screen: Screen;
   // "" until a mode is chosen, then one of GAME_MODES.
   gameMode: string;
-  albums: Album[];
+  /** The pool the next Song is drawn from, shrinking by one per round. */
+  albums: LibraryAlbum[];
   dailySongs: Song[];
   dailySongIndex: number;
   song: Song;
@@ -66,12 +86,36 @@ export interface GameState {
   nameInputValue: string;
   /** Whether this Run's score has been written to the leaderboard. One per Run. */
   scoreSubmitted: boolean;
+  /**
+   * The country the Suggestion form opens on, as an alpha-2 code, or "" when
+   * the screen was reached from the menu with nobody in mind.
+   *
+   * This is the *whole* of what the game reducer knows about a Suggestion: the
+   * router opening a screen with an argument, as `RESUME_RUN` opens one with a
+   * record. The form's own state — the fields, their validity, the write in
+   * flight — is local to it, and the write goes through `useSuggestions`. The
+   * reducer has no business knowing about a Spotify link.
+   */
+  suggestCountryCode: string;
 }
 
 export type GameAction =
+  // Infinite's way in. Competition arrives through the three Daily Run actions
+  // below instead, so the day's record decides which one the menu offers.
   | { type: "SET_MODE"; mode: string }
+  // The live half of the Library, arriving from the database after the app has
+  // already rendered on the bundled half.
+  | { type: "ALBUMS_LOADED"; albums: LibraryAlbum[]; today: string }
+  | { type: "START_RUN" }
+  | { type: "RESUME_RUN"; record: DailyRunRecord }
+  | { type: "SHOW_RUN_SUMMARY"; record: DailyRunRecord }
   | { type: "SHOW_SCOREBOARD" }
   | { type: "SHOW_EXPLORE" }
+  // Dispatched from the `#admin` hash alone — nothing in the UI sends it.
+  | { type: "SHOW_ADMIN" }
+  // The country code is a prefill and nothing more: Explore dispatches it with
+  // the country the player asked about, the menu dispatches it without one.
+  | { type: "SHOW_SUGGEST"; countryCode?: string }
   | { type: "SUBMIT_GUESS"; countryAnswer: string }
   | { type: "TOGGLE_GEO_HINTS"; checked: boolean }
   | { type: "NEXT_SONG" }
@@ -80,58 +124,88 @@ export type GameAction =
   | { type: "SCORE_SUBMITTED" }
   | { type: "SET_SONG_METADATA"; link: string; metadata: SongMetadata };
 
-// Pure song selection: mirrors the daily-seeded-then-random pool behaviour.
-// Returns the chosen song plus the album pool and daily index after selection.
-function pickNextSong(
-  albums: Album[],
-  dailySongs: Song[],
-  dailySongIndex: number,
-): { song: Song; albums: Album[]; dailySongIndex: number } {
-  let song: Song;
-  let nextDailyIndex = dailySongIndex;
-  let albumIndexToRemove = -1;
+/**
+ * A Song drawn at random from the album pool, with its Album removed so a
+ * session never plays the same record twice.
+ *
+ * This is what every draw *except* Competition's makes. The day's seeded list
+ * belongs to the Daily Run alone (issue #49): a player who opens Infinite first
+ * would otherwise hear today's Competition Songs, and then walk into the one Run
+ * they get that day already holding the answers. The seed is there to make Runs
+ * comparable between players, and there is no second Run to fall back on.
+ */
+function pickRandomSong(albums: LibraryAlbum[]): {
+  song: Song;
+  albums: LibraryAlbum[];
+} {
+  const albumIndex = Math.floor(Math.random() * albums.length);
+  // Invariant: the album pool outlasts any session (it only shrinks by one per
+  // round), so a random in-range index always lands on an album with at least
+  // one track.
+  const album = albums[albumIndex]!;
+  const trackIndex = Math.floor(Math.random() * album.tracks.length);
 
-  const dailySong = dailySongs[dailySongIndex];
-  if (dailySong !== undefined) {
-    song = dailySong;
-    nextDailyIndex = dailySongIndex + 1;
-    albumIndexToRemove = albums.findIndex(
-      (a) => a.album_name === dailySong.album,
-    );
-  } else {
-    albumIndexToRemove = Math.floor(Math.random() * albums.length);
-    // Invariant: the album pool outlasts any session (it only shrinks by one
-    // per round), so a random in-range index always lands on an album with at
-    // least one track.
-    const albumChoice = albums[albumIndexToRemove]!;
-    const songIndexChoice = Math.floor(
-      Math.random() * albumChoice.tracks.length,
-    );
-    song = {
-      country: albumChoice.country,
-      link: albumChoice.tracks[songIndexChoice]!,
-      album: albumChoice.album_name,
-    };
-  }
-
-  const nextAlbums =
-    albumIndexToRemove >= 0
-      ? albums.filter((_, index) => index !== albumIndexToRemove)
-      : albums;
-
-  return { song, albums: nextAlbums, dailySongIndex: nextDailyIndex };
+  return {
+    song: {
+      country: album.country,
+      link: album.tracks[trackIndex]!,
+      album: album.album_name,
+    },
+    albums: albums.filter((_, index) => index !== albumIndex),
+  };
 }
 
-export function createInitialState(albums: Album[] = albumsJSON): GameState {
-  const dailySongs = getDailySongs(albums);
-  const picked = pickNextSong(albums, dailySongs, 0);
+/**
+ * The next Song of the day's seeded ten — Competition's draw, and the only one
+ * that walks `dailySongIndex`. Past the end of the list the day has nothing left
+ * to say, so it falls back to a random draw; with 785 Albums that is
+ * unreachable, but a pool too small to seed ten Songs from must still yield a
+ * Song rather than nothing.
+ */
+function pickDailySong(
+  albums: LibraryAlbum[],
+  dailySongs: Song[],
+  dailySongIndex: number,
+): { song: Song; albums: LibraryAlbum[]; dailySongIndex: number } {
+  const song = dailySongs[dailySongIndex];
+  if (song === undefined) {
+    return { ...pickRandomSong(albums), dailySongIndex };
+  }
+
+  // The Song is already chosen; its Album leaves the pool so a later random
+  // draw cannot land on the record the day has already spent.
+  const albumIndex = albums.findIndex((a) => a.album_name === song.album);
+
+  return {
+    song,
+    albums:
+      albumIndex >= 0
+        ? albums.filter((_, index) => index !== albumIndex)
+        : albums,
+    dailySongIndex: dailySongIndex + 1,
+  };
+}
+
+export function createInitialState(
+  albums: LibraryAlbum[] = bundledAlbums,
+  today: string = dayString(new Date()),
+): GameState {
+  // Competition draws from the Library as it stood before today: a Community
+  // album added by a deploy must not change the day's ten under anyone
+  // part-way through them. Every other draw below takes the whole Library, so
+  // Explore and Infinite have it the moment it ships.
+  const dailySongs = getDailySongs(competitionAlbums(albums, today));
+  // The Song the menu is standing on is the one Infinite opens with, and no
+  // mode has been chosen yet — so it is drawn at random and the day is still
+  // whole. `START_RUN` is what spends the day's first Song.
+  const picked = pickRandomSong(albums);
 
   return {
     screen: "menu",
     gameMode: "",
     albums: picked.albums,
     dailySongs,
-    dailySongIndex: picked.dailySongIndex,
+    dailySongIndex: 0,
     song: picked.song,
     guesses: [],
     submitted: false,
@@ -147,6 +221,7 @@ export function createInitialState(albums: Album[] = albumsJSON): GameState {
     turns: [],
     nameInputValue: "",
     scoreSubmitted: false,
+    suggestCountryCode: "",
   };
 }
 
@@ -159,6 +234,138 @@ const roundReset = {
   errorMessage: "",
   roundPoints: 0,
 };
+
+// Fields reset when a Run begins or is left behind: everything a Run
+// accumulates, back to nothing.
+const runReset = {
+  ...roundReset,
+  geoHintsEnabled: false,
+  showGeoHints: false,
+  questionIndex: 0,
+  turnIndex: 0,
+  score: 0,
+  turns: [] as TurnResult[],
+  nameInputValue: "",
+  scoreSubmitted: false,
+};
+
+/**
+ * Open Competition on the day's first Song. The Run is *the day's seeded ten*,
+ * so it is anchored at index 0 whatever else the session has drawn from the
+ * list already — a Run that opened halfway down it would not be the Run
+ * everyone else played.
+ */
+function startRun(state: GameState): GameState {
+  const picked = pickDailySong(state.albums, state.dailySongs, 0);
+
+  return {
+    ...state,
+    ...runReset,
+    screen: "playing",
+    gameMode: GAME_MODES.competition,
+    song: picked.song,
+    albums: picked.albums,
+    dailySongIndex: picked.dailySongIndex,
+  };
+}
+
+/**
+ * The day's record, back as the Run it describes — the inbound half of the
+ * mapping `dailyRunRecordFrom` is the outbound half of. Both directions are
+ * written out field by field on purpose (ADR-0004): a field that matters to
+ * persistence cannot be renamed without walking past them.
+ */
+function resumedRun(state: GameState, record: DailyRunRecord): GameState {
+  // `dailySongIndex` is the *next* Song to draw, so the one in flight is the
+  // one before it.
+  const song = state.dailySongs[record.dailySongIndex - 1];
+  // Fail open: a record we cannot land a Song from is a bug of ours, and the
+  // player should get their Run rather than a dead button.
+  if (!song) return startRun(state);
+
+  const { round } = record;
+  return {
+    ...state,
+    screen: "playing",
+    gameMode: GAME_MODES.competition,
+    song,
+    dailySongIndex: record.dailySongIndex,
+    turnIndex: record.turnIndex,
+    questionIndex: record.turnIndex,
+    score: record.score,
+    turns: record.turns,
+    scoreSubmitted: record.scoreSubmitted,
+    nameInputValue: "",
+    // The round in flight comes back with the Run. Restoring to a clean turn
+    // boundary would let two wrong guesses plus a reload buy back a fresh
+    // 150-point first attempt.
+    guesses: round.guesses,
+    submitted: round.guesses.length > 0,
+    finished: round.finished,
+    correct: round.correct,
+    roundPoints: round.roundPoints,
+    geoHintsEnabled: round.geoHintsEnabled,
+    // Only the scoring flag is stored, because only it is owed to the Run. The
+    // switch comes back on with it: the round has already been charged for the
+    // hints, so showing them is the generous reading of a record that cannot
+    // say whether the player had since hidden them.
+    showGeoHints: round.geoHintsEnabled,
+    errorMessage:
+      round.finished && !round.correct ? `Answer was: ${song.country}` : "",
+  };
+}
+
+/** The other way a record comes back: a Run already played, as its summary. */
+function reopenedRunSummary(
+  state: GameState,
+  record: DailyRunRecord,
+): GameState {
+  return {
+    ...state,
+    ...runReset,
+    screen: "runSummary",
+    gameMode: GAME_MODES.competition,
+    turnIndex: NUM_COMPETITION_TURNS,
+    dailySongIndex: record.dailySongIndex,
+    score: record.score,
+    turns: record.turns,
+    // Load-bearing: without it the name box comes back, and one score goes onto
+    // the append-only leaderboard every time the summary is reopened.
+    scoreSubmitted: record.scoreSubmitted,
+  };
+}
+
+/**
+ * The Run as the day's record, or `null` when the player is not on one. The
+ * status is read from the Run's own turn count rather than the screen: the
+ * record has to still read "finished" long after the player walked back to the
+ * menu. See ADR-0004 for why this is a hand-mapped record and not a state dump.
+ */
+export function dailyRunRecordFrom(
+  state: GameState,
+  day: string,
+): DailyRunRecord | null {
+  if (state.gameMode !== GAME_MODES.competition) return null;
+
+  return {
+    v: DAILY_RUN_VERSION,
+    date: day,
+    status:
+      state.turnIndex >= NUM_COMPETITION_TURNS ? "finished" : "in-progress",
+    turnIndex: state.turnIndex,
+    score: state.score,
+    dailySongIndex: state.dailySongIndex,
+    scoreSubmitted: state.scoreSubmitted,
+    turns: state.turns,
+    round: {
+      guesses: state.guesses,
+      geoHintsEnabled: state.geoHintsEnabled,
+      finished: state.finished,
+      correct: state.correct,
+      roundPoints: state.roundPoints,
+    },
+  };
+}
 
 /**
  * The finished round, snapshotted as the Run's record of it. Called as the round
@@ -185,11 +392,62 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SET_MODE":
       return { ...state, gameMode: action.mode, screen: "playing" };
 
+    // Starting the Daily Run spends the day. Nothing here consults storage —
+    // the day's record is read above the reducer and arrives on the action.
+    case "START_RUN":
+      return startRun(state);
+
+    case "RESUME_RUN":
+      return resumedRun(state, action.record);
+
+    // Today's Run, seen again. A finished Run outlives the session that played
+    // it, so its summary is reopened from the record rather than from state.
+    case "SHOW_RUN_SUMMARY":
+      return reopenedRunSummary(state, action.record);
+
+    // The live albums have arrived. The bundled half rendered the app already,
+    // so this is a **top-up**: the pool gains what it has never seen, and the
+    // day's ten are recomputed now that the pool they seed from is whole.
+    //
+    // Appending is safe rather than merely convenient — an album that has just
+    // arrived cannot already have been drawn, so nothing here can resurrect a
+    // Song this session has played. Recomputing `dailySongs` is safe because
+    // Competition is shut until this lands (ADR-0007): a Run seeded from a
+    // partial pool would play a different ten onto the same leaderboard with
+    // nothing looking wrong, so the menu refuses to start one. The guard below
+    // says the same thing in the reducer, where it cannot be forgotten.
+    case "ALBUMS_LOADED": {
+      if (state.gameMode === GAME_MODES.competition) return state;
+
+      const held = new Set(state.albums.map((album) => album.album_name));
+      const fresh = action.albums.filter(
+        (album) => !held.has(album.album_name),
+      );
+
+      return {
+        ...state,
+        albums: [...state.albums, ...fresh],
+        dailySongs: getDailySongs(
+          competitionAlbums(libraryWith(action.albums), action.today),
+        ),
+      };
+    }
+
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };
 
+    case "SHOW_ADMIN":
+      return { ...state, screen: "admin" };
+
     case "SHOW_EXPLORE":
       return { ...state, screen: "explore" };
+
+    case "SHOW_SUGGEST":
+      return {
+        ...state,
+        screen: "suggest",
+        suggestCountryCode: action.countryCode ?? "",
+      };
 
     case "SUBMIT_GUESS": {
       const { countryAnswer } = action;
@@ -274,65 +532,61 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
-      const picked = pickNextSong(
-        state.albums,
-        state.dailySongs,
-        state.dailySongIndex,
-      );
-
-      const base: GameState = {
+      // Everything the next round inherits except the Song itself, which each
+      // branch below draws from its own list.
+      const withRoundCleared: GameState = {
         ...state,
         ...roundReset,
         questionIndex: state.questionIndex + 1,
-        song: picked.song,
-        albums: picked.albums,
-        dailySongIndex: picked.dailySongIndex,
       };
 
+      // Which list the next Song comes off is the whole of issue #49: the day's
+      // seeded ten are Competition's, and Infinite draws at random beside them.
       if (state.gameMode === GAME_MODES.competition) {
+        const picked = pickDailySong(
+          state.albums,
+          state.dailySongs,
+          state.dailySongIndex,
+        );
         const reachedFinalTurn = state.turnIndex === NUM_COMPETITION_TURNS - 1;
+
         return {
-          ...base,
+          ...withRoundCleared,
+          song: picked.song,
+          albums: picked.albums,
+          dailySongIndex: picked.dailySongIndex,
           geoHintsEnabled: false,
           showGeoHints: false,
           turnIndex: state.turnIndex + 1,
           // The retired turn joins the Run's record. Only Competition keeps one:
           // Infinite never ends, so nothing would ever read it.
           turns: [...state.turns, turnResultFrom(state)],
-          screen: reachedFinalTurn ? "runSummary" : base.screen,
+          screen: reachedFinalTurn ? "runSummary" : withRoundCleared.screen,
         };
       }
 
-      return base;
+      const picked = pickRandomSong(state.albums);
+      return { ...withRoundCleared, song: picked.song, albums: picked.albums };
     }
 
     case "RESET_TO_MENU": {
-      const picked = pickNextSong(
-        state.albums,
-        state.dailySongs,
-        state.dailySongIndex,
-      );
+      // The menu is nobody's mode, so its Song is a random one and the day is
+      // left exactly as the player left it.
+      const picked = pickRandomSong(state.albums);
 
       return {
         ...state,
-        ...roundReset,
+        // Leaving the screen discards the Run *from state*. The day's record
+        // outlives it in storage — that is what the menu reads to decide
+        // whether today's Run is still to play, half-played or done.
+        ...runReset,
         screen: "menu",
         gameMode: "",
-        geoHintsEnabled: false,
-        showGeoHints: false,
-        questionIndex: 0,
-        turnIndex: 0,
-        score: 0,
-        // Leaving the screen discards the Run: it lives in memory only, for as
-        // long as the player stays on it. The name box goes with it — the
-        // leaderboard write no longer reloads the page, so nothing else would
-        // stop one player's name carrying into the next Run.
-        turns: [],
-        nameInputValue: "",
-        scoreSubmitted: false,
         song: picked.song,
         albums: picked.albums,
-        dailySongIndex: picked.dailySongIndex,
+        // The home button is the only way off the Suggestion form, so this is
+        // where the country it opened on stops being anybody's business.
+        suggestCountryCode: "",
       };
     }
 

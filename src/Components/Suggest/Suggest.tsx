@@ -101,11 +101,11 @@ const Suggest = (props: SuggestProps) => {
           <Typography variant="h2" sx={{ fontSize: "1.125rem" }}>
             Suggestion received
           </Typography>
-          {/* Honest rather than warm: there is no reply coming, because the
-              form never asked for anywhere to send one. */}
+          {/* It promises a review and nothing more: no reply is coming,
+              because the form never asked for anywhere to send one. */}
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            A human reads these and adds the ones that fit. There's no reply and
-            no timeline — but it has been written down.
+            Thanks for your input. We will review it and add the album if it
+            fits.
           </Typography>
           <Button
             variant="outlined"

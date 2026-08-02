@@ -30,14 +30,16 @@ CSS. One resolved value in all three keeps a single red on screen.
 
 ## Macrostructure families
 
-- **Menu / Scoreboard (content pages)** — centred column on `Base`, capped at
-  `sm`, standing on the **night backdrop** (below): the map under a black veil,
-  which is ground rather than enrichment — nothing is added to the column.
-  Typography and the button stack carry it. These are the two screens that are
-  _about_ the game without being made of it, and the backdrop is what says so.
-  Their foreground is **paper on night**, the mirror of the app pages' ink on
-  paper; opaque surfaces they contain (the scoreboard's table card) are cream
-  and take ink back.
+- **Menu / Scoreboard / Suggest / Suggestion review (content pages)** — centred column on `Base`,
+  capped at `sm`, standing on the **night backdrop** (below): the map under a
+  black veil, which is ground rather than enrichment — nothing is added to the
+  column. Typography and the button stack carry it. These are the screens that
+  are _about_ the game without being made of it, and the backdrop is what says
+  so. Their foreground is **paper on night**, the mirror of the app pages' ink
+  on paper; opaque surfaces they contain (the scoreboard's table card, the
+  Suggestion form's, the review queue's) are cream and take ink back. The Suggestion form's card is
+  load-bearing rather than decorative: `TextField` here is cream, so unwrapped
+  on the night its boxes would float on black with no surface underneath them.
 - **Game / Explore (app pages)** — **Workbench**: the map is a live surface
   covering the viewport, with `PanelSurface` floating over one corner in
   landscape and dropping to a content-sized bottom tray in portrait. Governed by
@@ -138,7 +140,7 @@ old green/amber/red run translated into the palette one for one.
 
 ### The map as the content pages' backdrop
 
-The content pages are the way in to three surfaces made of the map, so they
+The content pages are the way in to the surfaces made of the map, so they
 stand on one: the game's map at rest, covering the viewport behind the column
 (`BackdropMap`). It is a **veil, not a wash** — the map is drawn at full
 strength and then covered in `night` at 0.76 — so what is left is a coastline in
@@ -167,7 +169,7 @@ nothing here is picked, so nothing here is a target:
   click-through and out of the accessibility tree, so the column's buttons
   remain the entire screen to a pointer, a keyboard and a screen reader alike.
 
-**Both content pages get it, and only they do.** The map surfaces are the map
+**Every content page gets it, and only they do.** The map surfaces are the map
 already; the backdrop is what marks a screen as being about the game without
 being made of it.
 
@@ -292,7 +294,15 @@ landscape/portrait, chrome clearance, the portrait tray's ceiling — stays in
   One per primary moment; three filled pear buttons never stack in a row except
   on the menu, where each _is_ a primary choice.
 - **Secondary** — outlined pill, **ink** border and ink label (not pear: see the
-  accent rule).
+  accent rule). On a content page it is drawn in that page's foreground instead,
+  so on the night backdrop the border and label are paper.
+
+**There is no third tier.** Anything that is not one of a screen's primary
+choices wears the secondary pill — which is why the menu carries two of them
+(Scoreboard, Suggest an album) beside its three primaries rather than dropping
+either to a text link. A text link would be a rung this system does not have,
+and a fourth filled button would make suggesting an album a peer of Competition,
+Infinite and Explore.
 
 ## What screens MUST share
 

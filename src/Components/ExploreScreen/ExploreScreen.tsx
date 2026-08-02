@@ -2,7 +2,9 @@ import React, { useEffect, useLayoutEffect, useRef } from "react";
 
 import Explore from "../Explore/Explore";
 import { useExplore } from "../../context/ExploreContext";
+import { useGame } from "../../context/GameContext";
 import { currentSong } from "../../state/exploreReducer";
+import { countryCodeByName } from "../../map/geography";
 import useSpotifyPlayer from "../../hooks/useSpotifyPlayer";
 import useKeyboardShortcuts from "../../hooks/useKeyboardShortcuts";
 
@@ -17,6 +19,11 @@ import useKeyboardShortcuts from "../../hooks/useKeyboardShortcuts";
  */
 const ExploreScreen = () => {
   const { state, dispatch } = useExplore();
+  // The one place the two reducers meet, and only as a router call: Explore
+  // knows which country was asked about, and the game reducer is what decides
+  // what is on screen (ADR-0003). The code travels as an argument to the screen
+  // being opened, exactly as a Daily Run record does.
+  const { dispatch: dispatchGame } = useGame();
   const countryInputRef = useRef<HTMLInputElement>(null);
   const song = currentSong(state);
   // No Clip cap: Explore is a listening surface, so a listener signed in to
@@ -86,6 +93,16 @@ const ExploreScreen = () => {
       onSkipClicked={skip}
       onSelectCountry={(country) =>
         dispatch({ type: "SELECT_COUNTRY", country })
+      }
+      askedAboutCountry={state.askedAbout}
+      onAskAboutCountry={(country) => dispatch({ type: "ASK_ABOUT", country })}
+      onSuggestClicked={() =>
+        dispatchGame({
+          type: "SHOW_SUGGEST",
+          ...(state.askedAbout
+            ? { countryCode: countryCodeByName(state.askedAbout) }
+            : {}),
+        })
       }
       onFormSubmit={onFormSubmit}
       embedRef={player.embedRef}

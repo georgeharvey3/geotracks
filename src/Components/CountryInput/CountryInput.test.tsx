@@ -110,6 +110,24 @@ describe("CountryInput", () => {
     expect(onFormSubmit).toHaveBeenCalled();
   });
 
+  // The list floats over the map, so one left open after a commit sits on top
+  // of the very countries the next guess has to reach.
+  it("closes the suggestions when the committed guess clears the box", async () => {
+    render(<CountryInput {...defaultProps} />);
+    const input = screen.getByPlaceholderText("Country");
+    await userEvent.type(input, "Fra");
+    await waitFor(() => {
+      expect(screen.getByRole("list")).toBeInTheDocument();
+    });
+
+    // Enter, the keyboard path: no suggestion is highlighted, so the keydown
+    // handler falls through and the form commits.
+    await userEvent.keyboard("{Enter}");
+
+    expect(input).toHaveValue("");
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  });
+
   it("closes suggestions on Escape key", async () => {
     render(<CountryInput {...defaultProps} />);
     const input = screen.getByPlaceholderText("Country");

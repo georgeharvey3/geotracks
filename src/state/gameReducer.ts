@@ -1,11 +1,19 @@
-import albumsJSON from "../albums.json";
 import countriesJSON from "../countries.json";
 import getDistance from "../helpers/getDistance";
 import getBearing from "../helpers/getBearing";
 import getDailySongs from "../helpers/getDailySongs";
-import { DAILY_RUN_VERSION, DailyRunRecord } from "../helpers/dailyRun";
 import {
-  Album,
+  DAILY_RUN_VERSION,
+  DailyRunRecord,
+  dayString,
+} from "../helpers/dailyRun";
+import {
+  bundledAlbums,
+  competitionAlbums,
+  libraryWith,
+} from "../music/library";
+import {
+  LibraryAlbum,
   Song,
   SongMetadata,
   Guess,
@@ -37,13 +45,24 @@ export const MAX_COMPETITION_SCORE = SCORE_VALUES[1]! * NUM_COMPETITION_TURNS;
 // `screen` is the app's single router. Explore keeps its own state in its own
 // reducer (ADR-0003), but which surface is on screen is decided in one place.
 export type Screen =
-  "menu" | "scoreboard" | "playing" | "runSummary" | "explore";
+  | "menu"
+  | "scoreboard"
+  | "playing"
+  | "runSummary"
+  | "explore"
+  | "suggest"
+  // Where Suggestions are reviewed. Not a player's screen: no control anywhere
+  // in the app leads to it, and it is reached only by the `#admin` hash. What
+  // keeps it shut is not that — it is the RTDB rules, which hand the Suggestions
+  // to one uid; this screen is empty for everyone else who finds it.
+  | "admin";
 
 export interface GameState {
   screen: Screen;
   // "" until a mode is chosen, then one of GAME_MODES.
   gameMode: string;
-  albums: Album[];
+  /** The pool the next Song is drawn from, shrinking by one per round. */
+  albums: LibraryAlbum[];
   dailySongs: Song[];
   dailySongIndex: number;
   song: Song;
@@ -67,17 +86,36 @@ export interface GameState {
   nameInputValue: string;
   /** Whether this Run's score has been written to the leaderboard. One per Run. */
   scoreSubmitted: boolean;
+  /**
+   * The country the Suggestion form opens on, as an alpha-2 code, or "" when
+   * the screen was reached from the menu with nobody in mind.
+   *
+   * This is the *whole* of what the game reducer knows about a Suggestion: the
+   * router opening a screen with an argument, as `RESUME_RUN` opens one with a
+   * record. The form's own state — the fields, their validity, the write in
+   * flight — is local to it, and the write goes through `useSuggestions`. The
+   * reducer has no business knowing about a Spotify link.
+   */
+  suggestCountryCode: string;
 }
 
 export type GameAction =
   // Infinite's way in. Competition arrives through the three Daily Run actions
   // below instead, so the day's record decides which one the menu offers.
   | { type: "SET_MODE"; mode: string }
+  // The live half of the Library, arriving from the database after the app has
+  // already rendered on the bundled half.
+  | { type: "ALBUMS_LOADED"; albums: LibraryAlbum[]; today: string }
   | { type: "START_RUN" }
   | { type: "RESUME_RUN"; record: DailyRunRecord }
   | { type: "SHOW_RUN_SUMMARY"; record: DailyRunRecord }
   | { type: "SHOW_SCOREBOARD" }
   | { type: "SHOW_EXPLORE" }
+  // Dispatched from the `#admin` hash alone — nothing in the UI sends it.
+  | { type: "SHOW_ADMIN" }
+  // The country code is a prefill and nothing more: Explore dispatches it with
+  // the country the player asked about, the menu dispatches it without one.
+  | { type: "SHOW_SUGGEST"; countryCode?: string }
   | { type: "SUBMIT_GUESS"; countryAnswer: string }
   | { type: "TOGGLE_GEO_HINTS"; checked: boolean }
   | { type: "NEXT_SONG" }
@@ -96,7 +134,10 @@ export type GameAction =
  * they get that day already holding the answers. The seed is there to make Runs
  * comparable between players, and there is no second Run to fall back on.
  */
-function pickRandomSong(albums: Album[]): { song: Song; albums: Album[] } {
+function pickRandomSong(albums: LibraryAlbum[]): {
+  song: Song;
+  albums: LibraryAlbum[];
+} {
   const albumIndex = Math.floor(Math.random() * albums.length);
   // Invariant: the album pool outlasts any session (it only shrinks by one per
   // round), so a random in-range index always lands on an album with at least
@@ -122,10 +163,10 @@ function pickRandomSong(albums: Album[]): { song: Song; albums: Album[] } {
  * Song rather than nothing.
  */
 function pickDailySong(
-  albums: Album[],
+  albums: LibraryAlbum[],
   dailySongs: Song[],
   dailySongIndex: number,
-): { song: Song; albums: Album[]; dailySongIndex: number } {
+): { song: Song; albums: LibraryAlbum[]; dailySongIndex: number } {
   const song = dailySongs[dailySongIndex];
   if (song === undefined) {
     return { ...pickRandomSong(albums), dailySongIndex };
@@ -145,8 +186,15 @@ function pickDailySong(
   };
 }
 
-export function createInitialState(albums: Album[] = albumsJSON): GameState {
-  const dailySongs = getDailySongs(albums);
+export function createInitialState(
+  albums: LibraryAlbum[] = bundledAlbums,
+  today: string = dayString(new Date()),
+): GameState {
+  // Competition draws from the Library as it stood before today: a Community
+  // album added by a deploy must not change the day's ten under anyone
+  // part-way through them. Every other draw below takes the whole Library, so
+  // Explore and Infinite have it the moment it ships.
+  const dailySongs = getDailySongs(competitionAlbums(albums, today));
   // The Song the menu is standing on is the one Infinite opens with, and no
   // mode has been chosen yet — so it is drawn at random and the day is still
   // whole. `START_RUN` is what spends the day's first Song.
@@ -173,6 +221,7 @@ export function createInitialState(albums: Album[] = albumsJSON): GameState {
     turns: [],
     nameInputValue: "",
     scoreSubmitted: false,
+    suggestCountryCode: "",
   };
 }
 
@@ -356,11 +405,49 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SHOW_RUN_SUMMARY":
       return reopenedRunSummary(state, action.record);
 
+    // The live albums have arrived. The bundled half rendered the app already,
+    // so this is a **top-up**: the pool gains what it has never seen, and the
+    // day's ten are recomputed now that the pool they seed from is whole.
+    //
+    // Appending is safe rather than merely convenient — an album that has just
+    // arrived cannot already have been drawn, so nothing here can resurrect a
+    // Song this session has played. Recomputing `dailySongs` is safe because
+    // Competition is shut until this lands (ADR-0007): a Run seeded from a
+    // partial pool would play a different ten onto the same leaderboard with
+    // nothing looking wrong, so the menu refuses to start one. The guard below
+    // says the same thing in the reducer, where it cannot be forgotten.
+    case "ALBUMS_LOADED": {
+      if (state.gameMode === GAME_MODES.competition) return state;
+
+      const held = new Set(state.albums.map((album) => album.album_name));
+      const fresh = action.albums.filter(
+        (album) => !held.has(album.album_name),
+      );
+
+      return {
+        ...state,
+        albums: [...state.albums, ...fresh],
+        dailySongs: getDailySongs(
+          competitionAlbums(libraryWith(action.albums), action.today),
+        ),
+      };
+    }
+
     case "SHOW_SCOREBOARD":
       return { ...state, screen: "scoreboard" };
 
+    case "SHOW_ADMIN":
+      return { ...state, screen: "admin" };
+
     case "SHOW_EXPLORE":
       return { ...state, screen: "explore" };
+
+    case "SHOW_SUGGEST":
+      return {
+        ...state,
+        screen: "suggest",
+        suggestCountryCode: action.countryCode ?? "",
+      };
 
     case "SUBMIT_GUESS": {
       const { countryAnswer } = action;
@@ -497,6 +584,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         gameMode: "",
         song: picked.song,
         albums: picked.albums,
+        // The home button is the only way off the Suggestion form, so this is
+        // where the country it opened on stops being anybody's business.
+        suggestCountryCode: "",
       };
     }
 

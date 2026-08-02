@@ -2,14 +2,13 @@ import { Box, Typography } from "@mui/material";
 
 import { CHROME_CLEARANCE, LANDSCAPE_MEDIA } from "../../layout";
 import { NUM_COMPETITION_TURNS } from "../../state/gameReducer";
+import { MONO } from "../../theme";
 import { COLORS } from "../../tokens";
 
 interface CurrentScoreProps {
   turnsRemaining: number;
   score: number;
 }
-
-const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
 /** One figure with its label, in the mono the design system keeps for figures. */
 const Stat = ({

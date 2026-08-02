@@ -2,9 +2,11 @@ import { Box, Button, Stack } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import PublicIcon from "@mui/icons-material/Public";
 import { GameModes } from "../../types";
 import { DayStatus } from "../../helpers/dailyRun";
+import { LibraryStatus } from "../../hooks/useCommunityAlbums";
 import { COLORS } from "../../tokens";
 
 interface MenuProps {
@@ -13,10 +15,30 @@ interface MenuProps {
   setGameMode: (mode: string) => void;
   /** Today's Competition Run: still to play, half-played, or done. */
   dailyRunStatus: DayStatus;
+  /**
+   * Whether the live half of the Library has arrived. Competition waits on it;
+   * Infinite and Explore never do.
+   */
+  libraryStatus: LibraryStatus;
   onDailyRun: () => void;
   setShowScoreboard: (show: boolean) => void;
   setShowExplore: () => void;
+  setShowSuggest: () => void;
 }
+
+// The secondary tier's treatment on the night backdrop: the outlined buttons
+// here are drawn in the page's own foreground, which on the menu is paper
+// rather than the theme's ink. There is no third tier to reach for — a text
+// link would be a rung this system does not have — so anything that is not one
+// of the three primary choices wears this.
+const SECONDARY_ON_NIGHT = {
+  color: COLORS.paper,
+  borderColor: COLORS.paper,
+  "&:hover": {
+    borderColor: COLORS.paper,
+    bgcolor: "rgba(247, 245, 236, 0.12)",
+  },
+};
 
 // One control in three states, so the label is what changes and not the button.
 // A finished day reopens its Run summary rather than going dead: the Run is
@@ -28,6 +50,23 @@ const DAILY_RUN_LABELS: Record<DayStatus, string> = {
   finished: "Today's Run",
 };
 
+// What Competition says while it cannot be started, and why it cannot.
+//
+// **The day's ten are drawn by index from a pool that is part bundled and part
+// live**, so a Run started before the live half arrives would be seeded from a
+// shorter pool: a different ten, played against the same leaderboard, with
+// nothing anywhere looking wrong. This is the one place in the app that fails
+// *closed* — the Daily Run's stored record fails open, because a serialization
+// bug of ours must not look like a punishment, whereas a Run on the wrong pool
+// is worse than no Run at all, being counted. See ADR-0007.
+//
+// The two waits are worded apart on purpose: one resolves by waiting, the other
+// does not resolve at all until the network does.
+const LIBRARY_LABELS: Partial<Record<LibraryStatus, string>> = {
+  loading: "Loading today's songs…",
+  failed: "Today's songs are unavailable",
+};
+
 const Menu = (props: MenuProps) => (
   <Box sx={{ mt: 4 }}>
     <Stack spacing={2} sx={{ maxWidth: 280, mx: "auto" }}>
@@ -36,8 +75,10 @@ const Menu = (props: MenuProps) => (
         size="large"
         startIcon={<EmojiEventsIcon />}
         onClick={props.onDailyRun}
+        disabled={props.libraryStatus !== "ready"}
       >
-        {DAILY_RUN_LABELS[props.dailyRunStatus]}
+        {LIBRARY_LABELS[props.libraryStatus] ??
+          DAILY_RUN_LABELS[props.dailyRunStatus]}
       </Button>
       <Button
         variant="contained"
@@ -56,24 +97,26 @@ const Menu = (props: MenuProps) => (
       >
         Explore
       </Button>
-      {/* The secondary action is drawn in the page's foreground, which on the
-          menu is paper rather than the theme's ink: the outlined button is the
-          one control here made of nothing but its own outline. */}
       <Button
         variant="outlined"
         size="large"
         startIcon={<LeaderboardIcon />}
         onClick={() => props.setShowScoreboard(true)}
-        sx={{
-          color: COLORS.paper,
-          borderColor: COLORS.paper,
-          "&:hover": {
-            borderColor: COLORS.paper,
-            bgcolor: "rgba(247, 245, 236, 0.12)",
-          },
-        }}
+        sx={SECONDARY_ON_NIGHT}
       >
         Scoreboard
+      </Button>
+      {/* Secondary, sitting with the scoreboard rather than becoming a fourth
+          filled button: a primary here would make suggesting an album a peer of
+          Competition, Infinite and Explore, and it is not one. */}
+      <Button
+        variant="outlined"
+        size="large"
+        startIcon={<LibraryMusicIcon />}
+        onClick={props.setShowSuggest}
+        sx={SECONDARY_ON_NIGHT}
+      >
+        Suggest an album
       </Button>
     </Stack>
   </Box>

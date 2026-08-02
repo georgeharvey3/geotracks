@@ -22,6 +22,8 @@ const select = (state: ExploreState, country: string) =>
   exploreReducer(state, { type: "SELECT_COUNTRY", country });
 const skip = (state: ExploreState) => exploreReducer(state, { type: "SKIP" });
 const leave = (state: ExploreState) => exploreReducer(state, { type: "LEAVE" });
+const askAbout = (state: ExploreState, country: string) =>
+  exploreReducer(state, { type: "ASK_ABOUT", country });
 
 const linkOf = (state: ExploreState) => currentSong(state)?.link;
 
@@ -139,6 +141,37 @@ describe("exploreReducer", () => {
     });
   });
 
+  describe("asking about a country with no music", () => {
+    it("picks it, without playing anything", () => {
+      const asked = askAbout(initial(), "Belgium");
+
+      expect(asked.askedAbout).toBe("Belgium");
+      expect(asked.country).toBeNull();
+      expect(currentSong(asked)).toBeUndefined();
+    });
+
+    // The point of the whole arrangement: the question costs nothing.
+    it("leaves the Song in flight exactly where it was", () => {
+      const mali = select(initial(), "Mali");
+      const asked = askAbout(mali, "Belgium");
+
+      expect(asked.country).toBe("Mali");
+      expect(linkOf(asked)).toBe(linkOf(mali));
+    });
+
+    it("has nothing to ask about a country the app holds music for", () => {
+      const state = initial();
+
+      expect(askAbout(state, "Mali")).toBe(state);
+    });
+
+    it("drops the question once a country is chosen to listen to", () => {
+      const asked = askAbout(initial(), "Belgium");
+
+      expect(select(asked, "Mali").askedAbout).toBeNull();
+    });
+  });
+
   describe("leaving", () => {
     it("leaves nothing playing", () => {
       const left = leave(select(initial(), "Mali"));
@@ -152,6 +185,10 @@ describe("exploreReducer", () => {
       const returned = select(leave(mali), "Mali");
 
       expect(linkOf(returned)).toBe(linkOf(mali));
+    });
+
+    it("takes the question with it, so a return opens on a clean map", () => {
+      expect(leave(askAbout(initial(), "Belgium")).askedAbout).toBeNull();
     });
 
     it("does nothing when nothing was playing", () => {

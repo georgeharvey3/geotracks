@@ -42,3 +42,34 @@ export const firebaseConfig = {
     import.meta.env.VITE_FIREBASE_APP_ID ||
     "1:309832762507:web:00232dc3ff78ae898ac08e",
 };
+
+// The Spotify application the review screen signs in against, so that accepting
+// a Suggestion can read the album's track list (ADR-0008).
+//
+// **This is the client id, never the client secret.** Authorization Code with
+// PKCE exists precisely so that a client which cannot keep a secret does not
+// need one, and Spotify documents the id as a public identifier — it is in the
+// authorize URL of every such app, in plain sight in the address bar. The secret
+// stays where it has always been: `SPOTIFY_CLIENT_SECRET` in a gitignored `.env`
+// with no `VITE_` prefix, read only by `scripts/add-community-album.ts`.
+//
+// Unlike the Firebase values there is **no committed fallback**, because this
+// one is not the app's — it belongs to whoever's Spotify developer account
+// registered the redirect URI below. Left unset, the review screen simply says
+// so and the terminal script remains the way to accept.
+export const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID || "";
+
+// Where Spotify sends the sign-in popup back to. Derived rather than configured
+// so it is right in dev and in production without either being remembered: the
+// site's own base URL, which is `/geotracks/` (see `vite.config.ts`).
+//
+// It must match a **Redirect URI** registered on the Spotify app *exactly*,
+// trailing slash included. In production that is the Pages URL, and production
+// is the only place this flow can run: Firebase Auth authorizes `localhost` and
+// refuses IP literals, while Spotify refuses `localhost` and demands the
+// loopback IP, so no local origin satisfies both gates on one page. Development
+// leaves `VITE_SPOTIFY_CLIENT_ID` unset and accepts from the terminal instead
+// (ADR-0008).
+export const SPOTIFY_REDIRECT_URI = `${window.location.origin}${
+  import.meta.env.BASE_URL
+}`;

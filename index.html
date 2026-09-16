@@ -6,13 +6,45 @@
          it is understood, and the .ico of the same drawing where it is not. -->
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" sizes="16x16 32x32 48x48" href="/geotracks.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f7f5ec" />
+    <!-- `viewport-fit=cover` is what lets the app reach the edges of an iPhone
+         rather than sitting in a letterboxed safe rectangle, and it is also what
+         gives `env(safe-area-inset-*)` a non-zero value — without it every
+         safe-area expression in the app resolves to 0 and the chrome quietly
+         ignores the notch and the home indicator. See `src/layout.ts`. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <!-- The starting value only. Which ground a screen stands on follows from
+         its family, so `useThemeColor` rewrites this on every screen change and
+         the status bar stops being cream over a near-black page. This value is
+         the menu's, because the menu is where the app opens. -->
+    <meta name="theme-color" content="#05070a" />
     <meta
       name="description"
       content="GeoTracks — a music geography guessing game. Listen to a clip and guess the country."
     />
-    <link rel="apple-touch-icon" href="/logo192.png" />
+
+    <!-- Added to the home screen, this runs as an app rather than as a tab.
+         `display: standalone` in the manifest is what says so on Android and on
+         iOS 16.4+; `apple-mobile-web-app-capable` is the same instruction for
+         the iPhones that predate it, and is still what a lot of them read. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- The label under the icon. Without it iOS uses <title>, which is
+         "Geotracks" — the app's own name has a capital T. -->
+    <meta name="apple-mobile-web-app-title" content="GeoTracks" />
+    <!-- Deliberately not `black-translucent`. That style fixes the status bar's
+         glyphs to white, and this app has two grounds: white glyphs are right
+         over the menu's night and invisible over the game screen's cream chrome.
+         `default` lets the bar take its cue from the theme colour above, which
+         changes with the screen. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Opaque and inset, unlike the favicons above: iOS fills transparency with
+         black and then masks the result into a squircle. See
+         `scripts/build-logo-assets.ts`, which draws both families from the one
+         geometry. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
     <link rel="manifest" href="/manifest.json" />
 

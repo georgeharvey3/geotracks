@@ -1,6 +1,6 @@
 import { Box, Typography } from "@mui/material";
 
-import { CHROME_CLEARANCE, LANDSCAPE_MEDIA } from "../../layout";
+import { CHROME_CLEARANCE, LANDSCAPE_MEDIA, safeArea } from "../../layout";
 import { NUM_COMPETITION_TURNS } from "../../state/gameReducer";
 import { MONO } from "../../theme";
 import { COLORS } from "../../tokens";
@@ -83,9 +83,17 @@ const CurrentScore = (props: CurrentScoreProps) => {
         position: "absolute",
         zIndex: 2,
         m: 0,
-        top: CHROME_CLEARANCE + 8,
-        right: 12,
-        [LANDSCAPE_MEDIA]: { top: "auto", bottom: 24, left: 24, right: "auto" },
+        // The plaque takes the corner furthest from the panel, so it is pinned
+        // to two edges of the phone and needs the insets of both. Portrait it
+        // sits under the chrome, which has itself moved down by the notch.
+        top: safeArea("top", CHROME_CLEARANCE + 8),
+        right: safeArea("right", 12),
+        [LANDSCAPE_MEDIA]: {
+          top: "auto",
+          bottom: safeArea("bottom", 24),
+          left: safeArea("left", 24),
+          right: "auto",
+        },
         display: "flex",
         alignItems: "center",
         gap: 1.75,

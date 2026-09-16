@@ -21,6 +21,7 @@ import {
   useLibraryStatus,
 } from "./context/GameContext";
 import { ExploreProvider } from "./context/ExploreContext";
+import { useThemeColor } from "./hooks/useThemeColor";
 import { GAME_MODES } from "./state/gameReducer";
 
 // Screen router: reads the current screen from the game reducer and renders the
@@ -126,6 +127,11 @@ function AppContent() {
     state.screen === "playing" ||
     state.screen === "explore" ||
     state.screen === "runSummary";
+
+  // Installed to a home screen there is no browser chrome between the status bar
+  // and the page, so the bar has to stand on the same ground the screen does.
+  // The same split, one line later.
+  useThemeColor(isMapSurface);
 
   return (
     <Base

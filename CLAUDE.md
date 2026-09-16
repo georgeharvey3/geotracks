@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` — ESLint over the repo; `npm run format` / `npm run format:check` for Prettier
 - `npm run test:coverage` — Run the suite with a V8 coverage report (`coverage/`); reported only, no enforced gate
 - `node scripts/build-map-geometry.mjs` — Regenerate the map's bundled country geometry (only needed after changing `src/countries.json` or the straggler threshold; see ADR-0002)
-- `node scripts/build-logo-assets.ts` — Regenerate `public/`'s favicon, PWA icons and `logo.svg` from the mark's geometry (only needed after changing the mark; needs Chrome on the machine)
+- `node scripts/build-logo-assets.ts` — Regenerate `public/`'s two icon families — the transparent favicons and the opaque, inset home-screen icons — plus `logo.svg`, all from the mark's geometry (only needed after changing the mark; needs Chrome on the machine)
 - `node scripts/add-community-album.ts [--live-from YYYY-MM-DD] [--dry-run]` — List the waiting Suggestions and accept the one you pick **into the database**, live without a deploy (ADR-0007). Pass `<album-url-or-id> <ALPHA2>` instead to add an album nobody suggested. Needs Spotify credentials in `.env` and a logged-in Firebase CLI; see "Community suggestions". The review screen at `#admin` accepts too now (ADR-0008) — this stays for `--live-from`, for albums nobody suggested, and for working without a browser
 
 ### CI/CD & deployment
@@ -119,6 +119,16 @@ Shared geometry lives in `src/layout.ts`, and the whole split follows from the w
 Nothing on this screen scrolls — the map claims touch gestures for pan/zoom (`touchAction: "none"`), so only the panel's own content may overflow.
 
 The **guess board** (`src/Components/Guesses/Guesses.tsx`) shows only the latest guess by default, with a toggle to unfold the rest; the end of a round folds it back up so the reveal and Next Song button have the room. The map still carries every guess, so nothing is lost by keeping the board short. Because the panel is a short scrolling box, the country autocomplete opens in a `Popper` portalled out of it (and selects on click, not mousedown, so a dismissed list can't pass the click through to the map underneath).
+
+### Installed to a home screen
+
+The app is installable — added to an iPhone's home screen it launches without browser chrome and behaves like an application ([ADR-0009](docs/adr/0009-installed-to-the-home-screen-as-a-standalone-app.md)). Nothing about the game changed; this is all about the frame it is shown in. There is **no service worker and so no offline**: the app is a Spotify client, and the thing a player came for does not work offline. `display: standalone` needs none on iOS.
+
+- **The mark is drawn twice.** `scripts/build-logo-assets.ts` still draws every committed asset from the one geometry, but now in two families. The **favicon** family (`logo.svg`, `logo192.png`, `logo512.png`, `geotracks.ico`) is transparent and full-bleed, because the browser composites it onto its own chrome and a favicon that pads itself looks smaller than its neighbours. The **installed** family (`apple-touch-icon.png` at 180, `maskable192.png`, `maskable512.png`) is **opaque cream and inset**, because the platform masks it — iOS fills transparency with black and then cuts a squircle out of what it gets. The maskable inset is fitted to the mark's **ink** rather than its bounding box: a pin has nothing in the corners, so bounding its diagonal would shrink it to 69% of the canvas to protect two empty ones. There are deliberately **no `apple-touch-startup-image` files** — twenty media-query'd PNGs to slightly out-perform the launch screen iOS now builds from the manifest is not a trade worth taking.
+- **The status bar follows the screen's family.** Installed there is no chrome between it and the page, so the OS paints that strip with the theme colour: night over a content page, cream over a map surface. One fixed value is wrong on half the screens, so `useThemeColor` rewrites the meta tag, taking `isMapSurface` — the split `App.tsx` had already computed — rather than mapping screens itself. For the same reason `apple-mobile-web-app-status-bar-style` is **`default` and not `black-translucent`**: the translucent style pins the bar's glyphs to white, which is right on night and invisible on cream. `background_color` stays cream because it describes what the _document_ paints before React mounts.
+- **The ground reaches the edges; everything on it does not.** `viewport-fit=cover` is what fills the phone rather than letterboxing it, and it is also what gives `env(safe-area-inset-*)` a value at all — without it every such expression is 0, which is why the one the repo already had (the tray's bottom padding) had never done anything. The map runs under the notch and the home indicator; every piece of floating chrome adds the inset of the edge it is pinned to, through `safeArea` in `src/layout.ts`. They are **additive, not a branch**: `env()` is 0 everywhere else, so nothing changes off a notched phone. The fallback (`env(…, 0px)`) is load-bearing the other way — an engine that does not know `env()` drops the whole declaration and the spacing with it.
+- **Two web-page tells are removed at the root** (`src/index.css`): `overscroll-behavior: none`, because a map surface is a fixed viewport and a drag the map does not take bounces the whole app; and a transparent `-webkit-tap-highlight-color`, because `design.md` says a button's press _is_ its feedback and a system rectangle over it is a second uninvited answer. The map also refuses text selection and the long-press callout — on touch the first tap only _arms_ a country, so the arming press is held by design, which is exactly the gesture iOS reads as "select this".
+- **Not done, on purpose:** no orientation lock (the layout has a considered answer in both), and no install prompt (`beforeinstallprompt` does not exist on iOS, where this was asked for).
 
 ### Explore
 
@@ -262,7 +272,10 @@ When enabled, incorrect guesses show distance (km) and compass direction (N/NE/E
 - `src/Components/RunSummaryPanel/RunSummaryPanel.tsx` — The Run summary's panel (see “Run summary”)
 - `src/Components/TurnResultRow/TurnResultRow.tsx` — One turn of the Run, as a row
 - `src/Components/AlbumArt/AlbumArt.tsx` — A Song's artwork with its placeholder, shared by the reveal card and the summary rows
-- `src/layout.ts` — Shared game-screen geometry: `LANDSCAPE_QUERY`/`LANDSCAPE_MEDIA`, `CHROME_CLEARANCE`, `PORTRAIT_PANEL_MAX_HEIGHT`
+- `src/layout.ts` — Shared game-screen geometry: `LANDSCAPE_QUERY`/`LANDSCAPE_MEDIA`, `CHROME_CLEARANCE`, `PORTRAIT_PANEL_MAX_HEIGHT`, and `safeArea` — the notch and home-indicator insets every piece of floating chrome adds
+- `src/hooks/useThemeColor.ts` — The installed app's status bar, stood on the ground its screen's family stands on
+- `index.html` — Where the app says it is installable: `viewport-fit=cover`, the Apple meta tags and the icon links. Vite rewrites the `/`-absolute hrefs with the `/geotracks/` base
+- `public/manifest.json` — The web app manifest: `display: standalone`, relative `start_url`/`scope`, and both icon purposes
 - `src/types.ts` — Shared TypeScript types
 - `design.md` — The locked design system (read before any visual change)
 - `src/tokens.ts` — Every colour, chosen once; `src/tokens.css` is the same set as custom properties

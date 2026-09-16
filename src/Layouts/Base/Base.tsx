@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef } from "react";
 import { Box, Container, IconButton, Typography } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 
+import { safeArea } from "../../layout";
 import { COLORS } from "../../tokens";
 import Logo from "../../Components/Logo/Logo";
 
@@ -202,6 +203,12 @@ const HomeButton = ({
  * Chrome for the full-bleed layout. The row itself is click-through so the map
  * underneath stays draggable; only the button takes pointer events. A scrim
  * keeps the wordmark legible over whatever the map draws beneath it.
+ *
+ * The scrim starts at the very top of the screen and the row inside it starts
+ * below the status bar: installed, the map runs under the notch — which is what
+ * a ground should do — and the wordmark must not. The side insets are for
+ * landscape, where the camera housing takes a whole edge and would otherwise sit
+ * on top of the home button.
  */
 const OverlayChrome = (props: {
   showMenuButton: boolean;
@@ -215,8 +222,9 @@ const OverlayChrome = (props: {
       left: 0,
       right: 0,
       zIndex: 2,
-      px: 1,
-      pt: 0.5,
+      pl: safeArea("left", 8),
+      pr: safeArea("right", 8),
+      pt: safeArea("top", 4),
       pb: 3,
       display: "flex",
       alignItems: "center",
@@ -296,6 +304,13 @@ const Base = (props: BaseProps) => {
           zIndex: 1,
           py: 2,
           px: 2,
+          // Installed, the backdrop reaches the edges of the phone and the
+          // column of type standing on it must not: the notch would cover the
+          // wordmark and the home indicator would sit under the last button.
+          pt: safeArea("top", 16),
+          pb: safeArea("bottom", 16),
+          pl: safeArea("left", 16),
+          pr: safeArea("right", 16),
         }}
       >
         <Box sx={{ position: "relative", mb: 1 }}>

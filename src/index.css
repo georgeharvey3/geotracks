@@ -10,6 +10,24 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The two things that give an installed app away as a web page.
+ *
+ * `overscroll-behavior: none` stops the rubber-band. A map surface is a fixed,
+ * non-scrolling viewport, so a drag that the map does not take is a drag on the
+ * document — and the whole app bouncing under a failed pan is the single most
+ * "this is Safari" moment the game has.
+ *
+ * The tap highlight is the grey rectangle iOS flashes over whatever was
+ * touched. `design.md` is explicit that a button's press *is* its feedback
+ * (§ Microinteractions stance), and a system rectangle over the top of it is a
+ * second, uninvited answer to the same question — drawn, on the map, around a
+ * country's bounding box rather than its shape. */
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Visible on cream at 6.7:1, and never animated: a focus ring that fades in is
    a focus ring that is missed. */
 :focus-visible {

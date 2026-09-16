@@ -3,10 +3,20 @@
  *
  *   node scripts/build-logo-assets.ts
  *
- * Writes `public/logo.svg`, `public/logo192.png`, `public/logo512.png` and
- * `public/geotracks.ico`. Re-run it only when the mark itself changes — like
+ * Writes `public/logo.svg`, `public/logo192.png`, `public/logo512.png`,
+ * `public/geotracks.ico`, `public/apple-touch-icon.png` and the two maskable
+ * PNGs. Re-run it only when the mark itself changes — like
  * `build-map-geometry.mjs`, the outputs are committed and the script is not part
  * of the build.
+ *
+ * Two families come out of the one drawing, because a tab strip and a home
+ * screen ask for opposite things. The **favicon** family is transparent and
+ * full-bleed: it is composited onto whatever chrome the browser has, and padding
+ * itself would only make it look smaller than its neighbours. The **installed**
+ * family is opaque and inset, because the platform masks it — iOS flattens any
+ * transparency to black and then cuts a squircle out of the result, so a
+ * transparent full-bleed mark becomes a clipped pin on a black tile. They are
+ * generated together so the two can never drift apart.
  *
  * The paths come from `src/Components/Logo/geometry.ts`, which `Logo.tsx` also
  * draws from, so the favicon cannot drift from the mark on screen. The two
@@ -46,13 +56,67 @@ const token = (name: string): string => {
 
 const pear = token("accent");
 const ink = token("ink");
+const paper = token("paper");
+
+/** The mark itself — the two paths, in viewBox units, and nothing around them. */
+const mark = `  <path d="${PIN_PATH}" fill="${pear}" stroke="${ink}" stroke-width="${LOGO_STROKE}" stroke-linejoin="round"/>
+  <path d="${PLAY_PATH}" fill="${ink}" stroke="${ink}" stroke-width="${GLYPH_STROKE}" stroke-linejoin="round"/>`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOGO_VIEW_BOX}">
-  <path d="${PIN_PATH}" fill="${pear}" stroke="${ink}" stroke-width="${LOGO_STROKE}" stroke-linejoin="round"/>
-  <path d="${PLAY_PATH}" fill="${ink}" stroke="${ink}" stroke-width="${GLYPH_STROKE}" stroke-linejoin="round"/>
+${mark}
 </svg>
 `;
 writeFileSync(join(publicDir, "logo.svg"), svg);
+
+/** The viewBox is square (see `LOGO_VIEW_BOX`); this is that square's side. */
+const BOX = Number(LOGO_VIEW_BOX.split(" ")[2]);
+
+/**
+ * The same mark, inset by `margin` of the canvas on every side and standing on
+ * cream rather than on nothing.
+ *
+ * Cream because it is the ground the mark is *designed* on: the ink outline
+ * around the pin exists because pear is 1.4:1 on paper (`design.md` § The
+ * brand), so an icon on cream is the mark exactly as the app draws it, outline
+ * and all, rather than a second treatment invented for the home screen.
+ *
+ * Opaque because the platforms that use these icons do not composite them onto
+ * anything friendly: iOS fills transparency with black, and Android draws them
+ * on its own wallpaper-dependent ground.
+ */
+const onPaper = (margin: number): string => {
+  const scale = 1 - margin * 2;
+  const offset = (BOX * margin).toFixed(4);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOGO_VIEW_BOX}">
+  <rect x="0" y="0" width="${BOX}" height="${BOX}" fill="${paper}"/>
+  <g transform="translate(${offset} ${offset}) scale(${scale})">
+${mark}
+  </g>
+</svg>
+`;
+};
+
+/**
+ * How much ground each installed icon leaves around the mark.
+ *
+ * `APPLE` — iOS masks the icon into a squircle whose corners eat roughly 22% of
+ * the side, and Apple's own icons seat their subject well inside that. 11% a
+ * side keeps the pin's point and head clear of the cut without shrinking it to
+ * a dot in the middle of a tile.
+ *
+ * `MASKABLE` — the web app manifest's `maskable` purpose promises that anything
+ * inside the **circle** of 80% diameter survives whatever mask the launcher
+ * applies, and this is the strict circular reading of that rather than the
+ * generous squircle one: an icon clipped on somebody else's launcher is not
+ * something we would ever see. The number is fitted to the mark's *ink* rather
+ * than to its bounding box — a pin is round on top and pointed at the bottom, so
+ * it has nothing in the corners, and bounding its diagonal instead would shrink
+ * it to 69% of the canvas to protect two corners that are empty. At 77% the
+ * furthest inked pixel sits at about 0.92 of the safe radius: inside, with the
+ * margin a drawing should keep from a boundary rather than hugging it.
+ */
+const APPLE_MARGIN = 0.11;
+const MASKABLE_MARGIN = 0.115;
 
 /**
  * Chrome, driven over the DevTools protocol rather than with `--screenshot`.
@@ -140,13 +204,20 @@ await inPage("Emulation.setDefaultBackgroundColorOverride", {
 });
 
 /**
- * Rasterise at `size`, on transparent ground.
+ * Rasterise `source` at `size`, on transparent ground.
  *
- * The pin is drawn to fill a square viewBox, so a square canvas is the mark's
- * own box: no padding is added here, because a favicon that pads itself is a
- * favicon that looks smaller than every other one in the tab strip.
+ * The ground stays transparent here whatever is being drawn: the favicon family
+ * wants it that way, and the installed family paints its own cream rect over the
+ * whole box (`onPaper`), so there is nothing left for the page underneath to
+ * show through.
+ *
+ * No padding is added at this level either. The mark fills a square viewBox, so
+ * a square canvas is its own box — a favicon that pads itself is a favicon that
+ * looks smaller than every other one in the tab strip — and the icons that *do*
+ * want an inset carry it in their SVG, where the reason for it can be written
+ * down next to the number.
  */
-const rasterise = async (size: number): Promise<Buffer> => {
+const rasterise = async (size: number, source = svg): Promise<Buffer> => {
   const { frameTree } = await inPage<{ frameTree: { frame: { id: string } } }>(
     "Page.getFrameTree",
   );
@@ -158,7 +229,7 @@ const rasterise = async (size: number): Promise<Buffer> => {
   });
   await inPage("Page.setDocumentContent", {
     frameId: frameTree.frame.id,
-    html: `<html><body style="margin:0">${svg.replace(
+    html: `<html><body style="margin:0">${source.replace(
       "<svg",
       `<svg width="${size}" height="${size}" style="display:block"`,
     )}</body></html>`,
@@ -173,6 +244,28 @@ const rasterise = async (size: number): Promise<Buffer> => {
 
 for (const size of [192, 512]) {
   writeFileSync(join(publicDir, `logo${size}.png`), await rasterise(size));
+}
+
+/**
+ * The installed family.
+ *
+ * `apple-touch-icon.png` is 180 because that is the one size an iPhone asks for
+ * — iOS scales it down for the sizes it also wants and never up, so a single
+ * 180 is the whole iOS story rather than the first of six files.
+ *
+ * The maskable pair matches the sizes of the transparent pair beside it in the
+ * manifest, because a launcher chooses between `any` and `maskable` at the same
+ * size and should not have to trade one property away for the other.
+ */
+writeFileSync(
+  join(publicDir, "apple-touch-icon.png"),
+  await rasterise(180, onPaper(APPLE_MARGIN)),
+);
+for (const size of [192, 512]) {
+  writeFileSync(
+    join(publicDir, `maskable${size}.png`),
+    await rasterise(size, onPaper(MASKABLE_MARGIN)),
+  );
 }
 
 /**
@@ -211,7 +304,10 @@ writeFileSync(
   Buffer.concat([header, ...entries, ...images]),
 );
 
-console.log("Wrote logo.svg, logo192.png, logo512.png and geotracks.ico");
+console.log(
+  "Wrote logo.svg, logo192.png, logo512.png, geotracks.ico, " +
+    "apple-touch-icon.png, maskable192.png and maskable512.png",
+);
 
 socket.close();
 browser.kill();

@@ -1,7 +1,11 @@
 import { ReactNode } from "react";
 import { Box } from "@mui/material";
 
-import { LANDSCAPE_MEDIA, PORTRAIT_PANEL_MAX_HEIGHT } from "../../layout";
+import {
+  LANDSCAPE_MEDIA,
+  PORTRAIT_PANEL_MAX_HEIGHT,
+  safeArea,
+} from "../../layout";
 
 /**
  * The surface every control panel sits on, shared so the game's panel and
@@ -28,9 +32,12 @@ const PanelSurface = ({ children }: { children: ReactNode }) => (
       // own back so its content can be scrolled.
       touchAction: "auto",
       textAlign: "center",
+      // Portrait, the tray is the bottom of the screen, so the home indicator
+      // lands inside it: the padding that keeps the last button clear of the bar
+      // is the one safe-area inset this app already had.
       px: 2,
       pt: 1.5,
-      pb: "calc(12px + env(safe-area-inset-bottom))",
+      pb: safeArea("bottom", 12),
       borderRadius: "20px 20px 0 0",
       // Opaque, and outlined rather than blurred. A translucent blur over a map
       // fights the thing it sits on: the panel is the one surface that has to
@@ -49,10 +56,20 @@ const PanelSurface = ({ children }: { children: ReactNode }) => (
         animation: "panel-enter-landscape 320ms var(--ease-snap) 120ms both",
         position: "absolute",
         flex: "none",
-        top: 72,
-        right: 24,
+        // Landscape puts the card against the top-right corner, which on a
+        // phone held with the camera housing on the right is behind it. Both
+        // insets, and the height it may grow to comes off both ends.
+        //
+        // `dvh` rather than `vh` for that height: `vh` is the viewport with the
+        // browser's UI *hidden*, so in a tab with the address bar showing, the
+        // card is allowed to grow taller than the screen and its last control
+        // ends up somewhere the player cannot reach. Installed there is no
+        // browser UI and the two are the same number.
+        top: safeArea("top", 72),
+        right: safeArea("right", 24),
         width: 380,
-        maxHeight: "calc(100vh - 96px)",
+        maxHeight:
+          "calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))",
         pb: 1.5,
         borderRadius: "20px",
         border: "1.5px solid",

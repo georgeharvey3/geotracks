@@ -25,7 +25,7 @@ import {
   polygonCodes,
   stragglerMarkers,
 } from "../../map/geography";
-import { CHROME_CLEARANCE, LANDSCAPE_QUERY } from "../../layout";
+import { CHROME_CLEARANCE, LANDSCAPE_QUERY, safeArea } from "../../layout";
 
 // How far in the player may zoom. Generous, because the furniture is
 // counter-scaled: zooming is how you separate a crowded archipelago and reach
@@ -295,7 +295,9 @@ const BaseMap = ({ veil = "none", ...props }: BaseMapProps) => {
     ? { transform: "translate(-50%, -100%)" }
     : {
         left: "50%",
-        top: CHROME_CLEARANCE + 8,
+        // Under the overlay chrome, which is itself pushed down by the notch
+        // when the app is running installed.
+        top: safeArea("top", CHROME_CLEARANCE + 8),
         transform: "translateX(-50%)",
       };
 
@@ -327,6 +329,14 @@ const BaseMap = ({ veil = "none", ...props }: BaseMapProps) => {
         overflow: "hidden",
         bgcolor: MAP_FILLS.sea,
         touchAction: "none",
+        // A pan is a press that then moves, which is exactly the gesture iOS
+        // reads as "select this" — and on a touch surface the first tap only
+        // arms a country, so the press that arms it is held for a moment by
+        // design. Without these, arming Chad raises the callout menu and paints
+        // the shape in selection blue.
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
       }}
     >
       {/* The inset lives on an inner box rather than as padding on the
@@ -336,7 +346,11 @@ const BaseMap = ({ veil = "none", ...props }: BaseMapProps) => {
         sx={{
           position: "absolute",
           inset: 0,
-          top: covers ? 0 : `${CHROME_CLEARANCE}px`,
+          // Portrait fits the whole world into what the chrome leaves. The
+          // covering case deliberately takes no inset at all: a ground should
+          // run under the notch, and cropping it there would put a cream band
+          // along the top of the phone.
+          top: covers ? 0 : safeArea("top", CHROME_CLEARANCE),
         }}
       >
         <ComposableMap

@@ -50,6 +50,15 @@ CSS. One resolved value in all three keeps a single red on screen.
 - **Run summary (content page over an app surface)** — the Workbench shell with
   the panel scrolling its Turn result rows.
 
+**Installed to a home screen, the family reaches one element further up: the
+status bar.** There is no browser chrome between it and the page, so the OS
+paints that strip with the theme colour and it sits directly on the top of the
+screen — night over a content page, cream over a map surface's chrome scrim. One
+fixed colour is wrong on half the screens, so `useThemeColor` follows the same
+split the layout does. On a map surface the inverse also holds: the map is
+ground and **runs under the notch and the home indicator**, while everything
+placed on it keeps clear of them (`safeArea`, in `src/layout.ts`). See ADR-0009.
+
 ## Theme
 
 | token                   | value                              | job                     |
@@ -195,9 +204,19 @@ The name is a compound, and the lockup says so twice.
   two scale together — the wordmark's flight between screens is a scale, and a
   mark measured in pixels would be the one part of it that didn't move (see
   Motion). It is drawn once, in `src/Components/Logo/Logo.tsx`, from geometry
-  that `scripts/build-logo-assets.ts` also draws `public/`'s favicon, PWA icons
+  that `scripts/build-logo-assets.ts` also draws `public/`'s favicon, app icons
   and `logo.svg` from, so the tab strip cannot end up showing a different mark
   from the screen.
+- **The icons come in two families**, and the split is about who composites the
+  mark rather than about how it is drawn. The **favicon** family is transparent
+  and full-bleed: the browser sets it on its own chrome, and a favicon that pads
+  itself is a favicon that looks smaller than every other one in the tab strip.
+  The **installed** family — the home-screen icon and the maskable pair — is
+  **opaque cream and inset**, because the platform masks it: iOS fills any
+  transparency with black and then cuts a squircle out of the result. Cream is
+  not a new decision there, it is this section's own: the ink outline exists
+  because pear is 1.4:1 on paper, so the mark on cream is the mark as designed,
+  and an icon on night would be a second treatment nobody chose. See ADR-0009.
 
 ## Typography
 

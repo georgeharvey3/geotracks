@@ -48,6 +48,17 @@
 
     <link rel="manifest" href="/manifest.json" />
 
+    <!-- The embed API announces itself exactly once, by calling this, and the
+         script is `async` — on a warm cache it can land before the app's own
+         bundle has evaluated and taken the handshake over. Stashing it here
+         means the announcement is never made to an empty room; whichever of the
+         two is second finds what the first left. See `src/spotify/iframeApi.ts`,
+         which is where the app picks it up and why it is page-level at all. -->
+    <script>
+      window.onSpotifyIframeApiReady = function (api) {
+        window.spotifyIFrameApi = api;
+      };
+    </script>
     <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import useSpotifyPlayer from "./useSpotifyPlayer";
+import { forgetIFrameApi } from "../spotify/iframeApi";
 import { Song } from "../types";
 
 /**
@@ -48,6 +49,47 @@ function fakeIFrameApi() {
   };
 }
 
+/**
+ * The same API, but answering when the test says so and handing out a fresh
+ * controller each time — which is what the real one does, and the only way to
+ * have two creations in flight at once.
+ */
+function deferredIFrameApi() {
+  const created: {
+    controller: SpotifyEmbedController;
+    deliver: () => void;
+    emitReady: () => void;
+  }[] = [];
+
+  const api: SpotifyIFrameAPI = {
+    createController: vi.fn((element, _options, callback) => {
+      const readyListeners: (() => void)[] = [];
+      const controller: SpotifyEmbedController = {
+        togglePlay: vi.fn(),
+        seek: vi.fn(),
+        loadUri: vi.fn(),
+        destroy: vi.fn(),
+        addListener: ((event: string, listener: never) => {
+          if (event === "ready") readyListeners.push(listener);
+        }) as SpotifyEmbedController["addListener"],
+      };
+      // The real API draws its iframe into the element it was handed, which is
+      // what tearing the embed down takes away again.
+      element.appendChild(document.createElement("iframe"));
+      created.push({
+        controller,
+        deliver: () => callback(controller),
+        emitReady: () => readyListeners.forEach((listener) => listener()),
+      });
+    }),
+  };
+
+  return { api, created };
+}
+
+// The hook's own load timeout, which the retry test has to outlast.
+const LOAD_TIMEOUT_MS = 10000;
+
 const SONG: Song = {
   country: "Mali",
   link: "https://open.spotify.com/track/abc123",
@@ -84,6 +126,10 @@ const settle = () => act(async () => {});
 
 describe("useSpotifyPlayer", () => {
   beforeEach(() => {
+    // A page that has not yet heard from the API script. The handshake is
+    // page-level and outlives any one player, so it is what has to be reset
+    // between tests rather than the global the script calls.
+    forgetIFrameApi();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve({ json: () => Promise.resolve(METADATA) })),
@@ -92,7 +138,7 @@ describe("useSpotifyPlayer", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete window.onSpotifyIframeApiReady;
+    delete window.spotifyIFrameApi;
   });
 
   it("loads the song and reports it ready", async () => {
@@ -140,5 +186,76 @@ describe("useSpotifyPlayer", () => {
       "spotify:track:def456",
     );
     await settle();
+  });
+
+  // The three ways the announcement and a player can miss each other. All of
+  // them ended the same way before the handshake became the page's: no
+  // controller, a Clip stuck on its spinner, and a play button that does
+  // nothing. See `src/spotify/iframeApi.ts`.
+
+  it("loads when the API script landed before the player was on screen", async () => {
+    const spotify = fakeIFrameApi();
+    // The script finishes while the player is still on the menu — which is
+    // where Competition holds them until the live Library arrives.
+    act(() => window.onSpotifyIframeApiReady!(spotify.api));
+
+    const rendered = renderHook(() => useSpotifyPlayer(SONG, OPTIONS));
+    act(() => rendered.result.current.embedRef(document.createElement("div")));
+    await settle();
+
+    expect(spotify.api.createController).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ uri: "spotify:track:abc123" }),
+      expect.any(Function),
+    );
+
+    act(() => spotify.emitReady());
+    expect(rendered.result.current.songReady).toBe(true);
+  });
+
+  it("loads on a second game screen in the same session", async () => {
+    const first = await renderPlayer(SONG);
+    act(() => first.spotify.emitReady());
+    first.unmount();
+
+    // The API is announced once per page, so the next player is only ever going
+    // to hear about it second-hand.
+    const second = renderHook(() => useSpotifyPlayer(SONG, OPTIONS));
+    act(() => second.result.current.embedRef(document.createElement("div")));
+    await settle();
+
+    expect(first.spotify.api.createController).toHaveBeenCalledTimes(2);
+  });
+
+  it("plays through the controller its embed actually holds", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const spotify = deferredIFrameApi();
+    act(() => window.onSpotifyIframeApiReady!(spotify.api));
+
+    const rendered = renderHook(() => useSpotifyPlayer(SONG, OPTIONS));
+    act(() => rendered.result.current.embedRef(document.createElement("div")));
+    await settle();
+
+    // The embed is slow enough that the load times out and is retried while the
+    // first controller is still being built.
+    act(() => vi.advanceTimersByTime(LOAD_TIMEOUT_MS));
+    expect(spotify.created).toHaveLength(2);
+
+    // Both answer, and in the order that hurts: the superseded one last.
+    act(() => spotify.created[1]!.deliver());
+    act(() => spotify.created[0]!.deliver());
+
+    const live = spotify.created[1]!;
+    const superseded = spotify.created[0]!;
+    act(() => live.emitReady());
+    expect(rendered.result.current.songReady).toBe(true);
+
+    act(() => rendered.result.current.onPlayClicked());
+    expect(live.controller.togglePlay).toHaveBeenCalled();
+    expect(superseded.controller.togglePlay).not.toHaveBeenCalled();
+    // And it was not left running in the background either.
+    expect(superseded.controller.destroy).toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 });

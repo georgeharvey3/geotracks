@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Song, SongMetadata } from "../types";
+import { whenIFrameApi } from "../spotify/iframeApi";
 
 export interface SpotifyPlayer {
   // Callback ref for the hidden embed element; wiring this triggers controller
@@ -76,6 +77,16 @@ export default function useSpotifyPlayer(
   const controllerRef = useRef<SpotifyEmbedController | null>(null);
   const iframeApiRef = useRef<SpotifyIFrameAPI | null>(null);
   const pendingSongRef = useRef<string | null>(null);
+  /**
+   * Which embed the controller being built belongs to. Creating a controller is
+   * asynchronous and nothing about it can be cancelled, so anything that tears
+   * the embed down bumps this: a controller that answers afterwards was built
+   * against an element that has since been wiped, and adopting it would leave
+   * the play button wired to an iframe that is no longer on the page.
+   */
+  const embedGenerationRef = useRef(0);
+  /** Our place in the queue for the API, while the page is still without it. */
+  const unsubscribeApiRef = useRef<(() => void) | null>(null);
   const songLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
   const replayPendingRef = useRef(false);
@@ -88,6 +99,8 @@ export default function useSpotifyPlayer(
   const selfPausedRef = useRef(false);
 
   const destroyController = useCallback(() => {
+    // Everything in flight for the old embed is now somebody else's controller.
+    embedGenerationRef.current += 1;
     if (controllerRef.current) {
       controllerRef.current.destroy();
       controllerRef.current = null;
@@ -106,11 +119,27 @@ export default function useSpotifyPlayer(
 
     const initialUri = toSpotifyUri(pendingSongRef.current);
     pendingSongRef.current = null;
+    const generation = embedGenerationRef.current;
 
     IFrameAPI.createController(
       embedElementRef.current,
       { uri: initialUri, width: "100%", height: 152 },
       (controller) => {
+        // The load timed out and the embed was rebuilt (or the screen was left)
+        // while this one was being built. Its iframe went with the element it
+        // was drawn into, so it can neither play nor be stopped — and the two
+        // creations can answer in either order, so without this the *live*
+        // controller is the one that gets dropped, the round reports itself
+        // ready, and the play button does nothing at all.
+        if (generation !== embedGenerationRef.current) {
+          try {
+            controller.destroy();
+          } catch {
+            // Its element is already gone; there is nothing left to tear down.
+          }
+          return;
+        }
+
         controllerRef.current = controller;
         controller.addListener("ready", () => {
           if (songLoadTimerRef.current) {
@@ -184,11 +213,16 @@ export default function useSpotifyPlayer(
     [initController],
   );
 
-  // Register the API-ready global once.
-  useEffect(() => {
-    window.onSpotifyIframeApiReady = (IFrameAPI) => {
-      initController(IFrameAPI);
-    };
+  /**
+   * Ask the page for the IFrame API, which answers at once if it already has it
+   * (`src/spotify/iframeApi.ts`). This is deliberately *not* a registration of
+   * our own: the script announces itself once per page and long before some
+   * players mount, so a player that listened for the announcement itself would
+   * only hear one that happened to land while it was on screen.
+   */
+  const requestApi = useCallback(() => {
+    unsubscribeApiRef.current?.();
+    unsubscribeApiRef.current = whenIFrameApi(initController);
   }, [initController]);
 
   const attemptLoad = useCallback(
@@ -215,12 +249,10 @@ export default function useSpotifyPlayer(
         controllerRef.current.loadUri(toSpotifyUri(songLink));
       } else {
         pendingSongRef.current = songLink;
-        if (iframeApiRef.current) {
-          initController(iframeApiRef.current);
-        }
+        requestApi();
       }
     },
-    [destroyController, initController],
+    [destroyController, requestApi],
   );
 
   // Load the track (and fetch its oEmbed metadata) whenever the song changes.
@@ -312,6 +344,8 @@ export default function useSpotifyPlayer(
   useEffect(() => {
     return () => {
       destroyController();
+      unsubscribeApiRef.current?.();
+      unsubscribeApiRef.current = null;
       if (songLoadTimerRef.current) {
         clearTimeout(songLoadTimerRef.current);
         songLoadTimerRef.current = null;

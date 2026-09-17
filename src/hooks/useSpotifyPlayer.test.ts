@@ -87,8 +87,9 @@ function deferredIFrameApi() {
   return { api, created };
 }
 
-// The hook's own load timeout, which the retry test has to outlast.
+// The hook's own load watchdog and retry budget, which these tests outlast.
 const LOAD_TIMEOUT_MS = 10000;
+const MAX_AUTO_RETRIES = 3;
 
 const SONG: Song = {
   country: "Mali",
@@ -225,6 +226,28 @@ describe("useSpotifyPlayer", () => {
     await settle();
 
     expect(first.spotify.api.createController).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not spend its retries while the page waits for the API script", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    const rendered = renderHook(() => useSpotifyPlayer(SONG, OPTIONS));
+    act(() => rendered.result.current.embedRef(document.createElement("div")));
+    await settle();
+
+    // Long enough for every retry, on a script that is simply slow. There is no
+    // embed yet, so there is nothing for the watchdog to be watching.
+    act(() => vi.advanceTimersByTime(LOAD_TIMEOUT_MS * (MAX_AUTO_RETRIES + 2)));
+    expect(rendered.result.current.songLoadFailed).toBe(false);
+
+    const spotify = fakeIFrameApi();
+    act(() => window.onSpotifyIframeApiReady!(spotify.api));
+    expect(spotify.api.createController).toHaveBeenCalledTimes(1);
+
+    act(() => spotify.emitReady());
+    expect(rendered.result.current.songReady).toBe(true);
+
+    vi.useRealTimers();
   });
 
   it("plays through the controller its embed actually holds", async () => {

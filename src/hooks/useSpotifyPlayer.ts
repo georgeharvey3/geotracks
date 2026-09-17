@@ -110,96 +110,117 @@ export default function useSpotifyPlayer(
     }
   }, []);
 
+  /**
+   * Start the clock on a load that has actually been issued.
+   *
+   * It is armed where the embed is asked to do something — a controller
+   * created, or a new URI loaded into one — and deliberately not when a load is
+   * merely *wanted*. While the page is still waiting for the API script there is
+   * no embed to time out, and a watchdog armed then spent its three retries
+   * tearing down and rebuilding an embed that had never been given a chance to
+   * start: on a cold connection, which is exactly when the script is slow, the
+   * retries made the load slower and then declared it failed.
+   *
+   * The body belongs to whichever load is current, so it travels by ref rather
+   * than through a dependency of everything that arms it.
+   */
+  const armLoadTimeoutRef = useRef<(() => void) | null>(null);
+  const armLoadTimeout = useCallback(() => armLoadTimeoutRef.current?.(), []);
+
   // Create the controller once the API is ready, the element exists, and a
   // song is pending. Wires ready/playback listeners on the new controller.
-  const initController = useCallback((IFrameAPI: SpotifyIFrameAPI) => {
-    iframeApiRef.current = IFrameAPI;
-    if (controllerRef.current || !embedElementRef.current) return;
-    if (!pendingSongRef.current) return;
+  const initController = useCallback(
+    (IFrameAPI: SpotifyIFrameAPI) => {
+      iframeApiRef.current = IFrameAPI;
+      if (controllerRef.current || !embedElementRef.current) return;
+      if (!pendingSongRef.current) return;
 
-    const initialUri = toSpotifyUri(pendingSongRef.current);
-    pendingSongRef.current = null;
-    const generation = embedGenerationRef.current;
+      const initialUri = toSpotifyUri(pendingSongRef.current);
+      pendingSongRef.current = null;
+      const generation = embedGenerationRef.current;
+      armLoadTimeout();
 
-    IFrameAPI.createController(
-      embedElementRef.current,
-      { uri: initialUri, width: "100%", height: 152 },
-      (controller) => {
-        // The load timed out and the embed was rebuilt (or the screen was left)
-        // while this one was being built. Its iframe went with the element it
-        // was drawn into, so it can neither play nor be stopped — and the two
-        // creations can answer in either order, so without this the *live*
-        // controller is the one that gets dropped, the round reports itself
-        // ready, and the play button does nothing at all.
-        if (generation !== embedGenerationRef.current) {
-          try {
-            controller.destroy();
-          } catch {
-            // Its element is already gone; there is nothing left to tear down.
-          }
-          return;
-        }
-
-        controllerRef.current = controller;
-        controller.addListener("ready", () => {
-          if (songLoadTimerRef.current) {
-            clearTimeout(songLoadTimerRef.current);
-            songLoadTimerRef.current = null;
-          }
-          retryCountRef.current = 0;
-          setSongLoadFailed(false);
-          setSongReady(true);
-          setSongFinished(false);
-          if (replayPendingRef.current) {
-            replayPendingRef.current = false;
-            controller.togglePlay();
-          }
-        });
-        controller.addListener("playback_update", (e) => {
-          const { isPaused, position, duration } = e.data;
-          const clipDuration = clipDurationRef.current;
-
-          // Capped: the Clip ends where the cap says, and we stop it ourselves.
-          const isClipFinished =
-            clipDuration !== undefined &&
-            duration > 0 &&
-            position >= clipDuration;
-          if (isClipFinished && !isPaused) {
-            controller.togglePlay();
+      IFrameAPI.createController(
+        embedElementRef.current,
+        { uri: initialUri, width: "100%", height: 152 },
+        (controller) => {
+          // The load timed out and the embed was rebuilt (or the screen was left)
+          // while this one was being built. Its iframe went with the element it
+          // was drawn into, so it can neither play nor be stopped — and the two
+          // creations can answer in either order, so without this the *live*
+          // controller is the one that gets dropped, the round reports itself
+          // ready, and the play button does nothing at all.
+          if (generation !== embedGenerationRef.current) {
+            try {
+              controller.destroy();
+            } catch {
+              // Its element is already gone; there is nothing left to tear down.
+            }
+            return;
           }
 
-          // Uncapped, position reaching duration is not a signal we can rely
-          // on: the embed reports the whole Song's duration to a listener who
-          // is not signed in to Spotify, but only plays its own ~30s preview,
-          // so position never gets there and the Song would never read as
-          // ended. What holds either way is that playback stopped and we were
-          // not the ones who stopped it.
-          const stoppedItself =
-            clipDuration === undefined &&
-            isPaused &&
-            position > 0 &&
-            playingRef.current &&
-            !selfPausedRef.current;
-
-          const isFinished =
-            (duration > 0 && position >= duration) ||
-            isClipFinished ||
-            stoppedItself;
-
-          // A pause we asked for is spent once it has been reported.
-          if (isPaused) selfPausedRef.current = false;
-
-          playingRef.current = !isPaused && !isFinished;
-          setSongPlaying(!isPaused && !isFinished);
-          if (isFinished) {
-            setSongFinished(true);
-          } else if (!isPaused) {
+          controllerRef.current = controller;
+          controller.addListener("ready", () => {
+            if (songLoadTimerRef.current) {
+              clearTimeout(songLoadTimerRef.current);
+              songLoadTimerRef.current = null;
+            }
+            retryCountRef.current = 0;
+            setSongLoadFailed(false);
+            setSongReady(true);
             setSongFinished(false);
-          }
-        });
-      },
-    );
-  }, []);
+            if (replayPendingRef.current) {
+              replayPendingRef.current = false;
+              controller.togglePlay();
+            }
+          });
+          controller.addListener("playback_update", (e) => {
+            const { isPaused, position, duration } = e.data;
+            const clipDuration = clipDurationRef.current;
+
+            // Capped: the Clip ends where the cap says, and we stop it ourselves.
+            const isClipFinished =
+              clipDuration !== undefined &&
+              duration > 0 &&
+              position >= clipDuration;
+            if (isClipFinished && !isPaused) {
+              controller.togglePlay();
+            }
+
+            // Uncapped, position reaching duration is not a signal we can rely
+            // on: the embed reports the whole Song's duration to a listener who
+            // is not signed in to Spotify, but only plays its own ~30s preview,
+            // so position never gets there and the Song would never read as
+            // ended. What holds either way is that playback stopped and we were
+            // not the ones who stopped it.
+            const stoppedItself =
+              clipDuration === undefined &&
+              isPaused &&
+              position > 0 &&
+              playingRef.current &&
+              !selfPausedRef.current;
+
+            const isFinished =
+              (duration > 0 && position >= duration) ||
+              isClipFinished ||
+              stoppedItself;
+
+            // A pause we asked for is spent once it has been reported.
+            if (isPaused) selfPausedRef.current = false;
+
+            playingRef.current = !isPaused && !isFinished;
+            setSongPlaying(!isPaused && !isFinished);
+            if (isFinished) {
+              setSongFinished(true);
+            } else if (!isPaused) {
+              setSongFinished(false);
+            }
+          });
+        },
+      );
+    },
+    [armLoadTimeout],
+  );
 
   // Callback ref: init as soon as the embed element mounts (handles the Game
   // screen mounting after the IFrame API has already loaded).
@@ -234,25 +255,34 @@ export default function useSpotifyPlayer(
       selfPausedRef.current = false;
       if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
 
-      songLoadTimerRef.current = setTimeout(() => {
-        if (retryCountRef.current < MAX_AUTO_RETRIES) {
-          retryCountRef.current += 1;
-          destroyController();
-          attemptLoad(songLink);
-        } else {
-          console.warn("[useSpotifyPlayer] all retries exhausted, load failed");
-          setSongLoadFailed(true);
-        }
-      }, LOAD_TIMEOUT_MS);
+      armLoadTimeoutRef.current = () => {
+        if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
+        songLoadTimerRef.current = setTimeout(() => {
+          if (retryCountRef.current < MAX_AUTO_RETRIES) {
+            retryCountRef.current += 1;
+            destroyController();
+            attemptLoad(songLink);
+          } else {
+            console.warn(
+              "[useSpotifyPlayer] all retries exhausted, load failed",
+            );
+            setSongLoadFailed(true);
+          }
+        }, LOAD_TIMEOUT_MS);
+      };
 
       if (controllerRef.current) {
+        armLoadTimeout();
         controllerRef.current.loadUri(toSpotifyUri(songLink));
       } else {
+        // No timer yet: `initController` arms one when it has an API and an
+        // element to build against, which is the first moment there is an embed
+        // whose silence means anything.
         pendingSongRef.current = songLink;
         requestApi();
       }
     },
-    [destroyController, requestApi],
+    [armLoadTimeout, destroyController, requestApi],
   );
 
   // Load the track (and fetch its oEmbed metadata) whenever the song changes.

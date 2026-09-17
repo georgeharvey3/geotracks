@@ -204,7 +204,7 @@ async function get<T>(url: string, token: string): Promise<T> {
 }
 
 /**
- * The album's track URLs, in order, cleaned. All 785 Folkways albums use bare
+ * The album's track URLs, in order, cleaned. All 784 Folkways albums use bare
  * `https://open.spotify.com/track/{id}` addresses, and the file must not develop
  * a second dialect: Spotify's own `external_urls` carry no `?si=`, but anything
  * that ever did is cut off here.

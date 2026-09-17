@@ -177,7 +177,7 @@ function pickRandomSong(albums: LibraryAlbum[]): {
 /**
  * The next Song of the day's seeded ten — Competition's draw, and the only one
  * that walks `dailySongIndex`. Past the end of the list the day has nothing left
- * to say, so it falls back to a random draw; with 785 Albums that is
+ * to say, so it falls back to a random draw; with 784 Albums that is
  * unreachable, but a pool too small to seed ten Songs from must still yield a
  * Song rather than nothing.
  */

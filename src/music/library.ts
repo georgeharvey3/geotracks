@@ -6,7 +6,7 @@ import { Album, LibraryAlbum } from "../types";
  * app: every Album catalogued by hand from the Smithsonian Folkways Archive.
  *
  * It stays a static asset for a reason that is about size and mutability rather
- * than trust — 785 albums and 12,111 track URLs, 0.91 MB raw and 245 KB gzipped
+ * than trust — 784 albums and 12,091 track URLs, 0.91 MB raw and 245 KB gzipped
  * behind a content hash the CDN caches indefinitely. Read from the database
  * instead, that is most of a megabyte fetched on every session, uncached and
  * metered. The half that changes is the small one (ADR-0007).

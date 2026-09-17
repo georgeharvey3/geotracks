@@ -67,6 +67,16 @@ const ExploreScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.songFinished]);
 
+  // A Song the embed loaded and would not start is skipped like one that
+  // ended: Explore has a queue, and the next Song is the answer it already has
+  // for a Song that is over. The link check keeps a verdict on the Song just
+  // skipped from skipping the next one too.
+  const { unplayableLink } = player;
+  useEffect(() => {
+    if (unplayableLink !== undefined && unplayableLink === song?.link) skip();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unplayableLink]);
+
   const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);

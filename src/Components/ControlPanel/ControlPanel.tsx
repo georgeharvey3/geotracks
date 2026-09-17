@@ -14,6 +14,8 @@ import { Guess, Song } from "../../types";
 interface ControlPanelProps {
   songReady: boolean;
   songLoadFailed: boolean;
+  albumUnplayable: boolean;
+  cutSwapped: boolean;
   onRetryLoad: () => void;
   songFinished: boolean;
   onPlayClicked: (e: React.MouseEvent<HTMLButtonElement>) => void;
@@ -47,12 +49,13 @@ const ControlPanel = (props: ControlPanelProps) => (
       <PlayerControls
         songReady={props.songReady}
         songLoadFailed={props.songLoadFailed}
+        albumUnplayable={props.albumUnplayable}
         songFinished={props.songFinished}
         songPlaying={props.songPlaying}
         onRetryLoad={props.onRetryLoad}
         onPlayClicked={props.onPlayClicked}
       />
-      {!props.songLoadFailed && (
+      {!props.songLoadFailed && !props.albumUnplayable && (
         <Typography
           variant="body2"
           sx={{ color: "text.secondary", textAlign: "left" }}
@@ -61,6 +64,19 @@ const ControlPanel = (props: ControlPanelProps) => (
         </Typography>
       )}
     </Stack>
+
+    {/* The round moved to another cut of its album because Spotify would not
+        play the first. Said quietly: the question is unchanged, and the player
+        did nothing wrong — but a Song that changes under a pressed play button
+        with no word about it reads as the app misbehaving. */}
+    {props.cutSwapped && !props.albumUnplayable && (
+      <Typography
+        variant="caption"
+        sx={{ display: "block", mt: 1, color: "text.secondary" }}
+      >
+        Spotify couldn't play that track, so here's another from the same album.
+      </Typography>
+    )}
 
     <Box sx={{ mt: 1.5 }}>
       <CountryInput

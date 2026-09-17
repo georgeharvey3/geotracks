@@ -255,6 +255,98 @@ describe("gameReducer", () => {
     });
   });
 
+  describe("a Song the embed will not play", () => {
+    // Three cuts of one Album, so the walk through it can wrap and run out.
+    const CUTS = [
+      "https://open.spotify.com/track/cut1",
+      "https://open.spotify.com/track/cut2",
+      "https://open.spotify.com/track/cut3",
+    ];
+    const ALBUM = { country: "France", album_name: "Test Album", tracks: CUTS };
+    const onCut = (link: string, overrides: Partial<GameState> = {}) =>
+      stateWith({
+        library: [ALBUM],
+        song: { ...FRANCE_SONG, link, trackTitle: "A title the cut had" },
+        ...overrides,
+      });
+
+    it("moves the round to the next cut of the same Album", () => {
+      const next = gameReducer(onCut(CUTS[0]!), {
+        type: "SONG_UNPLAYABLE",
+        link: CUTS[0]!,
+      });
+      expect(next.song.link).toBe(CUTS[1]);
+      // The question is unchanged: same Album, same country, same answer.
+      expect(next.song.country).toBe("France");
+      expect(next.song.album).toBe("Test Album");
+      // And a bare Song — the new cut fetches its own metadata.
+      expect(next.song.trackTitle).toBeUndefined();
+      expect(next.unplayableLinks).toEqual([CUTS[0]]);
+      expect(next.albumUnplayable).toBe(false);
+    });
+
+    it("wraps round the Album, skipping cuts already refused", () => {
+      const next = gameReducer(
+        onCut(CUTS[2]!, { unplayableLinks: [CUTS[0]!] }),
+        { type: "SONG_UNPLAYABLE", link: CUTS[2]! },
+      );
+      expect(next.song.link).toBe(CUTS[1]);
+    });
+
+    it("gives up on the Album once every cut has refused", () => {
+      const next = gameReducer(
+        onCut(CUTS[1]!, { unplayableLinks: [CUTS[0]!, CUTS[2]!] }),
+        { type: "SONG_UNPLAYABLE", link: CUTS[1]! },
+      );
+      expect(next.albumUnplayable).toBe(true);
+      // The Song stays: the guess still stands, and the map still takes it.
+      expect(next.song.link).toBe(CUTS[1]);
+    });
+
+    it("ignores a verdict on a Song that is no longer playing", () => {
+      const state = onCut(CUTS[1]!);
+      expect(
+        gameReducer(state, { type: "SONG_UNPLAYABLE", link: CUTS[0]! }),
+      ).toBe(state);
+    });
+
+    it("leaves the round's guesses and score untouched by the swap", () => {
+      const guesses = [{ country: "Spain", correct: false }];
+      const next = gameReducer(onCut(CUTS[0]!, { guesses, score: 300 }), {
+        type: "SONG_UNPLAYABLE",
+        link: CUTS[0]!,
+      });
+      expect(next.guesses).toBe(guesses);
+      expect(next.score).toBe(300);
+    });
+
+    it("starts the next round with a clean slate", () => {
+      const swapped = gameReducer(onCut(CUTS[0]!), {
+        type: "SONG_UNPLAYABLE",
+        link: CUTS[0]!,
+      });
+      const next = gameReducer(
+        { ...swapped, finished: true, gameMode: GAME_MODES.infinite },
+        { type: "NEXT_SONG" },
+      );
+      expect(next.unplayableLinks).toEqual([]);
+      expect(next.albumUnplayable).toBe(false);
+    });
+
+    it("reaches into the live half of the Library for a Community album's cuts", () => {
+      const community = { ...ALBUM, liveFrom: "2000-01-01" };
+      const loaded = gameReducer(
+        stateWith({ gameMode: GAME_MODES.infinite, library: [] }),
+        { type: "ALBUMS_LOADED", albums: [community], today: "2020-01-01" },
+      );
+      const next = gameReducer(
+        { ...loaded, song: { ...FRANCE_SONG, link: CUTS[0]! } },
+        { type: "SONG_UNPLAYABLE", link: CUTS[0]! },
+      );
+      expect(next.song.link).toBe(CUTS[1]);
+    });
+  });
+
   describe("Run summary", () => {
     // A Turn result is snapshotted when the turn is retired, so drive each turn
     // the way the game does: guess, then NEXT_SONG.

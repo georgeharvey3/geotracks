@@ -27,6 +27,8 @@ const createDefaultProps = (
     album: "Test Album",
   } as Song,
   embedRef: React.createRef<HTMLDivElement>(),
+  albumUnplayable: false,
+  cutSwapped: false,
   isCompetition: false,
   turnsRemaining: 10,
   score: 0,

@@ -24,6 +24,7 @@ interface Snapshot {
   songLoadFailed: boolean;
   metadata: SongMetadata;
   metadataLink: string | undefined;
+  unplayableLink: string | undefined;
 }
 
 const INITIAL: Snapshot = {
@@ -33,6 +34,7 @@ const INITIAL: Snapshot = {
   songLoadFailed: false,
   metadata: {},
   metadataLink: undefined,
+  unplayableLink: undefined,
 };
 
 // The Song the fake is currently loaded with. Metadata a test emits is filed
@@ -101,6 +103,15 @@ export const spotifyPlayerControl = {
     emit({ songReady: false, songPlaying: false, songLoadFailed: true }),
   setMetadata: (metadata: SongMetadata) =>
     emit({ metadata, metadataLink: loadedLink }),
+  /**
+   * The embed loaded the Song and then would not start it — what the real hook
+   * reports when a play request goes unanswered. Filed against the loaded Song,
+   * as the real one is.
+   */
+  emitUnplayable: () =>
+    // The swap that follows loads a new cut, and the real hook drops to
+    // Loading for it: `emitReady` afterwards is the new cut coming up.
+    emit({ songPlaying: false, songReady: false, unplayableLink: loadedLink }),
   onPlayClicked,
   togglePlay,
   onRetryLoad,
@@ -131,6 +142,10 @@ export default function useSpotifyPlayerFake(
     songLoadFailed: snap.songLoadFailed,
     metadata: snap.metadata,
     metadataLink: snap.metadataLink,
+    // A verdict belongs to the Song it was reached on: a swap clears it, as the
+    // real hook's next load does.
+    unplayableLink:
+      snap.unplayableLink === song?.link ? snap.unplayableLink : undefined,
     onPlayClicked,
     togglePlay,
     onRetryLoad,

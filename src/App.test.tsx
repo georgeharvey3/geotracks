@@ -6,6 +6,7 @@ import App from "./App";
 import { spotifyPlayerControl } from "./test/spotifyPlayerFake";
 import { leaderboardControl } from "./test/leaderboardFake";
 import { suggestionControl } from "./test/suggestionFake";
+import { bundledAlbums } from "./music/library";
 import {
   answerAt,
   currentAnswer,
@@ -39,6 +40,10 @@ vi.mock("react-simple-maps", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-simple-maps")>()),
   ZoomableGroup: (await import("./test/zoomableGroupFake")).default,
 }));
+
+// The album a track link belongs to; every link is held by exactly one.
+const albumHolding = (link: string) =>
+  bundledAlbums.find((album) => album.tracks.includes(link))!.album_name;
 
 // The Run summary, the Daily Run and the Library read live in `Run.test.tsx`:
 // one file may not run for 60 seconds (see `src/test/appHarness.tsx`).
@@ -156,6 +161,31 @@ describe("App integration", () => {
       fireEvent.keyPress(document, { key: " ", charCode: 32 });
       expect(spotifyPlayerControl.onPlayClicked).toHaveBeenCalled();
       expect(screen.getByTestId("PauseIcon")).toBeInTheDocument();
+    });
+
+    it("moves to another cut of the same album when Spotify will not play the one it drew", async () => {
+      render(<App />);
+      await startCompetition();
+      act(() => spotifyPlayerControl.emitReady());
+      const refused = spotifyPlayerControl.loadedLink()!;
+      const album = albumHolding(refused);
+
+      await userEvent.click(playButton());
+      act(() => spotifyPlayerControl.emitUnplayable());
+
+      // A different cut of the very same album: the answer has not moved.
+      const swapped = spotifyPlayerControl.loadedLink()!;
+      expect(swapped).not.toBe(refused);
+      expect(albumHolding(swapped)).toBe(album);
+      expect(currentAnswer()).toBe(answerAt(0));
+      expect(
+        screen.getByText(/Spotify couldn't play that track/i),
+      ).toBeInTheDocument();
+
+      // The player pressed play already: the new cut starts by itself.
+      spotifyPlayerControl.togglePlay.mockClear();
+      act(() => spotifyPlayerControl.emitReady());
+      expect(spotifyPlayerControl.togglePlay).toHaveBeenCalledTimes(1);
     });
 
     it("shows a retry fallback on load failure and recovers", async () => {

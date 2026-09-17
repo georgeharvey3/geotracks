@@ -56,4 +56,9 @@ interface SpotifyIFrameAPI {
 
 interface Window {
   onSpotifyIframeApiReady?: (IFrameAPI: SpotifyIFrameAPI) => void;
+  /**
+   * Where `index.html` leaves the API when the script beats the app's bundle to
+   * the handshake. Read once, by `src/spotify/iframeApi.ts`.
+   */
+  spotifyIFrameApi?: SpotifyIFrameAPI;
 }

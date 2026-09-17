@@ -18,6 +18,15 @@ export interface SpotifyPlayer {
    * Song when a fetch resolves after the Song has moved on.
    */
   metadataLink: string | undefined;
+  /**
+   * The link of a Song the embed loaded and then would not start — asked to
+   * play, it reported nothing at all. Spotify's embed plays a track's preview
+   * for a listener who is not signed in, and a track with none (region, or
+   * simply no preview cut) loads to a working-looking player whose play button
+   * does nothing. The embed has no event for it, so the silence is the signal:
+   * see `PLAY_TIMEOUT_MS`. Undefined otherwise, and cleared by the next load.
+   */
+  unplayableLink: string | undefined;
   // Play/pause with replay handling when the clip has finished.
   onPlayClicked: () => void;
   // Raw play/pause toggle (used for desktop auto-play on a new question).
@@ -27,6 +36,14 @@ export interface SpotifyPlayer {
 
 const MAX_AUTO_RETRIES = 3;
 const LOAD_TIMEOUT_MS = 10000;
+/**
+ * How long a play request may go unanswered before the Song is called
+ * unplayable. A playable track reports playback (buffering counts) well inside
+ * a second; the margin is for a slow phone on a slow link, and the cost of
+ * getting it wrong is small either way — the caller swaps in another cut of the
+ * same album, which is a different track and not a lost turn.
+ */
+const PLAY_TIMEOUT_MS = 3000;
 
 // One frozen empty object, so "nothing fetched yet" keeps a stable identity for
 // consumers that depend on `metadata`.
@@ -66,6 +83,9 @@ export default function useSpotifyPlayer(
   const [songPlaying, setSongPlaying] = useState(false);
   const [songFinished, setSongFinished] = useState(false);
   const [songLoadFailed, setSongLoadFailed] = useState(false);
+  const [unplayableLink, setUnplayableLink] = useState<string | undefined>(
+    undefined,
+  );
   // Metadata and the link it describes are one value, so they can never be read
   // apart from each other.
   const [fetchedMetadata, setFetchedMetadata] = useState<{
@@ -90,6 +110,10 @@ export default function useSpotifyPlayer(
   const songLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
   const replayPendingRef = useRef(false);
+  /** The play request in flight: nothing has answered it yet. */
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The link the embed currently holds, for the listeners wired once. */
+  const currentLinkRef = useRef<string | undefined>(undefined);
 
   // The controller's listeners are wired once, so anything they need to read
   // later travels by ref.
@@ -109,6 +133,29 @@ export default function useSpotifyPlayer(
       embedElementRef.current.innerHTML = "";
     }
   }, []);
+
+  const clearPlayWatch = useCallback(() => {
+    if (playTimerRef.current) {
+      clearTimeout(playTimerRef.current);
+      playTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Start the clock on a request to *play*. Every ask goes through here — the
+   * button, the keyboard, the replay after a finished Clip — and the first
+   * playback report of any kind stops it. Fire, and the Song is reported as
+   * one the embed would not start.
+   */
+  const armPlayWatch = useCallback(() => {
+    clearPlayWatch();
+    const link = currentLinkRef.current;
+    if (!link) return;
+    playTimerRef.current = setTimeout(() => {
+      playTimerRef.current = null;
+      setUnplayableLink(link);
+    }, PLAY_TIMEOUT_MS);
+  }, [clearPlayWatch]);
 
   /**
    * Start the clock on a load that has actually been issued.
@@ -171,12 +218,18 @@ export default function useSpotifyPlayer(
             setSongFinished(false);
             if (replayPendingRef.current) {
               replayPendingRef.current = false;
+              armPlayWatch();
               controller.togglePlay();
             }
           });
           controller.addListener("playback_update", (e) => {
-            const { isPaused, position, duration } = e.data;
+            const { isPaused, isBuffering, position, duration } = e.data;
             const clipDuration = clipDurationRef.current;
+
+            // The embed took the play request: it is playing, or fetching in
+            // order to. A report of "still paused" is what an unplayable track
+            // sends too, if it sends anything, so only life counts.
+            if (!isPaused || isBuffering) clearPlayWatch();
 
             // Capped: the Clip ends where the cap says, and we stop it ourselves.
             const isClipFinished =
@@ -219,7 +272,7 @@ export default function useSpotifyPlayer(
         },
       );
     },
-    [armLoadTimeout],
+    [armLoadTimeout, armPlayWatch, clearPlayWatch],
   );
 
   // Callback ref: init as soon as the embed element mounts (handles the Game
@@ -297,6 +350,9 @@ export default function useSpotifyPlayer(
   useEffect(() => {
     if (!songLink) return;
 
+    currentLinkRef.current = songLink;
+    clearPlayWatch();
+    setUnplayableLink(undefined);
     retryCountRef.current = 0;
     setSongFinished(false);
     setFetchedMetadata(null);
@@ -341,14 +397,18 @@ export default function useSpotifyPlayer(
       cancelled = true;
       if (songLoadTimerRef.current) clearTimeout(songLoadTimerRef.current);
     };
-  }, [songLink, attemptLoad]);
+  }, [songLink, attemptLoad, clearPlayWatch]);
 
   const togglePlay = useCallback(() => {
     // Remember a pause we asked for, so the next report of one isn't mistaken
     // for playback stopping by itself.
-    if (playingRef.current) selfPausedRef.current = true;
+    if (playingRef.current) {
+      selfPausedRef.current = true;
+    } else {
+      armPlayWatch();
+    }
     controllerRef.current?.togglePlay();
-  }, []);
+  }, [armPlayWatch]);
 
   const onPlayClicked = useCallback(() => {
     // Restart from the top when the clip has already finished.
@@ -374,6 +434,7 @@ export default function useSpotifyPlayer(
   useEffect(() => {
     return () => {
       destroyController();
+      clearPlayWatch();
       unsubscribeApiRef.current?.();
       unsubscribeApiRef.current = null;
       if (songLoadTimerRef.current) {
@@ -381,7 +442,7 @@ export default function useSpotifyPlayer(
         songLoadTimerRef.current = null;
       }
     };
-  }, [destroyController]);
+  }, [destroyController, clearPlayWatch]);
 
   return {
     embedRef,
@@ -391,6 +452,7 @@ export default function useSpotifyPlayer(
     songLoadFailed,
     metadata: fetchedMetadata?.metadata ?? NO_METADATA,
     metadataLink: fetchedMetadata?.link,
+    unplayableLink,
     onPlayClicked,
     togglePlay,
     onRetryLoad,

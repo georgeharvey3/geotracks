@@ -16,6 +16,12 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 interface PlayerControlsProps {
   songReady: boolean;
   songLoadFailed: boolean;
+  /**
+   * Spotify would not play any cut of this round's Album. Unlike a load
+   * failure there is nothing to retry — the guess itself still stands, and the
+   * map still takes it.
+   */
+  albumUnplayable?: boolean;
   songFinished: boolean;
   songPlaying: boolean;
   onRetryLoad: () => void;
@@ -34,6 +40,26 @@ const PlayerControls = (props: PlayerControlsProps) => {
     } else {
       buttonIcon = <PlayArrowIcon sx={{ fontSize: 28 }} />;
     }
+  }
+
+  if (props.albumUnplayable) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexWrap: "wrap",
+          gap: 1,
+          width: "100%",
+        }}
+      >
+        <ErrorOutlineIcon sx={{ fontSize: 24, color: "error.main" }} />
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Spotify can't play this album here — guess from the map, or move on
+        </Typography>
+      </Box>
+    );
   }
 
   if (props.songLoadFailed) {

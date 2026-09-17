@@ -90,6 +90,7 @@ function deferredIFrameApi() {
 // The hook's own load watchdog and retry budget, which these tests outlast.
 const LOAD_TIMEOUT_MS = 10000;
 const MAX_AUTO_RETRIES = 3;
+const PLAY_TIMEOUT_MS = 3000;
 
 const SONG: Song = {
   country: "Mali",
@@ -280,5 +281,77 @@ describe("useSpotifyPlayer", () => {
     expect(superseded.controller.destroy).toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+
+  // Spotify's embed plays a listener who is not signed in the track's preview,
+  // and a track with none loads to a play button that does nothing: no event,
+  // no report, nothing. The silence is the only signal there is.
+  describe("a Song the embed loads and will not start", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("is reported once a play request goes unanswered", async () => {
+      const { result, spotify } = await renderPlayer(SONG);
+      act(() => spotify.emitReady());
+      expect(result.current.unplayableLink).toBeUndefined();
+
+      act(() => result.current.onPlayClicked());
+      act(() => vi.advanceTimersByTime(PLAY_TIMEOUT_MS));
+
+      expect(result.current.unplayableLink).toBe(SONG.link);
+    });
+
+    it("is not reported when the embed answers, even only to buffer", async () => {
+      const { result, spotify } = await renderPlayer(SONG);
+      act(() => spotify.emitReady());
+
+      act(() => result.current.onPlayClicked());
+      act(() => spotify.emitPlayback({ isPaused: true, isBuffering: true }));
+      act(() => vi.advanceTimersByTime(PLAY_TIMEOUT_MS));
+
+      expect(result.current.unplayableLink).toBeUndefined();
+    });
+
+    it("is not confused by the embed's idle report", async () => {
+      const { result, spotify } = await renderPlayer(SONG);
+      act(() => spotify.emitReady());
+
+      act(() => result.current.onPlayClicked());
+      // What an unplayable track sends, if it sends anything at all.
+      act(() => spotify.emitPlayback({ isPaused: true, position: 0 }));
+      act(() => vi.advanceTimersByTime(PLAY_TIMEOUT_MS));
+
+      expect(result.current.unplayableLink).toBe(SONG.link);
+    });
+
+    it("is cleared by the next Song, which is judged on its own", async () => {
+      const { result, rerender, spotify } = await renderPlayer(SONG);
+      act(() => spotify.emitReady());
+      act(() => result.current.onPlayClicked());
+      act(() => vi.advanceTimersByTime(PLAY_TIMEOUT_MS));
+      expect(result.current.unplayableLink).toBe(SONG.link);
+
+      rerender({
+        song: { ...SONG, link: "https://open.spotify.com/track/def456" },
+      });
+      expect(result.current.unplayableLink).toBeUndefined();
+      await settle();
+    });
+
+    it("is not reported for a pause", async () => {
+      const { result, spotify } = await renderPlayer(SONG);
+      act(() => spotify.emitReady());
+      act(() => result.current.onPlayClicked());
+      act(() => spotify.emitPlayback({ position: 2000 }));
+      expect(result.current.songPlaying).toBe(true);
+
+      // A pause is not a play request; nothing is being waited for.
+      act(() => result.current.onPlayClicked());
+      act(() => vi.advanceTimersByTime(PLAY_TIMEOUT_MS));
+
+      expect(result.current.unplayableLink).toBeUndefined();
+    });
   });
 });

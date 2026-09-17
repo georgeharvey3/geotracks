@@ -63,6 +63,12 @@ export interface GameState {
   gameMode: string;
   /** The pool the next Song is drawn from, shrinking by one per round. */
   albums: LibraryAlbum[];
+  /**
+   * The whole Library, never drawn down: what a round reaches back into for
+   * another cut of its Album when the embed will not play the one it was
+   * handed. The pool above has already let that Album go by then.
+   */
+  library: LibraryAlbum[];
   dailySongs: Song[];
   dailySongIndex: number;
   song: Song;
@@ -78,6 +84,16 @@ export interface GameState {
   score: number;
   /** Points this round has earned so far: 0 until the answer is named. */
   roundPoints: number;
+  /**
+   * The cuts of this round's Album that the embed loaded and would not start.
+   * Spotify plays a listener who is not signed in a track's *preview*, and a
+   * track with none loads to a play button that does nothing — so the round
+   * moves to another cut of the same Album, whose country is the same answer.
+   * Kept so the walk through the Album never revisits one.
+   */
+  unplayableLinks: string[];
+  /** Every cut of the round's Album has refused. There is nothing left to try. */
+  albumUnplayable: boolean;
   /**
    * The Run so far, one entry per retired turn — Competition only, since
    * Infinite has no end to summarise. Cleared when the Run is left behind.
@@ -122,7 +138,10 @@ export type GameAction =
   | { type: "RESET_TO_MENU" }
   | { type: "SET_NAME"; value: string }
   | { type: "SCORE_SUBMITTED" }
-  | { type: "SET_SONG_METADATA"; link: string; metadata: SongMetadata };
+  | { type: "SET_SONG_METADATA"; link: string; metadata: SongMetadata }
+  // The embed loaded this Song and would not start it. Carries the link, as
+  // SET_SONG_METADATA does, so a verdict that outlived its Song is dropped.
+  | { type: "SONG_UNPLAYABLE"; link: string };
 
 /**
  * A Song drawn at random from the album pool, with its Album removed so a
@@ -204,6 +223,7 @@ export function createInitialState(
     screen: "menu",
     gameMode: "",
     albums: picked.albums,
+    library: albums,
     dailySongs,
     dailySongIndex: 0,
     song: picked.song,
@@ -218,6 +238,8 @@ export function createInitialState(
     turnIndex: 0,
     score: 0,
     roundPoints: 0,
+    unplayableLinks: [],
+    albumUnplayable: false,
     turns: [],
     nameInputValue: "",
     scoreSubmitted: false,
@@ -233,6 +255,8 @@ const roundReset = {
   correct: false,
   errorMessage: "",
   roundPoints: 0,
+  unplayableLinks: [] as string[],
+  albumUnplayable: false,
 };
 
 // Fields reset when a Run begins or is left behind: everything a Run
@@ -304,6 +328,10 @@ function resumedRun(state: GameState, record: DailyRunRecord): GameState {
     finished: round.finished,
     correct: round.correct,
     roundPoints: round.roundPoints,
+    // Not part of the record: a reload hands back the day's own cut, and if
+    // the embed still refuses it the swap simply happens again.
+    unplayableLinks: [],
+    albumUnplayable: false,
     geoHintsEnabled: round.geoHintsEnabled,
     // Only the scoring flag is stored, because only it is owed to the Run. The
     // switch comes back on with it: the round has already been charged for the
@@ -387,6 +415,33 @@ function turnResultFrom(state: GameState): TurnResult {
   };
 }
 
+/**
+ * The next cut of the round's Album after `failed`, skipping every link in
+ * `tried`, or undefined when none is left. The Album is looked up by name and
+ * country in the whole Library rather than the pool, which let it go when the
+ * round drew it.
+ */
+function anotherCut(
+  state: GameState,
+  failed: string,
+  tried: string[],
+): string | undefined {
+  const album = state.library.find(
+    (candidate) =>
+      candidate.album_name === state.song.album &&
+      candidate.country === state.song.country,
+  );
+  if (!album) return undefined;
+
+  const { tracks } = album;
+  const from = tracks.indexOf(failed);
+  for (let step = 1; step <= tracks.length; step++) {
+    const link = tracks[(from + step) % tracks.length];
+    if (link !== undefined && !tried.includes(link)) return link;
+  }
+  return undefined;
+}
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "SET_MODE":
@@ -427,6 +482,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         albums: [...state.albums, ...fresh],
+        library: libraryWith(action.albums),
         dailySongs: getDailySongs(
           competitionAlbums(libraryWith(action.albums), action.today),
         ),
@@ -597,6 +653,32 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "SCORE_SUBMITTED":
       return { ...state, scoreSubmitted: true };
+
+    // The embed loaded the Song and then would not start it. The round is not
+    // lost and the answer does not change: the Song is one cut of an Album, and
+    // the Album's country is what the player is guessing, so any other cut of
+    // it is the same question. Walk forward from the one that refused, wrapping,
+    // to the first not yet tried; run out, and the Album itself is the problem.
+    case "SONG_UNPLAYABLE": {
+      if (action.link !== state.song.link) return state;
+      if (state.unplayableLinks.includes(action.link)) return state;
+
+      const unplayableLinks = [...state.unplayableLinks, action.link];
+      const next = anotherCut(state, action.link, unplayableLinks);
+
+      return next === undefined
+        ? { ...state, unplayableLinks, albumUnplayable: true }
+        : {
+            ...state,
+            unplayableLinks,
+            // A bare Song: the new cut fetches its own title and artwork.
+            song: {
+              country: state.song.country,
+              album: state.song.album,
+              link: next,
+            },
+          };
+    }
 
     case "SET_SONG_METADATA":
       // Keyed by the link it was fetched for, so a late-resolving fetch cannot

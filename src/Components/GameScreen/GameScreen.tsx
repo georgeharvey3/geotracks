@@ -22,6 +22,10 @@ const GameScreen = () => {
     clipDurationMs: CLIP_DURATION_MS,
   });
   const wasReadyRef = useRef(false);
+  // A cut swapped in for one the embed refused should start by itself: the
+  // player already pressed play, and what they pressed it for has changed
+  // underneath them through no fault of theirs.
+  const swapPendingRef = useRef(false);
 
   useKeyboardShortcuts({
     inputRef: countryInputRef,
@@ -35,11 +39,24 @@ const GameScreen = () => {
   useEffect(() => {
     const becameReady = !wasReadyRef.current && player.songReady;
     wasReadyRef.current = player.songReady;
-    if (becameReady && state.questionIndex > 0 && window.innerWidth >= 1024) {
+    if (!becameReady) return;
+    const swapped = swapPendingRef.current;
+    swapPendingRef.current = false;
+    if (swapped || (state.questionIndex > 0 && window.innerWidth >= 1024)) {
       player.togglePlay();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player.songReady, state.questionIndex]);
+
+  // The embed loaded the Song and would not start it. The reducer moves the
+  // round to another cut of the same Album — same country, same answer — and
+  // the load that follows is the one the effect above starts unasked.
+  const { unplayableLink } = player;
+  useEffect(() => {
+    if (unplayableLink === undefined) return;
+    swapPendingRef.current = true;
+    dispatch({ type: "SONG_UNPLAYABLE", link: unplayableLink });
+  }, [unplayableLink, dispatch]);
 
   const onFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,6 +84,8 @@ const GameScreen = () => {
     <Game
       songReady={player.songReady}
       songLoadFailed={player.songLoadFailed}
+      albumUnplayable={state.albumUnplayable}
+      cutSwapped={state.unplayableLinks.length > 0}
       onRetryLoad={player.onRetryLoad}
       songFinished={player.songFinished}
       onPlayClicked={player.onPlayClicked}

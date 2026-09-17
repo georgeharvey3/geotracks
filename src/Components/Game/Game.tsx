@@ -9,6 +9,10 @@ import { Guess, Song } from "../../types";
 interface GameProps {
   songReady: boolean;
   songLoadFailed: boolean;
+  /** Every cut of this round's Album refused to play: nothing left to swap in. */
+  albumUnplayable: boolean;
+  /** The Song playing is not the one the round opened on; a cut was swapped. */
+  cutSwapped: boolean;
   onRetryLoad: () => void;
   songFinished: boolean;
   onPlayClicked: (e: React.MouseEvent<HTMLButtonElement>) => void;
@@ -75,6 +79,8 @@ const Game = (props: GameProps) => {
       <ControlPanel
         songReady={props.songReady}
         songLoadFailed={props.songLoadFailed}
+        albumUnplayable={props.albumUnplayable}
+        cutSwapped={props.cutSwapped}
         onRetryLoad={props.onRetryLoad}
         songFinished={props.songFinished}
         onPlayClicked={props.onPlayClicked}

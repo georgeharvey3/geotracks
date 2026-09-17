@@ -42,7 +42,7 @@ export function nextDay(date: Date): string {
  * A track URL as the Library stores them: `https://open.spotify.com/track/{id}`
  * and nothing after it.
  *
- * All 785 Folkways albums use that bare form, and the Library must not develop a
+ * All 784 Folkways albums use that bare form, and the Library must not develop a
  * second dialect — duplicate detection below is by exact string, so one album
  * carrying `?si=` tokens would be invisible to the check that stops it being
  * added twice. Spotify's own `external_urls` carry no query today; anything that
